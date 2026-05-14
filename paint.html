@@ -1,0 +1,1745 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>蜜乐涂料 (Miller Paint) - 智能库存补货系统</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 React 核心库 -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- 引入 Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-50 overflow-hidden">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useRef } = React;
+
+        // --- 图标组件集合 ---
+        const IconSettings = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>;
+        const IconUpload = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>;
+        const IconDownload = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>;
+        const IconSearch = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>;
+        const IconAlertCircle = ({ size = 24, className = "", title }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><title>{title}</title><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>;
+        const IconFileSpreadsheet = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M8 13h2"></path><path d="M8 17h2"></path><path d="M14 13h2"></path><path d="M14 17h2"></path></svg>;
+        const IconPackage = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"></line><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>;
+        const IconDollarSign = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>;
+        const IconBarChart3 = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 3v18h18"></path><rect width="4" height="7" x="7" y="10" rx="1"></rect><rect width="4" height="12" x="15" y="5" rx="1"></rect></svg>;
+        const IconCalculator = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="16" height="20" x="4" y="2" rx="2"></rect><line x1="8" x2="16" y1="6" y2="6"></line><line x1="16" x2="16" y1="14" y2="18"></line></svg>;
+        const IconChevronUp = ({ size = 14, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="18 15 12 9 6 15"></polyline></svg>;
+        const IconChevronDown = ({ size = 14, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="6 9 12 15 18 9"></polyline></svg>;
+        const IconChevronsUpDown = ({ size = 14, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="7 15 12 20 17 15"></polyline><polyline points="7 9 12 4 17 9"></polyline></svg>;
+        const IconTag = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>;
+        const IconInfo = ({ size = 14, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>;
+        const IconHelpCircle = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>;
+        const IconLayoutDashboard = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>;
+        const IconTable = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="3" x2="21" y1="9" y2="9"/><line x1="3" x2="21" y1="15" y2="15"/><line x1="9" x2="9" y1="9" y2="21"/><line x1="15" x2="15" y1="9" y2="21"/></svg>;
+        const IconAlertTriangle = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>;
+        const IconTrendingUp = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>;
+        const IconArrowDown = ({ size = 12, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>;
+        const IconPanelLeft = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><path d="M9 3v18"/></svg>;
+        const IconCheckCircle = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>;
+        const IconLayers = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>;
+
+        const App = () => {
+          const initialSettings = {
+            // 美国涂料海运周期较长
+            leadTime: 45, 
+            safetyDays: 15,
+            
+            // 箱规与货柜配置
+            skuMultiplier: 4,      // 单型号订货必须为4的倍数
+            containerSize: 2520,   // 整柜起定量，总补货量将凑满整柜
+            
+            // 差异化补货频率
+            orderDaysA: 60,        // A类高周转，备2个月即可
+            orderDaysB: 120,       // B类低周转，备4个月降低发单频次
+            orderDaysC: 180,       // C类极低频长尾，一次性备货半年
+
+            demandCalcMethod: 'simple', 
+            weight30d: 40,
+            weight90d: 30,
+            weightOlder: 30,
+            
+            minOrderFreq: 5, 
+
+            coreMetric: 'qty', // 统一控制看板分析视角与 ABC 分类基准
+
+            abcThresholdA: 70, // A类商品贡献70%占比
+            abcThresholdB: 95, // B类商品贡献25%占比，C类5%
+
+            basePeriod: 180,       
+            endDate: new Date().toISOString().split('T')[0],
+
+            overstockWarningDays: 270, // 半年预警
+            deadStockDays: 720         // 一年死库
+          };
+          
+          const [draftSettings, setDraftSettings] = useState(initialSettings);
+          const [appliedSettings, setAppliedSettings] = useState(initialSettings);
+
+          const [rawData, setRawData] = useState([]);
+          const [searchTerm, setSearchTerm] = useState('');
+          const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+          const [uploadError, setUploadError] = useState(''); 
+          
+          const [sortConfig, setSortConfig] = useState({ key: 'd', direction: 'desc' }); // 默认排序改为日均销量
+          
+          const [showUserGuide, setShowUserGuide] = useState(false); // 新增新手指南状态
+          const [showGuide, setShowGuide] = useState(false); 
+          const [showAbcGuide, setShowAbcGuide] = useState(false);
+          const [showAlgoSettings, setShowAlgoSettings] = useState(true); 
+
+          const [parsedHeadersInfo, setParsedHeadersInfo] = useState(null);
+          const [viewMode, setViewMode] = useState('table');
+          const [clearanceView, setClearanceView] = useState('spec'); // 新增：积压视图状态
+          const fileInputRef = useRef(null);
+          const priceFileInputRef = useRef(null);
+          const onOrderFileInputRef = useRef(null); // 新增在途数据引用
+
+          const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+          const showToastMessage = (message, type = 'success') => {
+              setToast({ show: true, message, type });
+              setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3500); 
+          };
+
+          const handleSettingChange = (e) => {
+            const { name, value } = e.target;
+            setDraftSettings(prev => ({ 
+                ...prev, 
+                [name]: (name === 'endDate' || name === 'demandCalcMethod' || name === 'coreMetric') ? value : Number(value) 
+            }));
+          };
+
+          const handleApplySettings = () => {
+            let msg = "参数已保存，数据已按「目标水位填补模型」重新计算！";
+            let msgType = "success";
+
+            if (draftSettings.demandCalcMethod === 'weighted') {
+                const totalW = draftSettings.weight30d + draftSettings.weight90d + draftSettings.weightOlder;
+                if (totalW !== 100) {
+                    msg = "加权平均的权重总和不是100%，系统已自动修正并在后台重新计算！";
+                    msgType = "warning";
+                } else if (rawData.length > 0 && !rawData[0].hasSales30d) {
+                    msg = "已切换至加权模式，但由于数据源无[近30天销量]等列，系统自动降级为单列全权重计算。";
+                    msgType = "warning";
+                } else {
+                    msg = "参数已保存，动态加权预测模型已重新计算完毕！";
+                }
+            }
+
+            setAppliedSettings(draftSettings);
+            showToastMessage(msg, msgType);
+          };
+
+          const cleanNumber = (val) => {
+             if (!val) return 0;
+             const cleaned = String(val).replace(/,/g, '').replace(/"/g, '').trim();
+             return parseFloat(cleaned) || 0;
+          };
+
+          const parseDateString = (dateStr) => {
+              if (!dateStr || dateStr === '-') return NaN;
+              let s = String(dateStr).replace(/年/g, '-').replace(/月/g, '-').replace(/日/g, '').replace(/\//g, '-').trim();
+              s = s.replace(/-$/, ''); 
+              if (s.split('-').length === 2) s += '-01'; 
+              return new Date(s).getTime();
+          };
+
+          const parseCSV = (text) => {
+            if (text.charCodeAt(0) === 0xFEFF) {
+                text = text.substring(1);
+            }
+
+            const lines = text.split(/\r\n|\n|\r/).filter(line => line.trim() !== '');
+            if (lines.length === 0) return { data: [], headersFound: false, matchedColumns: null };
+            
+            let commas = 0, tabs = 0;
+            const firstLineForCheck = lines[0] || '';
+            commas = (firstLineForCheck.match(/,/g) || []).length;
+            tabs = (firstLineForCheck.match(/\t/g) || []).length;
+            const delimiter = tabs > commas ? '\t' : ',';
+            
+            const splitCSVRow = (str) => {
+                const result = [];
+                let current = '';
+                let inQuotes = false;
+                for (let i = 0; i < str.length; i++) {
+                    if (str[i] === '"') { inQuotes = !inQuotes; } 
+                    else if (str[i] === delimiter && !inQuotes) { result.push(current.trim()); current = ''; } 
+                    else { current += str[i]; }
+                }
+                result.push(current.trim());
+                return result;
+            };
+
+            const getColumnIndex = (hdrs, exactArr, includeArr, usedSet) => {
+                const clean = s => String(s).replace(/[\s\-_\(\)（）\uFEFF]/g, '').toLowerCase(); 
+                for (let match of exactArr) {
+                    const cMatch = clean(match);
+                    const idx = hdrs.findIndex((h, i) => !usedSet.has(i) && clean(h) === cMatch);
+                    if (idx !== -1) { usedSet.add(idx); return idx; }
+                }
+                for (let match of includeArr) {
+                    const cMatch = clean(match);
+                    const idx = hdrs.findIndex((h, i) => !usedSet.has(i) && clean(h).includes(cMatch));
+                    if (idx !== -1) { usedSet.add(idx); return idx; }
+                }
+                return -1;
+            };
+
+            const headers = splitCSVRow(lines[0]).map(h => h.replace(/["\r]/g, ''));
+            const usedCols = new Set();
+            
+            // 强化主表物料号的精准与模糊匹配
+            const colItemCode = getColumnIndex(headers, ['涂料编号', '涂料编码', '产品编号', '产品编码', '型号', '编号', '代码', 'SKU', '物料号', '商品编码'], ['编号', '编码', '型号', '代码', 'sku', '品号', '条码'], usedCols);
+            const colItemName = getColumnIndex(headers, ['涂料名称', '产品名称', '品名', '名称'], ['名称', '品名'], usedCols);
+            const colSpec = getColumnIndex(headers, ['规格', '容量', '包装'], ['规格', '容量', '包装'], usedCols);
+
+            const colStock = getColumnIndex(headers, ['公司库存', '总库存', '库存', '当前库存', '结存'], ['库存', '结存', '实物'], usedCols);
+            const colOnOrder = getColumnIndex(headers, ['采购在途', '在途库存', '在途', '已订购'], ['在途', '未交', '未到', '待收', '待入库', '已订'], usedCols);
+
+            const colSales = getColumnIndex(headers, ['销量', '销售量', '总销量', '出库数量', '数量'], ['销量', '出库', '销售数'], usedCols);
+            const colSales30d = getColumnIndex(headers, ['近30天销量', '30天销量', '月销量'], ['30天', '月销'], usedCols);
+            const colSales90d = getColumnIndex(headers, ['近90天销量', '90天销量', '季销量'], ['90天', '季销'], usedCols);
+            const colRevenue = getColumnIndex(headers, ['金额', '销售额', '销售金额', '营业额'], ['金额', '销售额'], usedCols);
+            
+            const colLaunchDate = getColumnIndex(headers, ['上市时间', '建档日期', '创建时间'], ['上市', '建档', '创建'], usedCols);
+            const colOrderFreq = getColumnIndex(headers, ['订货频次', '订单数', '频次', '笔数'], ['频次', '笔数', '单数'], usedCols);
+
+            const headersFound = colItemCode !== -1 || colItemName !== -1 || colSales !== -1 || colStock !== -1;
+
+            if (!headersFound) return { data: [], headersFound: false, matchedColumns: null };
+
+            const parsedData = [];
+            for (let i = 1; i < lines.length; i++) {
+              const values = splitCSVRow(lines[i]);
+              if (values.length > 0) {
+                const stockVal = colStock !== -1 ? cleanNumber(values[colStock]) : 0;
+                const onOrderVal = colOnOrder !== -1 ? cleanNumber(values[colOnOrder]) : 0;
+
+                const sales = colSales !== -1 ? cleanNumber(values[colSales]) : 0;
+                const sales30 = colSales30d !== -1 && values[colSales30d] ? cleanNumber(values[colSales30d]) : null;
+                const sales90 = colSales90d !== -1 && values[colSales90d] ? cleanNumber(values[colSales90d]) : null;
+
+                const revenue = colRevenue !== -1 ? cleanNumber(values[colRevenue]) : 0;
+                const orderFreqVal = colOrderFreq !== -1 && values[colOrderFreq] ? cleanNumber(values[colOrderFreq]) : null;
+
+                const rawCode = colItemCode !== -1 && values[colItemCode] ? String(values[colItemCode]).replace(/"/g, '') : '';
+                const rawName = colItemName !== -1 && values[colItemName] ? String(values[colItemName]).replace(/"/g, '') : '';
+                
+                if (!rawCode && !rawName && sales === 0 && revenue === 0 && stockVal === 0) continue;
+
+                parsedData.push({
+                  itemCode: rawCode || '-',
+                  itemName: rawName || `未命名产品-${i}`,
+                  spec: (colSpec !== -1 && values[colSpec]) ? String(values[colSpec]).replace(/"/g, '') : '-',
+                  
+                  sales: sales,
+                  sales30d: sales30,
+                  hasSales30d: sales30 !== null,
+                  sales90d: sales90,
+                  hasSales90d: sales90 !== null,
+                  revenue: revenue,
+                  launchDate: (colLaunchDate !== -1 && values[colLaunchDate]) ? String(values[colLaunchDate]).replace(/"/g, '') : '-',
+                  
+                  currentStock: stockVal,
+                  onOrderStock: onOrderVal,
+                  availableStock: stockVal + onOrderVal,
+
+                  orderFreqConfig: orderFreqVal,
+                  hasOrderFreq: colOrderFreq !== -1 && orderFreqVal !== null
+                });
+              }
+            }
+            
+            const matchedColumns = {
+                itemCode: colItemCode !== -1 ? headers[colItemCode] : null,
+                stock: colStock !== -1 ? headers[colStock] : null,
+                sales: colSales !== -1 ? headers[colSales] : null,
+                sales30d: colSales30d !== -1 ? headers[colSales30d] : null,
+            };
+
+            return { data: parsedData, headersFound: true, matchedColumns };
+          };
+
+          const handleFileUpload = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            setUploadError(''); 
+            setParsedHeadersInfo(null);
+
+            if (file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')) {
+                setUploadError('格式拦截：您上传的是 Excel 原生文件。请在 Excel 中使用【另存为 -> CSV (逗号分隔)】保存后再导入。');
+                if (fileInputRef.current) fileInputRef.current.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              const buffer = event.target.result;
+              const headerBytes = new Uint8Array(buffer).slice(0, 4);
+              if ((headerBytes[0] === 0x50 && headerBytes[1] === 0x4B) || (headerBytes[0] === 0xD0 && headerBytes[1] === 0xCF)) {
+                  setUploadError('格式伪装拦截：这是被强行修改后缀名的 Excel 文件，系统拒绝解析乱码。请老老实实通过 Excel【另存为 CSV】。');
+                  setRawData([]); 
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                  return;
+              }
+
+              let text = new TextDecoder('utf-8').decode(buffer);
+              let result = parseCSV(text);
+
+              if (!result.headersFound) {
+                try {
+                  text = new TextDecoder('gbk').decode(buffer);
+                  result = parseCSV(text);
+                } catch (e) {
+                  console.warn("GBK 解码失败", e);
+                }
+              }
+
+              if (result.data.length === 0) {
+                setUploadError('表格内容为空，或未能提取到有效的数据行。');
+                setRawData([]);
+              } else if (!result.headersFound) {
+                setUploadError('无法定位表头：请确保第一行包含【涂料编号】、【涂料名称】、【销量】或【库存】等标准字段名。');
+                setRawData([]); 
+                setParsedHeadersInfo(null);
+              } else {
+                setRawData(result.data);
+                setParsedHeadersInfo(result.matchedColumns);
+                setViewMode('table');
+                
+                showToastMessage('数据载入成功，引擎已根据您的配置完成初次运算！', 'success');
+                setSortConfig({ key: 'd', direction: 'desc' });
+              }
+              if (fileInputRef.current) fileInputRef.current.value = '';
+            };
+            reader.readAsArrayBuffer(file);
+          };
+
+          const processSupplementaryUpload = (e, type) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const buffer = event.target.result;
+                let text = new TextDecoder('utf-8').decode(buffer);
+                if (text.charCodeAt(0) === 0xFEFF) text = text.substring(1);
+
+                // 快速解析表头
+                const getHeaders = (txt) => {
+                    const lines = txt.split(/\r\n|\n|\r/).filter(line => line.trim() !== '');
+                    if(lines.length === 0) return [];
+                    let commas = (lines[0].match(/,/g) || []).length;
+                    let tabs = (lines[0].match(/\t/g) || []).length;
+                    const delimiter = tabs > commas ? '\t' : ',';
+                    let current = ''; let inQuotes = false;
+                    const result = [];
+                    for (let i = 0; i < lines[0].length; i++) {
+                        if (lines[0][i] === '"') inQuotes = !inQuotes;
+                        else if (lines[0][i] === delimiter && !inQuotes) { result.push(current.trim()); current = ''; }
+                        else current += lines[0][i];
+                    }
+                    result.push(current.trim());
+                    return result.map(h => h.replace(/["\r]/g, ''));
+                };
+
+                let headers = getHeaders(text);
+                const clean = s => String(s).replace(/[\s\-_\(\)（）\uFEFF]/g, '').toLowerCase();
+                
+                // 升级防干扰的精准+模糊分层匹配引擎
+                const findCol = (hdrs, exactArr, includeArr) => {
+                    // 第一层：优先找字面意思完全一样的（防止被"供应商代码"等无关列抢占）
+                    for (let match of exactArr) {
+                        const idx = hdrs.findIndex(h => clean(h) === clean(match));
+                        if (idx !== -1) return idx;
+                    }
+                    // 第二层：如果没有精准词，再找包含指定关键字的
+                    for (let match of includeArr) {
+                        const idx = hdrs.findIndex(h => clean(h).includes(clean(match)));
+                        if (idx !== -1) return idx;
+                    }
+                    return -1;
+                };
+
+                const codeExact = ['涂料编号', '涂料编码', '产品编号', '产品编码', '型号', '编号', '代码', 'SKU', '物料号', '商品编码'];
+                const codeInclude = ['编号', '编码', '型号', '代码', 'sku', '品号', '条码'];
+                
+                const priceExact = ['单价', '经销价', '销售价', '标准价', '结算价', '含税单价', '无税单价', '成本价'];
+                const priceInclude = ['单价', '价格', '售价', '成本', '金额'];
+                
+                const onOrderExact = ['采购在途', '在途库存', '在途数量', '在途', '已订购数量', '未交数量'];
+                const onOrderInclude = ['在途', '未交', '未到', '待收', '待入库', '已订'];
+
+                let codeIdx = findCol(headers, codeExact, codeInclude);
+                let targetIdx = type === 'price' ? findCol(headers, priceExact, priceInclude) : findCol(headers, onOrderExact, onOrderInclude);
+
+                // 如果 UTF-8 没找到表头，自动回退 GBK 解码（防中文乱码）
+                if (codeIdx === -1 || targetIdx === -1) {
+                    try {
+                        text = new TextDecoder('gbk').decode(buffer);
+                        if (text.charCodeAt(0) === 0xFEFF) text = text.substring(1);
+                        headers = getHeaders(text);
+                        codeIdx = findCol(headers, codeExact, codeInclude);
+                        targetIdx = type === 'price' ? findCol(headers, priceExact, priceInclude) : findCol(headers, onOrderExact, onOrderInclude);
+                    } catch(err) {}
+                }
+
+                if (codeIdx === -1 || targetIdx === -1) {
+                    showToastMessage(`未识别到表头。补充表需包含【编号/编码】和【${type === 'price' ? '单价/价格' : '在途/未交'}】相关字段。`, 'error');
+                    if(type === 'price' && priceFileInputRef.current) priceFileInputRef.current.value = '';
+                    if(type === 'onOrder' && onOrderFileInputRef.current) onOrderFileInputRef.current.value = '';
+                    return;
+                }
+
+                const lines = text.split(/\r\n|\n|\r/).filter(line => line.trim() !== '');
+                let commas = (lines[0].match(/,/g) || []).length;
+                let tabs = (lines[0].match(/\t/g) || []).length;
+                const delimiter = tabs > commas ? '\t' : ',';
+
+                const splitCSVRow = (str) => {
+                    const result = [];
+                    let current = ''; let inQuotes = false;
+                    for (let i = 0; i < str.length; i++) {
+                        if (str[i] === '"') inQuotes = !inQuotes;
+                        else if (str[i] === delimiter && !inQuotes) { result.push(current.trim()); current = ''; }
+                        else current += str[i];
+                    }
+                    result.push(current.trim());
+                    return result;
+                };
+
+                const dataMap = {};
+                const cleanCodeStr = str => String(str).replace(/[\s\-_]/g, '').toUpperCase();
+
+                for (let i = 1; i < lines.length; i++) {
+                    const row = splitCSVRow(lines[i]);
+                    if (row.length > Math.max(codeIdx, targetIdx)) {
+                        const rawCode = row[codeIdx].replace(/["\r]/g, '').trim();
+                        const code = cleanCodeStr(rawCode);
+                        const valStr = row[targetIdx].replace(/["\r,]/g, '').trim();
+                        
+                        // 【核心修复】：将空白值或横杠强制解析为 0，防止跳过这些有效型号
+                        const val = (valStr === '' || valStr === '-') ? 0 : parseFloat(valStr);
+                        
+                        if (code && !isNaN(val)) {
+                            dataMap[code] = val;
+                        }
+                    }
+                }
+
+                let updatedCount = 0;
+                const newData = rawData.map(item => {
+                    const itemCleanCode = cleanCodeStr(item.itemCode);
+                    if (dataMap[itemCleanCode] !== undefined) {
+                        updatedCount++;
+                        if (type === 'price') {
+                            return { ...item, uploadedPrice: dataMap[itemCleanCode] };
+                        } else {
+                            return { 
+                                ...item, 
+                                onOrderStock: dataMap[itemCleanCode],
+                                availableStock: item.currentStock + dataMap[itemCleanCode]
+                            };
+                        }
+                    }
+                    return item;
+                });
+
+                if(updatedCount > 0) {
+                    setRawData(newData);
+                    showToastMessage(`成功匹配并导入了 ${updatedCount} 款产品的${type === 'price' ? '单价' : '在途'}数据！`, 'success');
+                } else {
+                    showToastMessage('匹配失败：未能与当前库存数据的任何编号对齐。请检查编号格式。', 'warning');
+                }
+                
+                if(type === 'price' && priceFileInputRef.current) priceFileInputRef.current.value = '';
+                if(type === 'onOrder' && onOrderFileInputRef.current) onOrderFileInputRef.current.value = '';
+            };
+            reader.readAsArrayBuffer(file);
+          };
+
+          const handlePriceUpload = (e) => { processSupplementaryUpload(e, 'price'); };
+          const handleOnOrderUpload = (e) => { processSupplementaryUpload(e, 'onOrder'); };
+
+          const processedResult = useMemo(() => {
+            if (rawData.length === 0) return { data: [], totalContainers: 0, targetTotalPurchase: 0, containerFilledQty: 0, allowPadding: false, paddingReason: '无数据' };
+            const end = new Date(appliedSettings.endDate);
+
+            // 第一阶段：基础统计与 ABC 评级
+            let mappedData = rawData.map(item => {
+                let effectiveDays = appliedSettings.basePeriod;
+                if (item.launchDate && item.launchDate !== '-') {
+                  const launchTime = parseDateString(item.launchDate);
+                  if (!isNaN(launchTime)) {
+                    const diffTime = end.getTime() - launchTime; 
+                    if (diffTime > 0) {
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        if (diffDays < appliedSettings.basePeriod) effectiveDays = diffDays;
+                    } else { effectiveDays = 1; }
+                  }
+                }
+                
+                let unitPrice = item.uploadedPrice !== undefined ? item.uploadedPrice : (item.sales > 0 ? (item.revenue / item.sales) : 0);
+
+                let rawD = 0;
+                if (appliedSettings.demandCalcMethod === 'weighted') {
+                    if (item.hasSales30d && item.hasSales90d) {
+                        let daysTotal = effectiveDays;
+                        let totalW = appliedSettings.weight30d + appliedSettings.weight90d + appliedSettings.weightOlder;
+                        let w30 = (appliedSettings.weight30d / totalW);
+                        let w90 = (appliedSettings.weight90d / totalW);
+                        let wOld = (appliedSettings.weightOlder / totalW);
+                        
+                        if (daysTotal <= 30) {
+                            rawD = item.sales / daysTotal;
+                        } else if (daysTotal <= 90) {
+                            let d30 = item.sales30d / 30;
+                            let dOlder = Math.max(0, item.sales - item.sales30d) / Math.max(1, daysTotal - 30);
+                            let w1 = w30 / (w30 + w90); 
+                            let w2 = w90 / (w30 + w90);
+                            rawD = (d30 * w1) + (dOlder * w2);
+                        } else {
+                            let d30 = item.sales30d / 30;
+                            let d90 = Math.max(0, item.sales90d - item.sales30d) / 60;
+                            let dOlder = Math.max(0, item.sales - item.sales90d) / Math.max(1, daysTotal - 90);
+                            rawD = (d30 * w30) + (d90 * w90) + (dOlder * wOld);
+                        }
+                    } else {
+                        rawD = effectiveDays > 0 ? (item.sales / effectiveDays) : 0;
+                    }
+                } else {
+                    rawD = effectiveDays > 0 ? (item.sales / effectiveDays) : 0;
+                }
+
+                let freqPenalty = 1;
+                if (item.hasOrderFreq && item.orderFreqConfig > 0) {
+                    if (item.orderFreqConfig < appliedSettings.minOrderFreq) freqPenalty = item.orderFreqConfig / appliedSettings.minOrderFreq;
+                }
+                
+                let d = rawD * freqPenalty;
+                const pureD = effectiveDays > 0 ? (item.sales / effectiveDays) : 0;
+                
+                // 双轴周转天数独立计算
+                const physicalCoverDays = pureD > 0 ? (item.currentStock / pureD) : (item.currentStock > 0 ? Infinity : 0);
+                const totalCoverDays = pureD > 0 ? (item.availableStock / pureD) : (item.availableStock > 0 ? Infinity : 0);
+                
+                let calcSales = item.sales;
+                if (appliedSettings.demandCalcMethod === 'weighted') {
+                    calcSales = d * effectiveDays;
+                }
+                // 核算金额：优先使用导入的单价 * 算法修正销量
+                let calcRevenue = unitPrice > 0 ? (calcSales * unitPrice) : item.revenue;
+                
+                // 统一核心基准：联动看板和 ABC 评级
+                let sortValue = calcSales; 
+                if (appliedSettings.coreMetric === 'revenue') {
+                    sortValue = calcRevenue; 
+                }
+
+                // --- 夸托/QT装拦截逻辑 ---
+                const isQtStr = (str) => {
+                    if(!str) return false;
+                    const upper = String(str).toUpperCase();
+                    // 兼容多种写法：QT、夸托、夸脱
+                    return upper.includes('QT') || upper.includes('夸托') || upper.includes('夸脱');
+                };
+                const isColorantStr = (str) => {
+                    if(!str) return false;
+                    return String(str).includes('色浆');
+                };
+                // 如果是QT或夸托，并且不是色浆，则标记为排除采购
+                const isExcludedQt = (isQtStr(item.spec) || isQtStr(item.itemName)) && !(isColorantStr(item.spec) || isColorantStr(item.itemName));
+
+                let promoAction = '-', promoLevel = 0;
+                if (item.currentStock === 0) { promoAction = '健康 (零库存)'; promoLevel = 0; } 
+                // 库龄和清仓依然以“实物库存”为准 (因为飘在海上的不占物理库房也没变老)
+                else if (physicalCoverDays === Infinity) { promoAction = '无动销死库'; promoLevel = 2; } 
+                else if (physicalCoverDays > appliedSettings.deadStockDays) { promoAction = '重度积压'; promoLevel = 2; } 
+                else if (physicalCoverDays > appliedSettings.overstockWarningDays) { promoAction = '滞销预警'; promoLevel = 1; } 
+                else { promoAction = '健康流转'; promoLevel = 0; }
+
+                return { 
+                  ...item, unitPrice, effectiveDays, d, pureD, freqPenalty,
+                  calcSales, calcRevenue, sortValue,
+                  physicalCoverDays, totalCoverDays, promoAction, promoLevel, isExcludedQt,
+                  // 初始化变量
+                  rop: 0, targetStock: 0, basePurchase: 0, actualPurchase: 0, padQty: 0, initialCapital: 0, 
+                  needsRestock: false, isCritical: false, immediateRisk: false
+                };
+            });
+
+            // 排序并进行 ABC 评级
+            mappedData.sort((a, b) => b.sortValue - a.sortValue);
+            const totalSortValue = mappedData.reduce((sum, item) => sum + item.sortValue, 0);
+            let runningVal = 0;
+
+            const step1Data = mappedData.map(item => {
+                runningVal += item.sortValue;
+                const cumPct = totalSortValue > 0 ? runningVal / totalSortValue : 0;
+                
+                let abcClass = 'C', classLabel = 'C类 (极低频长尾)';
+                const thresholdA = appliedSettings.abcThresholdA / 100;
+                const thresholdB = appliedSettings.abcThresholdB / 100;
+
+                // 现在所有商品均会参与采购计划，只作层级标识区分策略
+                if (cumPct <= thresholdA) { abcClass = 'A'; classLabel = 'A类 (高频畅销)'; } 
+                else if (cumPct <= thresholdB) { abcClass = 'B'; classLabel = 'B类 (低频常规)'; } 
+                
+                return { ...item, abcClass, classLabel };
+            });
+
+            // 第二阶段：目标水位填补模型 (Target Inventory Level) 采购量计算
+            let totalBasePurchase = 0;
+            step1Data.forEach(item => {
+                let sL = appliedSettings.leadTime;
+                let sSS = appliedSettings.safetyDays;
+                
+                // 【差异化策略】：根据不同ABC分类使用不同的期望备货期
+                let oqDays = item.abcClass === 'A' ? appliedSettings.orderDaysA : 
+                            (item.abcClass === 'B' ? appliedSettings.orderDaysB : appliedSettings.orderDaysC);
+
+                let rop = Math.ceil(item.d * (sL + sSS)); 
+                let oq = Math.ceil(item.d * oqDays); 
+                let targetInitialStock = rop + oq; // 目标理想备货水位
+                
+                item.rop = item.isExcludedQt ? 0 : rop;
+                item.targetStock = item.isExcludedQt ? 0 : targetInitialStock;
+                
+                // 【双轴告急预警】：仅作看板状态及凑单强度的依据，不作为补货的前置拦截
+                // 1. 发单红线告急：(包含在途) 决定是否需要强制开船凑柜
+                item.isCritical = !item.isExcludedQt && item.availableStock <= rop && item.d > 0; 
+                // 2. 实物断货风险：单看现有仓库货量是不是快断了（如果在途还没到，就面临即时缺货）
+                item.immediateRisk = !item.isExcludedQt && item.currentStock <= rop && item.d > 0; 
+
+                // 【核心算法升级】：直接补足到目标水位 (Top-up)，移除跌破 ROP 的前置条件限制
+                if (!item.isExcludedQt && item.d > 0) {
+                    let rawPurchase = targetInitialStock - item.availableStock;
+                    
+                    if (rawPurchase > 0) {
+                        // 只要没满，就向上取整至 skuMultiplier 的倍数生成刚需订单
+                        let base = Math.ceil(rawPurchase / appliedSettings.skuMultiplier) * appliedSettings.skuMultiplier;
+                        
+                        item.basePurchase = base;
+                        item.actualPurchase = base;
+                        item.needsRestock = true; // 只要有不满水位的刚需就标记为需补货
+                        totalBasePurchase += base;
+                    }
+                }
+            });
+
+            // 第三阶段：全局整柜智能凑单算法 (Container Optimization) 带有凑柜拦截逻辑
+            let totalContainers = 0;
+            let targetTotalPurchase = 0;
+            let containerFilledQty = totalBasePurchase;
+            let allowPadding = false;
+            let paddingReason = '当前无任何备货需求';
+
+            if (totalBasePurchase > 0) {
+                // 判断是否触发强制满柜 (判定条件基于 isCritical 而非普通的 needsRestock)
+                const abCriticalCount = step1Data.filter(i => (i.abcClass === 'A' || i.abcClass === 'B') && i.isCritical).length;
+                const cItems = step1Data.filter(i => i.abcClass === 'C' && !i.isExcludedQt);
+                const cCriticalCount = cItems.filter(i => i.isCritical).length;
+                const cCriticalRatio = cItems.length > 0 ? (cCriticalCount / cItems.length) : 0;
+
+                if (abCriticalCount > 0) {
+                    allowPadding = true;
+                    paddingReason = 'A/B类跌破红线告急，启动满柜凑单';
+                } else if (cCriticalRatio >= 0.6) {
+                    allowPadding = true;
+                    paddingReason = `C类大面积告急(${(cCriticalRatio*100).toFixed(0)}%)，启动满柜凑单`;
+                } else {
+                    allowPadding = false;
+                    paddingReason = '暂无紧急缺货，仅做按需零星补平(免积压)';
+                }
+
+                if (allowPadding) {
+                    totalContainers = Math.ceil(totalBasePurchase / appliedSettings.containerSize);
+                    targetTotalPurchase = totalContainers * appliedSettings.containerSize;
+                    let gap = targetTotalPurchase - totalBasePurchase;
+
+                    let candidates = step1Data.filter(i => i.needsRestock && i.pureD > 0 && !i.isExcludedQt);
+                    if (candidates.length === 0) candidates = step1Data.filter(i => i.pureD > 0 && !i.isExcludedQt);
+
+                    if (candidates.length > 0) {
+                        let maxLoops = 10000; // 防止无限循环的保险
+                        
+                        // 【新增逻辑】：凑柜第一阶段 - 优先把不足 32 桶的款式补足到 32 桶（不考虑ABC）
+                        while (gap > 0 && maxLoops-- > 0) {
+                            let under32Candidates = candidates.filter(i => i.actualPurchase < 32);
+                            if (under32Candidates.length === 0) break; // 所有候选项都已达到或超过32桶，结束第一阶段
+                            
+                            let bestItem = under32Candidates[0];
+                            let minCoverDays = Infinity;
+
+                            for (let i = 0; i < under32Candidates.length; i++) {
+                                let it = under32Candidates[i];
+                                // 不考虑 ABC，只看谁的可用天数最短，优先拉它一把
+                                let futureCover = (it.availableStock + it.actualPurchase) / it.pureD;
+                                
+                                if (futureCover < minCoverDays) {
+                                    minCoverDays = futureCover;
+                                    bestItem = it;
+                                }
+                            }
+
+                            // 每次分配一个箱规(如4件)
+                            bestItem.actualPurchase += appliedSettings.skuMultiplier;
+                            bestItem.padQty += appliedSettings.skuMultiplier;
+                            gap -= appliedSettings.skuMultiplier;
+                        }
+
+                        // 【原逻辑】：凑柜第二阶段 - 按ABC优先级继续填补剩余的货柜空间
+                        while (gap > 0 && maxLoops-- > 0) {
+                            let bestItem = candidates[0];
+                            let minCoverDays = Infinity;
+
+                            for (let i = 0; i < candidates.length; i++) {
+                                let it = candidates[i];
+                                // 凑柜优先级策略：A类最高 (系数1.0)，B类次之 (1.5)，C类最低 (2.0)
+                                let classMultiplier = it.abcClass === 'A' ? 1.0 : (it.abcClass === 'B' ? 1.5 : 2.0); 
+                                let futureCover = ((it.availableStock + it.actualPurchase) / it.pureD) * classMultiplier;
+                                
+                                if (futureCover < minCoverDays) {
+                                    minCoverDays = futureCover;
+                                    bestItem = it;
+                                }
+                            }
+
+                            // 每次分配一个箱规(如4件)
+                            bestItem.actualPurchase += appliedSettings.skuMultiplier;
+                            bestItem.padQty += appliedSettings.skuMultiplier;
+                            gap -= appliedSettings.skuMultiplier;
+                        }
+                    }
+                    containerFilledQty = targetTotalPurchase;
+                } else {
+                    // 如果取消强行凑柜，真实反映零散数量
+                    totalContainers = (totalBasePurchase / appliedSettings.containerSize).toFixed(2);
+                    targetTotalPurchase = totalBasePurchase;
+                    containerFilledQty = totalBasePurchase;
+                }
+            }
+
+            // 计算全部款式的采购资金
+            step1Data.forEach(item => {
+                item.initialCapital = item.actualPurchase * item.unitPrice;
+            });
+
+            return { data: step1Data, totalContainers, targetTotalPurchase, containerFilledQty, allowPadding, paddingReason };
+          }, [rawData, appliedSettings]); 
+
+          const processedData = processedResult.data;
+
+          const filteredData = useMemo(() => {
+            if (!searchTerm.trim()) return processedData;
+            const keywords = searchTerm.toLowerCase().trim().split(/\s+/);
+            return processedData.filter(item => {
+                const combinedStr = [ item.itemCode || '', item.itemName || '', item.spec || '' ].join(' ').toLowerCase();
+                const cleanCombinedStr = combinedStr.replace(/[\s\-_]/g, '');
+                return keywords.every(kw => {
+                    const cleanKw = kw.replace(/[\s\-_]/g, '');
+                    return combinedStr.includes(kw) || cleanCombinedStr.includes(cleanKw);
+                });
+            });
+          }, [processedData, searchTerm]);
+
+          const sortedData = useMemo(() => {
+            let sortableItems = [...filteredData];
+            if (sortConfig !== null) {
+              sortableItems.sort((a, b) => {
+                let valA = a[sortConfig.key]; let valB = b[sortConfig.key];
+                if (valA === undefined) valA = 0; if (valB === undefined) valB = 0;
+                if (typeof valA === 'string') valA = valA.toLowerCase();
+                if (typeof valB === 'string') valB = valB.toLowerCase();
+                if (valA === valB) return 0;
+                if (valA === null || valA === '') return 1;
+                if (valB === null || valB === '') return -1;
+                if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+              });
+            }
+            return sortableItems;
+          }, [filteredData, sortConfig]);
+
+          const requestSort = (key) => {
+            let direction = 'asc';
+            if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+            setSortConfig({ key, direction });
+          };
+
+          const SortableHeader = ({ label, sortKey, align = "left", className = "", title = "" }) => {
+            const isActive = sortConfig.key === sortKey;
+            return (
+                <th className={`py-2.5 px-2 font-semibold text-slate-600 border-b cursor-pointer hover:bg-slate-200 transition-colors select-none ${align === 'right' ? 'text-right' : 'text-left'} ${className}`} onClick={() => requestSort(sortKey)} title={title}>
+                    <div className={`flex items-center gap-1 ${align === 'right' ? 'justify-end' : 'justify-start'}`}>
+                        {label}
+                        <span className="text-slate-400 shrink-0">
+                            {isActive ? (sortConfig.direction === 'asc' ? <IconChevronUp /> : <IconChevronDown />) : <IconChevronsUpDown className="opacity-30" />}
+                        </span>
+                    </div>
+                </th>
+            );
+          };
+
+          const metrics = useMemo(() => {
+            let totalA = 0, totalB = 0, totalC = 0, totalCapital = 0, totalStock = 0;
+            let totalOverstockItems = 0;
+            processedData.forEach(item => {
+              if (item.abcClass === 'A') totalA++;
+              if (item.abcClass === 'B') totalB++;
+              if (item.abcClass === 'C') totalC++;
+              totalCapital += item.initialCapital; 
+              totalStock += item.actualPurchase;
+              if (item.promoLevel > 0) totalOverstockItems++;
+            });
+            return { totalA, totalB, totalC, totalCapital, totalStock, totalItems: processedData.length, totalOverstockItems };
+          }, [processedData]);
+          
+          const dashboardData = useMemo(() => {
+             let healthyFunds = 0, warningFunds = 0, deadFunds = 0;
+             let healthyQty = 0, warningQty = 0, deadQty = 0;
+             let safeItems = 0, restockItems = 0;
+             let restockCapital = 0, restockQty = 0;
+             
+             let age30 = { count: 0, qty: 0, fund: 0, name: '≤30天', color: '#10b981' };
+             let age90 = { count: 0, qty: 0, fund: 0, name: '31-90天', color: '#34d399' };
+             let age180 = { count: 0, qty: 0, fund: 0, name: '91-180天', color: '#fbbf24' };
+             let age360 = { count: 0, qty: 0, fund: 0, name: '181-360天', color: '#f59e0b' };
+             let ageOver = { count: 0, qty: 0, fund: 0, name: '>360天', color: '#ef4444' };
+             let ageDead = { count: 0, qty: 0, fund: 0, name: '无动销', color: '#94a3b8' };
+
+             processedData.forEach(item => {
+                 const fund = item.currentStock * item.unitPrice;
+                 const qty = item.currentStock;
+                 
+                 if (item.promoLevel === 0) { healthyFunds += fund; healthyQty += qty; }
+                 else if (item.promoLevel === 1) { warningFunds += fund; warningQty += qty; }
+                 else { deadFunds += fund; deadQty += qty; }
+
+                 if (item.needsRestock) {
+                     restockItems++;
+                     restockCapital += item.initialCapital;
+                     restockQty += item.actualPurchase;
+                 } else if (item.d > 0) {
+                     safeItems++;
+                 }
+
+                 if (item.currentStock > 0) {
+                     if (item.physicalCoverDays === Infinity) { ageDead.count++; ageDead.qty+=qty; ageDead.fund+=fund; }
+                     else if (item.physicalCoverDays > 360) { ageOver.count++; ageOver.qty+=qty; ageOver.fund+=fund; }
+                     else if (item.physicalCoverDays > 180) { age360.count++; age360.qty+=qty; age360.fund+=fund; }
+                     else if (item.physicalCoverDays > 90) { age180.count++; age180.qty+=qty; age180.fund+=fund; }
+                     else if (item.physicalCoverDays > 30) { age90.count++; age90.qty+=qty; age90.fund+=fund; }
+                     else { age30.count++; age30.qty+=qty; age30.fund+=fund; }
+                 }
+             });
+
+             const restockList = processedData
+                 .filter(i => i.needsRestock)
+                 .sort((a,b) => b.actualPurchase - a.actualPurchase)
+                 .slice(0, 5);
+
+             const fullClearanceItems = processedData
+                 .filter(i => i.promoLevel > 0)
+                 .map(i => ({...i, deadFund: i.currentStock * i.unitPrice}));
+
+             const initBreakdownObj = () => ({ warningQty: 0, warningFund: 0, deadQty: 0, deadFund: 0 });
+             const breakdown = {
+                spec: { '加仑': initBreakdownObj(), '夸脱': initBreakdownObj(), '其它': initBreakdownObj() },
+                series: { '百年': initBreakdownObj(), '极净': initBreakdownObj(), '至臻': initBreakdownObj(), 'PF': initBreakdownObj(), '色浆': initBreakdownObj(), '其它': initBreakdownObj() },
+                baseType: { '超深基': initBreakdownObj(), '深基': initBreakdownObj(), '浅基(白基)': initBreakdownObj(), '其它': initBreakdownObj() }
+             };
+
+             fullClearanceItems.forEach(item => {
+                 const nameUpper = (item.itemName || '').toUpperCase();
+                 const specUpper = (item.spec || '').toUpperCase();
+                 const qty = item.currentStock;
+                 const fund = item.deadFund;
+                 
+                 const isWarning = item.promoLevel === 1;
+                 const isDead = item.promoLevel >= 2;
+
+                 const addData = (cat, key) => {
+                     if (!breakdown[cat][key]) breakdown[cat][key] = initBreakdownObj();
+                     if (isWarning) { breakdown[cat][key].warningQty += qty; breakdown[cat][key].warningFund += fund; }
+                     if (isDead) { breakdown[cat][key].deadQty += qty; breakdown[cat][key].deadFund += fund; }
+                 };
+
+                 // 按规格
+                 if (specUpper.includes('加仑') || specUpper.includes('GL') || nameUpper.includes('加仑')) { addData('spec', '加仑'); }
+                 else if (specUpper.includes('夸脱') || specUpper.includes('夸托') || specUpper.includes('QT') || nameUpper.includes('夸脱')) { addData('spec', '夸脱'); }
+                 else { addData('spec', '其它'); }
+
+                 // 按系列
+                 if (nameUpper.includes('百年')) { addData('series', '百年'); }
+                 else if (nameUpper.includes('极净')) { addData('series', '极净'); }
+                 else if (nameUpper.includes('至臻')) { addData('series', '至臻'); }
+                 else if (nameUpper.includes('PF') || nameUpper.includes('PRO')) { addData('series', 'PF'); }
+                 else if (nameUpper.includes('色浆') || specUpper.includes('色浆')) { addData('series', '色浆'); }
+                 else { addData('series', '其它'); }
+
+                 // 按基漆
+                 if (nameUpper.includes('超深基') || nameUpper.includes('UD') || nameUpper.includes('ULTRA')) { addData('baseType', '超深基'); }
+                 else if (nameUpper.includes('深基') || nameUpper.includes('DP') || nameUpper.includes('DEEP')) { addData('baseType', '深基'); }
+                 else if (nameUpper.includes('浅基') || nameUpper.includes('白基') || nameUpper.includes('PASTEL') || nameUpper.includes('LIGHT')) { addData('baseType', '浅基(白基)'); }
+                 else { addData('baseType', '其它'); }
+             });
+
+             const formatBreakdown = (obj) => {
+                 return Object.keys(obj)
+                     .map(k => {
+                         const totalQty = obj[k].warningQty + obj[k].deadQty;
+                         const totalFund = obj[k].warningFund + obj[k].deadFund;
+                         return { name: k, ...obj[k], totalQty, totalFund };
+                     })
+                     .sort((a, b) => {
+                         const valA = appliedSettings.coreMetric === 'qty' ? a.totalQty : a.totalFund;
+                         const valB = appliedSettings.coreMetric === 'qty' ? b.totalQty : b.totalFund;
+                         return valB - valA;
+                     });
+             };
+
+                 return {
+                     funds: [
+                         { name: `健康流转`, value: healthyFunds, qty: healthyQty, color: '#10b981' },
+                         { name: `轻度积压预警`, value: warningFunds, qty: warningQty, color: '#f59e0b' },
+                         { name: `重度滞销/死库`, value: deadFunds, qty: deadQty, color: '#f43f5e' }
+                     ],
+                     totalFunds: healthyFunds + warningFunds + deadFunds,
+                     totalQty: healthyQty + warningQty + deadQty,
+                     radar: { safe: safeItems, restock: restockItems, restockCapital: restockCapital, restockQty: restockQty },
+                     age: [age30, age90, age180, age360, ageOver, ageDead],
+                     restockList,
+                     clearanceBreakdown: {
+                         spec: formatBreakdown(breakdown.spec),
+                         series: formatBreakdown(breakdown.series),
+                         baseType: formatBreakdown(breakdown.baseType)
+                     }
+                 };
+              }, [processedData, appliedSettings.coreMetric]);
+
+          const exportToCSV = (exportType = 'all') => {
+            let dataToExport = sortedData;
+            let filename = '蜜乐涂料_智能整柜补货计划(全品类).csv';
+
+            if (exportType === 'restock') {
+              dataToExport = sortedData.filter(item => item.needsRestock);
+              filename = '蜜乐涂料_标准采购单.csv';
+            } else if (exportType === 'clearance') {
+              dataToExport = sortedData.filter(item => item.promoLevel > 0);
+              filename = '蜜乐涂料_滞销处理清单.csv';
+            }
+
+            if (dataToExport.length === 0) { alert('当前没有符合条件的导出数据。'); return; }
+
+            const headers = ['涂料编号', '涂料名称', '规格', 'ABC分类', '核算销量', '日均需求', '当前公司库存', '实物周转天数', '采购在途', '可用总库存', '总库周转天数', '系统状态', '预估单价', '目标水位(Target)', '防断货红线(ROP)', '箱规(桶/箱)', '刚需数量', '凑柜补平量', '最终下单量(总额)', '预估采购资金'];
+            const csvContent = [
+              headers.join(','),
+              ...dataToExport.map(item => {
+                const physicalCoverStr = item.physicalCoverDays === Infinity ? '无动销死库' : (item.physicalCoverDays > 0 ? Math.round(item.physicalCoverDays).toString() : '0');
+                const totalCoverStr = item.totalCoverDays === Infinity ? '无动销' : (item.totalCoverDays > 0 ? Math.round(item.totalCoverDays).toString() : '0');
+                
+                const escapeCSV = (str) => `"${String(str).replace(/"/g, '""')}"`;
+                return [
+                  escapeCSV(item.itemCode), escapeCSV(item.itemName), escapeCSV(item.spec),
+                  escapeCSV(item.classLabel), 
+                  Math.round(item.calcSales), item.d.toFixed(2),
+                  item.currentStock, physicalCoverStr, item.onOrderStock, item.availableStock, totalCoverStr,
+                  escapeCSV(item.promoAction), item.unitPrice.toFixed(2), 
+                  item.d > 0 && !item.isExcludedQt ? item.targetStock : '-',
+                  item.d > 0 && !item.isExcludedQt ? item.rop : '-', 
+                  item.d > 0 && !item.isExcludedQt ? appliedSettings.skuMultiplier : '-',
+                  item.basePurchase > 0 ? item.basePurchase : '-', 
+                  item.padQty > 0 ? item.padQty : '-', 
+                  item.isExcludedQt ? '停补(建议分装)' : (item.actualPurchase > 0 ? item.actualPurchase : '-'), 
+                  item.initialCapital > 0 ? item.initialCapital : '-'
+                ].join(',');
+              })
+            ].join('\n');
+
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          };
+
+          const renderDashboard = () => {
+              const { funds, totalFunds, totalQty, radar, age, restockList, clearanceBreakdown } = dashboardData;
+              const isQtyMode = appliedSettings.coreMetric === 'qty';
+              
+              const totalHealthMetric = isQtyMode ? totalQty : totalFunds;
+              const maxAgeMetric = Math.max(...age.map(a => isQtyMode ? a.qty : a.fund), 1);
+
+              return (
+                  <div className="flex-1 overflow-auto custom-scrollbar bg-slate-50 flex flex-col gap-5 p-5 animate-fade-in">
+                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 shrink-0">
+                         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col">
+                             <h3 className="text-base font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                 {isQtyMode ? <IconPackage size={20} className="text-emerald-500"/> : <IconDollarSign size={20} className="text-emerald-500"/>}
+                                 {isQtyMode ? '库存健康度盘点 (按件数)' : '资金健康度盘点 (按金额)'}
+                             </h3>
+                             <div className="h-8 w-full flex rounded-full overflow-hidden mb-6 bg-slate-100">
+                                  {funds.map((f, i) => {
+                                      const wVal = isQtyMode ? f.qty : f.value;
+                                      if (wVal <= 0) return null;
+                                      return <div key={i} style={{width: `${(wVal/totalHealthMetric)*100}%`, backgroundColor: f.color}} className="h-full border-r border-white/20 last:border-0 hover:opacity-90 transition-opacity" title={`${f.name}: ${f.qty}件 (¥${f.value.toFixed(2)})`}></div>
+                                  })}
+                             </div>
+                             <div className="grid grid-cols-3 gap-4 mt-auto">
+                                 {funds.map((f, i) => (
+                                     <div key={i} className="border border-slate-100 bg-slate-50 p-3 lg:p-4 rounded-xl flex flex-col justify-center">
+                                         <div className="flex items-center gap-1.5 mb-1.5">
+                                             <span className="w-3 h-3 rounded-full shrink-0 shadow-sm" style={{backgroundColor: f.color}}></span>
+                                             <span className="text-xs font-medium text-slate-600 truncate" title={f.name}>{f.name}</span>
+                                         </div>
+                                         <p className="text-lg font-bold text-slate-800 truncate" title={isQtyMode ? `${f.qty}件` : `¥${f.value.toFixed(2)}`}>
+                                            {isQtyMode ? f.qty.toLocaleString() : `¥${(f.value/10000).toFixed(2)}`}
+                                            <span className="text-xs text-slate-500 font-normal ml-0.5">{isQtyMode ? '件' : '万'}</span>
+                                         </p>
+                                         <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                                            {isQtyMode ? (f.value > 0 ? `预估金额: ¥${f.value.toLocaleString(undefined, {maximumFractionDigits:0})}` : '暂无金额数据') : `${f.qty.toLocaleString()} 件`}
+                                         </p>
+                                     </div>
+                                 ))}
+                             </div>
+                         </div>
+
+                         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col">
+                             <h3 className="text-base font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                 <IconLayers size={20} className="text-blue-500"/> 整柜自动凑单预警 (全局ABC类)
+                             </h3>
+                             <div className="flex items-center gap-6 mb-6 h-[110px]">
+                                 <div className="flex-1 flex flex-col justify-center items-center p-3 bg-emerald-50/70 rounded-xl border border-emerald-100/50">
+                                     <p className="text-xs text-emerald-600 font-medium mb-1">建议集装箱数</p>
+                                     <p className="text-4xl font-bold text-emerald-700">{processedResult.totalContainers} <span className="text-sm font-normal text-emerald-500">柜</span></p>
+                                     <p className={`text-[10px] font-medium mt-1.5 text-center px-2 py-0.5 rounded shadow-sm ${processedResult.allowPadding ? 'bg-emerald-100/50 text-emerald-600' : 'bg-amber-100/50 text-amber-700'}`}>
+                                        凑单状态: {processedResult.paddingReason}
+                                     </p>
+                                 </div>
+                                 <div className="flex-1 flex flex-col justify-center items-center p-4 bg-blue-50/70 rounded-xl border border-blue-100/50 relative overflow-hidden">
+                                     <div className="absolute top-0 right-0 w-16 h-16 bg-blue-100 rounded-bl-full -mr-8 -mt-8 opacity-50"></div>
+                                     <p className="text-xs text-blue-600 font-medium mb-1">本次产生补单数量</p>
+                                     <p className="text-4xl font-bold text-blue-700">{radar.restock} <span className="text-sm font-normal text-blue-500">款</span></p>
+                                 </div>
+                             </div>
+                             <div className="bg-slate-800 text-white rounded-xl p-4 flex justify-between items-center mt-auto shadow-inner">
+                                 <span className="text-sm font-medium text-slate-300">系统总排产件数：</span>
+                                 <div className="text-right">
+                                    <span className="text-xl font-bold text-amber-400 tracking-wide mr-3">{processedResult.containerFilledQty.toLocaleString()} <span className="text-[11px] text-amber-200 font-normal">加仑/桶</span></span>
+                                    {radar.restockCapital > 0 && <span className="text-xl font-bold text-amber-400 tracking-wide">¥{(radar.restockCapital/10000).toFixed(2)} <span className="text-[11px] text-amber-200 font-normal">万</span></span>}
+                                 </div>
+                             </div>
+                         </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+                          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col">
+                              <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                 <IconBarChart3 size={20} className="text-indigo-500"/> {isQtyMode ? '库龄分布状态图 (按件数)' : '库龄分布状态图 (按占用资金)'}
+                              </h3>
+                              
+                              <div className="flex-1 relative mt-2 flex flex-col justify-end min-h-[220px]">
+                                  <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-8">
+                                      <div className="border-t border-dashed border-slate-200 w-full h-0"></div>
+                                      <div className="border-t border-dashed border-slate-200 w-full h-0"></div>
+                                      <div className="border-t border-dashed border-slate-200 w-full h-0"></div>
+                                      <div className="border-t border-slate-300 w-full h-0"></div>
+                                  </div>
+
+                                  <div className="flex items-end justify-around gap-2 absolute inset-0 pb-8 z-10">
+                                      {age.map((a, i) => {
+                                          const currentMetric = isQtyMode ? a.qty : a.fund;
+                                          const heightPct = maxAgeMetric > 0 ? (currentMetric / maxAgeMetric) * 100 : 0;
+                                          return (
+                                          <div key={i} className="flex flex-col justify-end items-center w-full h-full group relative cursor-pointer">
+                                              <div className="absolute bottom-full mb-2 hidden group-hover:flex flex-col items-center bg-slate-800 text-white text-xs p-2.5 rounded shadow-xl z-20 whitespace-nowrap pointer-events-none">
+                                                  <span className="font-bold mb-1.5 text-slate-200 border-b border-slate-600 w-full text-center pb-1">{a.name}</span>
+                                                  <div className="flex justify-between w-full gap-4 mb-0.5"><span className="text-slate-400">包含款式:</span> <span>{a.count} 款</span></div>
+                                                  <div className="flex justify-between w-full gap-4 mb-0.5"><span className="text-slate-400">总件数:</span> <span>{a.qty.toLocaleString()} 件</span></div>
+                                                  <div className="flex justify-between w-full gap-4 mt-1"><span className="text-slate-400">预估资金:</span> <span className="font-bold text-amber-300">{a.fund > 0 ? `¥${a.fund.toLocaleString(undefined, {maximumFractionDigits:0})}` : '未知'}</span></div>
+                                                  <div className="absolute top-full w-0 h-0 border-4 border-transparent border-t-slate-800"></div>
+                                              </div>
+                                              
+                                              <div className="text-[10px] font-bold text-slate-500 mb-1.5 opacity-0 group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-300">
+                                                  {a.count}款
+                                              </div>
+                                              
+                                              <div 
+                                                  className="w-full max-w-[42px] rounded-t-md transition-all duration-700 ease-out shadow-sm relative overflow-hidden" 
+                                                  style={{height: `max(4px, ${heightPct}%)`, backgroundColor: a.color, opacity: 0.85}}
+                                              >
+                                                  <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent"></div>
+                                              </div>
+                                          </div>
+                                      )})}
+                                  </div>
+
+                                  <div className="flex justify-around pt-2 z-10 relative">
+                                      {age.map((a, i) => (
+                                          <div key={i} className="flex flex-col items-center w-full">
+                                             <span className="text-[10px] font-medium text-slate-600 text-center leading-tight mt-1 truncate w-full px-1" title={a.name}>{a.name}</span>
+                                             <span className="text-[10px] text-slate-800 font-bold mt-0.5">
+                                                {isQtyMode ? `${a.qty.toLocaleString()}` : `¥${(a.fund/10000).toFixed(1)}万`}
+                                             </span>
+                                          </div>
+                                      ))}
+                                  </div>
+                              </div>
+                          </div>
+
+                          <div className="xl:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-5">
+                              <div className="bg-white rounded-2xl border border-rose-200 shadow-sm overflow-hidden flex flex-col relative h-[320px]">
+                                  <div className="absolute top-0 left-0 w-1 h-full bg-rose-500"></div>
+                                  <div className="bg-rose-50/50 px-5 py-3.5 border-b border-rose-100 flex items-center justify-between">
+                                      <h3 className="text-sm font-bold text-rose-800 flex items-center gap-2">🔥 补单量 TOP 5</h3>
+                                      <span className="text-[10px] font-medium bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full border border-rose-200">主力备货目标</span>
+                                  </div>
+                                  <div className="p-4 flex-1 flex flex-col gap-2.5">
+                                      {restockList.length === 0 ? <p className="text-sm text-slate-400 text-center py-10">🎉 当前备货充足，无需发单</p> : restockList.map((item, i) => (
+                                          <div key={i} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded-xl border border-transparent hover:border-slate-100 transition-all">
+                                              <div className="flex items-center gap-3.5 overflow-hidden">
+                                                  <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold shadow-sm ${i===0?'bg-rose-500 text-white':i===1?'bg-rose-400 text-white':i===2?'bg-rose-300 text-white':'bg-slate-100 text-slate-500'}`}>{i+1}</span>
+                                                  <div className="truncate">
+                                                      <p className="text-[13px] font-bold text-slate-800 truncate mb-0.5" title={`${item.itemName} ${item.spec}`}>
+                                                          {item.itemName} <span className="text-slate-500 text-[11px] ml-1">({item.spec})</span>
+                                                      </p>
+                                                      <p className="text-[11px] font-medium text-slate-500">包含凑平装箱: <span className="text-purple-600">+{item.padQty}</span></p>
+                                                  </div>
+                                              </div>
+                                              <div className="text-right shrink-0 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100 min-w-[76px]">
+                                                  <p className="text-[10px] text-rose-600 mb-0.5 font-bold">最终下单</p>
+                                                  <p className="text-base font-bold text-rose-700 leading-none mb-1">{item.actualPurchase.toLocaleString()}</p>
+                                                  {item.initialCapital > 0 && <p className="text-[10px] text-rose-500 font-medium">¥{item.initialCapital.toLocaleString(undefined,{maximumFractionDigits:0})}</p>}
+                                              </div>
+                                          </div>
+                                      ))}
+                                  </div>
+                              </div>
+
+                              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col relative h-[320px]">
+                                  <div className="absolute top-0 left-0 w-1 h-full bg-slate-800"></div>
+                                  <div className="bg-slate-800 px-4 py-3 flex items-center justify-between">
+                                      <div>
+                                          <h3 className="text-[13px] font-bold text-white flex items-center gap-1.5">{isQtyMode ? '💀 积压与死库分布 (件数)' : '💀 积压与死库分布 (金额)'}</h3>
+                                          <div className="flex items-center gap-3 mt-1.5 text-[10px]">
+                                              <div className="flex items-center gap-1"><span className="w-2 h-2 bg-amber-400 rounded-sm shadow-sm"></span><span className="text-slate-300">轻度积压</span></div>
+                                              <div className="flex items-center gap-1"><span className="w-2 h-2 bg-rose-500 rounded-sm shadow-sm"></span><span className="text-slate-300">重度死库</span></div>
+                                          </div>
+                                      </div>
+                                      <div className="flex bg-slate-700 rounded p-0.5 shrink-0">
+                                          <button onClick={()=>setClearanceView('spec')} className={`px-2 py-1 text-[10px] rounded transition-colors ${clearanceView==='spec'?'bg-slate-600 text-white font-bold shadow-sm':'text-slate-400 hover:text-slate-200'}`}>规格</button>
+                                          <button onClick={()=>setClearanceView('series')} className={`px-2 py-1 text-[10px] rounded transition-colors ${clearanceView==='series'?'bg-slate-600 text-white font-bold shadow-sm':'text-slate-400 hover:text-slate-200'}`}>系列</button>
+                                          <button onClick={()=>setClearanceView('baseType')} className={`px-2 py-1 text-[10px] rounded transition-colors ${clearanceView==='baseType'?'bg-slate-600 text-white font-bold shadow-sm':'text-slate-400 hover:text-slate-200'}`}>基漆</button>
+                                      </div>
+                                  </div>
+                                  <div className="p-4 flex-1 flex flex-col gap-3.5 overflow-y-auto custom-scrollbar bg-slate-50/50">
+                                      {(() => {
+                                          const viewData = clearanceBreakdown[clearanceView].filter(x => (isQtyMode ? x.totalQty : x.totalFund) > 0);
+                                          if(viewData.length === 0) return <p className="text-sm text-slate-400 text-center py-10">🎉 当前无积压款式</p>;
+                                          
+                                          const maxVal = Math.max(...viewData.map(x => isQtyMode ? x.totalQty : x.totalFund));
+                                          
+                                          return viewData.map((item, i) => {
+                                              const totalVal = isQtyMode ? item.totalQty : item.totalFund;
+                                              const warningVal = isQtyMode ? item.warningQty : item.warningFund;
+                                              const deadVal = isQtyMode ? item.deadQty : item.deadFund;
+                                              
+                                              const pctWarning = totalVal > 0 ? (warningVal / totalVal) * 100 : 0;
+                                              const pctDead = totalVal > 0 ? (deadVal / totalVal) * 100 : 0;
+                                              const pctTotal = maxVal > 0 ? (totalVal / maxVal) * 100 : 0;
+
+                                              return (
+                                                  <div key={i} className="flex flex-col gap-1 w-full">
+                                                      <div className="flex justify-between items-end mb-0.5">
+                                                          <span className="text-[12px] font-bold text-slate-700">{item.name}</span>
+                                                          <div className="text-right leading-none">
+                                                              <span className="text-[13px] font-bold text-slate-800">{isQtyMode ? `${totalVal.toLocaleString()}` : `¥${totalVal.toLocaleString(undefined,{maximumFractionDigits:0})}`}</span>
+                                                              {isQtyMode && <span className="text-[10px] text-slate-500 ml-0.5">件</span>}
+                                                          </div>
+                                                      </div>
+                                                      
+                                                      <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden flex">
+                                                          <div className="h-full flex transition-all duration-500" style={{width: `${pctTotal}%`}}>
+                                                              {pctWarning > 0 && <div className="bg-amber-400 h-full" style={{width: `${pctWarning}%`}}></div>}
+                                                              {pctDead > 0 && <div className="bg-rose-500 h-full" style={{width: `${pctDead}%`}}></div>}
+                                                          </div>
+                                                      </div>
+
+                                                      <div className="flex justify-between text-[9px] text-slate-400 mt-0.5">
+                                                          <div className="flex gap-2">
+                                                              {warningVal > 0 && <span className="text-amber-600 font-medium">轻度: {isQtyMode ? warningVal.toLocaleString() : `¥${warningVal.toFixed(0)}`}</span>}
+                                                              {deadVal > 0 && <span className="text-rose-500 font-medium">死库: {isQtyMode ? deadVal.toLocaleString() : `¥${deadVal.toFixed(0)}`}</span>}
+                                                          </div>
+                                                          {!isQtyMode && item.totalQty > 0 && <span>含 {item.totalQty.toLocaleString()} 件</span>}
+                                                      </div>
+                                                  </div>
+                                              );
+                                          });
+                                      })()}
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              );
+          };
+
+          return (
+            <div className="h-screen w-screen bg-slate-50 flex font-sans text-slate-800 overflow-hidden relative">
+              
+              {/* --- 全局 Toast 提示 --- */}
+              {toast.show && (
+                  <div className={`fixed top-4 right-4 z-50 flex items-center gap-2.5 px-5 py-3.5 rounded-xl shadow-lg border animate-slide-in-right ${
+                      toast.type === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-800' :
+                      toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' :
+                      'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  }`}>
+                      {toast.type === 'success' ? <IconCheckCircle size={20} className="text-emerald-500"/> : <IconAlertTriangle size={20} />}
+                      <span className="text-[13px] font-bold tracking-wide">{toast.message}</span>
+                  </div>
+              )}
+
+              {/* --- 左侧设置边栏 --- */}
+              <div className={`bg-white border-r border-slate-200 transition-all duration-300 flex flex-col shadow-sm z-10 shrink-0 overflow-hidden ${isSidebarOpen ? 'w-[320px]' : 'w-0'}`}>
+                <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0 bg-blue-50/50">
+                  <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                    <IconSettings size={18} className="text-blue-600" />
+                    参数与策略配置
+                  </h2>
+                </div>
+                
+                <div className="px-4 py-4 overflow-y-auto flex-1 space-y-4 custom-scrollbar">
+                  
+                  {/* --- 新手指南说明面板 --- */}
+                  <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-md overflow-hidden mb-2 text-white">
+                      <button onClick={() => setShowUserGuide(!showUserGuide)} className="w-full px-3 py-2.5 flex items-center justify-between hover:bg-white/10 transition-colors">
+                          <div className="flex items-center gap-2">
+                              <IconHelpCircle size={16} className="text-blue-100" />
+                              <h3 className="text-xs font-bold tracking-wide">新手操作指南 (点击展开)</h3>
+                          </div>
+                          {showUserGuide ? <IconChevronUp size={14} className="text-blue-200"/> : <IconChevronDown size={14} className="text-blue-200"/>}
+                      </button>
+                      {showUserGuide && (
+                          <div className="p-3 space-y-2 border-t border-white/20 bg-white/5 text-[11px] leading-relaxed">
+                              <p><strong className="text-amber-300">① 基础必须：</strong>先导入包含【型号】【库存】【销量】的主数据表。</p>
+                              <p><strong className="text-amber-300">② 补全金额：</strong>通过右上角【补单价表】，系统自动联动全盘资金分析。</p>
+                              <p><strong className="text-amber-300">③ 补全在途：</strong>通过右上角【补在途表】，自动减去在途重算风险。</p>
+                              <p><strong className="text-amber-300">④ 参数生效：</strong>每次修改下方策略后，需点击底部【保存参数并重算】。</p>
+                              <p><strong className="text-amber-300">⑤ 智能凑柜：</strong>计算完刚需后，系统先将不足32桶的优先补齐，最后再将整柜空余塞给A/B类。</p>
+                              
+                              <div className="mt-3 pt-3 border-t border-white/20 border-dashed">
+                                  <p className="font-bold text-blue-100 mb-1.5 flex items-center gap-1"><IconCalculator size={12}/> 【核心补货推演原理】</p>
+                                  <ul className="list-disc pl-4 space-y-1.5 text-white/80">
+                                      <li><strong className="text-white">预测日均：</strong>结合30/90天分段加权预测，利用订货频次过滤异常工程大单。</li>
+                                      <li><strong className="text-white">防断货红线 (ROP)：</strong>预测日均 × (海外提前期 + 安全缓冲期)。</li>
+                                      <li><strong className="text-white">目标备货水位：</strong>防断货红线 + (预测日均 × 该类期望备货天数)。</li>
+                                      <li><strong className="text-white">刚需计算：</strong>(目标水位 - 当前可用总库) ，然后向上取整至单品箱规倍数。</li>
+                                  </ul>
+                              </div>
+                          </div>
+                      )}
+                  </div>
+
+                  {/* --- ABC 类别说明面板 --- */}
+                  <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                      <button onClick={() => setShowAbcGuide(!showAbcGuide)} className="w-full bg-slate-100 px-3 py-2.5 flex items-center justify-between hover:bg-slate-200 transition-colors">
+                          <div className="flex items-center gap-2">
+                              <IconInfo size={16} className="text-slate-600" />
+                              <h3 className="text-xs font-bold text-slate-700">全局业务分析基准</h3>
+                          </div>
+                          {showAbcGuide ? <IconChevronUp size={14} className="text-slate-500"/> : <IconChevronDown size={14} className="text-slate-500"/>}
+                      </button>
+                      {showAbcGuide && (
+                          <div className="p-3 space-y-3 border-t border-slate-200 bg-white">
+                              <div>
+                                  <label className="block text-[11px] font-bold text-slate-700 mb-1" title="切换后将同时改变看板呈现数据与ABC等级划分规则">核心分析视角 (全局联动)</label>
+                                  <select name="coreMetric" value={draftSettings.coreMetric} onChange={handleSettingChange} className="w-full border border-blue-200 rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none bg-blue-50 text-blue-800 font-medium">
+                                      <option value="qty">以【库存件数/销量】为主 (默认)</option>
+                                      <option value="revenue">以【占用资金/销售额】为主</option>
+                                  </select>
+                              </div>
+                              <div className="pt-2 border-t border-slate-100">
+                                <h3 className="text-[11px] font-bold text-slate-700 mb-2">📊 ABC 累计占比界限 (%)</h3>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="block text-[10px] font-medium text-slate-500 mb-0.5 truncate">A类(畅销)界限</label>
+                                    <input type="number" name="abcThresholdA" value={draftSettings.abcThresholdA} onChange={handleSettingChange} className="w-full border border-slate-300 rounded px-2 py-1 text-sm font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] font-medium text-slate-500 mb-0.5 truncate">B类(常规)界限</label>
+                                    <input type="number" name="abcThresholdB" value={draftSettings.abcThresholdB} onChange={handleSettingChange} className="w-full border border-slate-300 rounded px-2 py-1 text-sm font-bold text-emerald-700 focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                  </div>
+                                </div>
+                              </div>
+                          </div>
+                      )}
+                  </div>
+
+                  {/* --- 全局供应链参数 (装箱与货柜) --- */}
+                  <div className="bg-white border border-blue-100 rounded-xl shadow-sm overflow-hidden">
+                    <div className="bg-blue-50/50 px-3 py-2.5 border-b border-blue-50 flex items-center gap-2">
+                      <IconPackage size={16} className="text-blue-600" />
+                      <h3 className="text-[12px] font-bold text-blue-900">📦 装箱与整柜设定</h3>
+                    </div>
+                    <div className="p-3 grid grid-cols-2 gap-3 bg-white">
+                      <div>
+                        <label className="block text-[11px] font-bold text-purple-700 mb-0.5 truncate" title="单个型号下单必须是此数字的倍数">单品装箱数(倍数)</label>
+                        <input type="number" name="skuMultiplier" value={draftSettings.skuMultiplier} onChange={handleSettingChange} className="w-full border border-purple-300 rounded px-2 py-1.5 text-sm bg-purple-50 focus:ring-2 focus:ring-purple-500 outline-none font-bold" />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-purple-700 mb-0.5 truncate" title="系统会自动补足加项直到填满货柜">整柜容量(桶/加仑)</label>
+                        <input type="number" name="containerSize" value={draftSettings.containerSize} onChange={handleSettingChange} className="w-full border border-purple-300 rounded px-2 py-1.5 text-sm bg-purple-50 focus:ring-2 focus:ring-purple-500 outline-none font-bold" />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-700 mb-0.5 truncate" title="海运+报关+内陆总耗时">海外提前期 L(天)</label>
+                        <input type="number" name="leadTime" value={draftSettings.leadTime} onChange={handleSettingChange} className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-700 mb-0.5 truncate" title="应对船期延误等风险">安全缓冲期 SS(天)</label>
+                        <input type="number" name="safetyDays" value={draftSettings.safetyDays} onChange={handleSettingChange} className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                      </div>
+                      
+                      <div className="col-span-2 pt-1 border-t border-slate-100">
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1.5">各分类期望备货周期 (天)</label>
+                        <div className="grid grid-cols-3 gap-2">
+                            <div>
+                                <span className="text-[10px] text-blue-600 block mb-0.5 font-medium">A类备货</span>
+                                <input type="number" name="orderDaysA" value={draftSettings.orderDaysA} onChange={handleSettingChange} className="w-full border border-blue-300 rounded px-2 py-1.5 text-sm bg-blue-50 focus:ring-2 focus:ring-blue-500 outline-none font-bold text-center" />
+                            </div>
+                            <div>
+                                <span className="text-[10px] text-emerald-600 block mb-0.5 font-medium">B类备货</span>
+                                <input type="number" name="orderDaysB" value={draftSettings.orderDaysB} onChange={handleSettingChange} className="w-full border border-emerald-300 rounded px-2 py-1.5 text-sm bg-emerald-50 focus:ring-2 focus:ring-emerald-500 outline-none font-bold text-center" />
+                            </div>
+                            <div>
+                                <span className="text-[10px] text-slate-600 block mb-0.5 font-medium">C类备货</span>
+                                <input type="number" name="orderDaysC" value={draftSettings.orderDaysC} onChange={handleSettingChange} className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm bg-slate-50 focus:ring-2 focus:ring-slate-500 outline-none font-bold text-center" />
+                            </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* --- 需求预测算法配置 --- */}
+                  <div className="bg-white border border-indigo-100 rounded-xl shadow-sm overflow-hidden mt-4">
+                      <button onClick={() => setShowAlgoSettings(!showAlgoSettings)} className="w-full bg-indigo-50/50 px-3 py-2.5 flex items-center justify-between hover:bg-indigo-100/50 transition-colors border-b border-indigo-50">
+                          <div className="flex items-center gap-2">
+                              <IconTrendingUp size={16} className="text-indigo-600" />
+                              <h3 className="text-[12px] font-bold text-indigo-900">📈 日均销量预测算法</h3>
+                          </div>
+                          {showAlgoSettings ? <IconChevronUp size={14} className="text-indigo-400"/> : <IconChevronDown size={14} className="text-indigo-400"/>}
+                      </button>
+                      {showAlgoSettings && (
+                          <div className="p-3 space-y-3 bg-white">
+                              <div>
+                                  <label className="block text-[11px] font-bold text-slate-700 mb-1">计算模式选择：</label>
+                                  <select name="demandCalcMethod" value={draftSettings.demandCalcMethod} onChange={handleSettingChange} className="w-full border border-slate-300 rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-slate-50">
+                                      <option value="simple">简单平均 (总销量÷天数)</option>
+                                      <option value="weighted">多段加权 (近期权重更高)</option>
+                                  </select>
+                              </div>
+                              
+                              {draftSettings.demandCalcMethod === 'weighted' && (
+                                  <div className="pt-2 border-t border-slate-100">
+                                      <label className="block text-[11px] font-bold text-indigo-700 mb-2">销量阶段权重分配 (%)</label>
+                                      <div className="flex items-center justify-between gap-2">
+                                          <div className="flex-1">
+                                              <p className="text-[9px] text-slate-500 mb-0.5 text-center">近30天</p>
+                                              <input type="number" name="weight30d" value={draftSettings.weight30d} onChange={handleSettingChange} className="w-full border border-indigo-200 rounded px-1 py-1 text-xs text-center focus:ring-2 focus:ring-indigo-500" />
+                                          </div>
+                                          <div className="flex-1">
+                                              <p className="text-[9px] text-slate-500 mb-0.5 text-center">31~90天</p>
+                                              <input type="number" name="weight90d" value={draftSettings.weight90d} onChange={handleSettingChange} className="w-full border border-indigo-200 rounded px-1 py-1 text-xs text-center focus:ring-2 focus:ring-indigo-500" />
+                                          </div>
+                                          <div className="flex-1">
+                                              <p className="text-[9px] text-slate-500 mb-0.5 text-center">>90天</p>
+                                              <input type="number" name="weightOlder" value={draftSettings.weightOlder} onChange={handleSettingChange} className="w-full border border-indigo-200 rounded px-1 py-1 text-xs text-center focus:ring-2 focus:ring-indigo-500" />
+                                          </div>
+                                      </div>
+                                  </div>
+                              )}
+                              
+                              <div className="pt-2 border-t border-slate-100">
+                                  <label className="block text-[11px] font-bold text-indigo-700 mb-1" title="如果某型号频次极低，将被判定为工程偶然单，削减其日均需求防爆仓">工程大单过滤 (最低频次)</label>
+                                  <div className="flex items-center gap-2">
+                                      <input type="number" name="minOrderFreq" value={draftSettings.minOrderFreq} onChange={handleSettingChange} className="w-20 border border-slate-300 rounded px-2 py-1 text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-700" />
+                                      <span className="text-[10px] text-slate-500">次 / 周期</span>
+                                  </div>
+                              </div>
+                          </div>
+                      )}
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-3">
+                    <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">系统时间基准</h3>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] font-bold text-indigo-700 mb-0.5 truncate" title="ERP导出【总销量】的对应时间跨度">总销量周期(天)</label>
+                        <input type="number" name="basePeriod" value={draftSettings.basePeriod} onChange={handleSettingChange} className="w-full border border-indigo-300 rounded px-2 py-1 text-sm bg-indigo-50 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-900" />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-700 mb-0.5 truncate" title="数据导出日期">数据基准日</label>
+                        <input type="date" name="endDate" value={draftSettings.endDate} onChange={handleSettingChange} className="w-full border border-slate-300 rounded px-1.5 py-1 text-[11px] focus:ring-2 focus:ring-slate-400 outline-none" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-3 pb-1">
+                    <h3 className="text-[11px] font-bold text-rose-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+                        <IconTag size={12} /> 滞销清仓预警规则
+                    </h3>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-700 mb-0.5 truncate">轻度积压天数</label>
+                        <input type="number" name="overstockWarningDays" value={draftSettings.overstockWarningDays} onChange={handleSettingChange} className="w-full border border-slate-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-rose-400 outline-none" />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-700 mb-0.5 truncate">死库红线天数</label>
+                        <input type="number" name="deadStockDays" value={draftSettings.deadStockDays} onChange={handleSettingChange} className="w-full border border-slate-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-rose-400 outline-none" />
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+                
+                <div className="p-3 border-t border-slate-100 bg-slate-50 shrink-0">
+                  <button onClick={handleApplySettings} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition-colors shadow-md flex items-center justify-center gap-2">
+                    <IconCalculator size={18} />
+                    保存参数并重算
+                  </button>
+                </div>
+              </div>
+
+              {/* --- 右侧主工作区 --- */}
+              <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/50">
+                <header className="bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0 z-20 relative">
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className={`text-slate-500 hover:text-blue-600 transition-all duration-300 bg-slate-100 p-1.5 rounded-md border border-slate-200 ${!isSidebarOpen ? 'rotate-180' : ''}`} title="收起/展开左侧设置">
+                      <IconPanelLeft size={18} />
+                    </button>
+                    
+                    {rawData.length > 0 && (
+                        <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 ml-4 shadow-inner">
+                            <button onClick={()=>setViewMode('table')} className={`px-4 py-1.5 text-xs font-bold rounded-md flex items-center gap-1.5 transition-all duration-300 ${viewMode === 'table' ? 'bg-white shadow-sm text-blue-700 border border-slate-200/50' : 'text-slate-500 hover:text-slate-700'}`}>
+                                <IconTable size={14} /> 补货与风险明细表
+                            </button>
+                            <button onClick={()=>setViewMode('dashboard')} className={`px-4 py-1.5 text-xs font-bold rounded-md flex items-center gap-1.5 transition-all duration-300 ${viewMode === 'dashboard' ? 'bg-white shadow-sm text-blue-700 border border-slate-200/50' : 'text-slate-500 hover:text-slate-700'}`}>
+                                <IconLayoutDashboard size={14} /> 智能分析看板
+                            </button>
+                        </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
+                    <input type="file" accept=".csv" className="hidden" ref={priceFileInputRef} onChange={handlePriceUpload} />
+                    <input type="file" accept=".csv" className="hidden" ref={onOrderFileInputRef} onChange={handleOnOrderUpload} />
+                    {rawData.length > 0 && (
+                      <div className="flex items-center gap-2 mr-2 pr-2 border-r border-slate-200">
+                          <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 px-3 py-1.5 rounded font-bold transition-colors text-xs border border-slate-200 shadow-sm">
+                            <IconUpload size={14} /> 重导主表
+                          </button>
+                          <button onClick={() => onOrderFileInputRef.current?.click()} className="flex items-center gap-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-1.5 rounded font-bold transition-colors text-xs border border-blue-100 shadow-sm" title="若主数据无在途，可单独补充导入在途表">
+                            <IconPackage size={14} /> 补在途表
+                          </button>
+                          <button onClick={() => priceFileInputRef.current?.click()} className="flex items-center gap-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 px-3 py-1.5 rounded font-bold transition-colors text-xs border border-amber-100 shadow-sm" title="若主数据无销售额，可单独补充导入单价表">
+                            <IconDollarSign size={14} /> 补单价表
+                          </button>
+                      </div>
+                    )}
+                    <button onClick={() => exportToCSV('all')} disabled={processedData.length === 0} className="flex items-center gap-1.5 bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50 px-3 py-1.5 rounded font-bold transition-colors text-xs shadow-sm">
+                      <IconDownload size={14} /> 导出完整方案
+                    </button>
+                    <button onClick={() => exportToCSV('restock')} disabled={processedData.length === 0} className="flex items-center gap-1.5 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 disabled:opacity-50 px-3 py-1.5 rounded font-bold transition-colors text-xs border border-emerald-200 shadow-sm">
+                      <IconDownload size={14} /> 仅导出采购单
+                    </button>
+                  </div>
+                </header>
+
+                <main className="flex-1 flex flex-col overflow-hidden relative">
+                  {rawData.length === 0 ? (
+                    <div className="h-full w-full flex flex-col items-center justify-center p-8 bg-slate-50 overflow-y-auto custom-scrollbar">
+                        <div className="w-full max-w-4xl bg-white rounded-2xl shadow-sm border border-slate-200 p-8 md:p-12 text-slate-800">
+                            <div className="text-center mb-8">
+                                <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-5 shadow-inner">
+                                    <IconFileSpreadsheet size={40} className="text-blue-500" />
+                                </div>
+                                <h2 className="text-2xl font-bold text-slate-800 mb-3 tracking-wide">美国蜜乐涂料 - 补货中枢系统已待命</h2>
+                                <p className="text-slate-500 text-sm mb-6">请从您的进销存或 ERP 系统导出最新数据 (需另存为 CSV 格式) 并在此载入。</p>
+                                <button onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-2 bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5">
+                                    <IconUpload size={18} /> 选择 CSV 格式的涂料数据表
+                                </button>
+                                {uploadError && (
+                                    <div className="mt-4 inline-flex items-start gap-2 px-4 py-2 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm font-medium text-left">
+                                        <IconAlertCircle size={18} className="shrink-0 mt-0.5 text-red-500" />
+                                        <span>{uploadError}</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-10">
+                                <div className="bg-slate-50 p-5 rounded-xl border border-slate-100 shadow-sm">
+                                    <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-3">
+                                        <span className="w-6 h-6 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center text-xs">1</span>
+                                        必填：基础数据表头规范
+                                    </h3>
+                                    <ul className="text-[13px] text-slate-600 space-y-2 pl-1">
+                                        <li><strong className="text-slate-700">基础属性：</strong>涂料编号 (型号/编码等)、涂料名称、规格</li>
+                                        <li><strong className="text-slate-700">库存指标：</strong>公司库存 (实物结存)</li>
+                                        <li><strong className="text-slate-700">销售指标：</strong>销量 (周期内总发货数)</li>
+                                    </ul>
+                                </div>
+
+                                <div className="bg-slate-50 p-5 rounded-xl border border-slate-100 shadow-sm">
+                                    <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-3">
+                                        <span className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs">2</span>
+                                        选填：进阶 / 后续可单独导入
+                                    </h3>
+                                    <ul className="text-[13px] text-slate-600 space-y-2 pl-1">
+                                        <li><strong className="text-slate-700">采购在途：</strong>可随主表导入，<span className="text-blue-600 font-bold">也可单独导【补在途表】</span></li>
+                                        <li><strong className="text-slate-700">单价/金额：</strong>可随主表导入，<span className="text-amber-600 font-bold">也可单独导【补单价表】</span></li>
+                                        <li><strong className="text-slate-700">动态趋势：</strong>近30天销量、近90天销量</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                  ) : viewMode === 'dashboard' ? (
+                     renderDashboard()
+                  ) : (
+                    <div className="flex-1 flex flex-col w-full mx-auto space-y-4 overflow-hidden p-5 animate-fade-in">
+                      
+                      {/* --- 顶部指标卡片 --- */}
+                      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 shrink-0">
+                        <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-3 rounded-xl border border-blue-800 shadow-md flex items-center gap-3 text-white relative overflow-hidden">
+                          <div className="absolute right-0 top-0 w-24 h-24 bg-white/10 rounded-full -mr-8 -mt-8 pointer-events-none"></div>
+                          <div className="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center shrink-0">
+                            <IconLayers className="text-white" size={18} />
+                          </div>
+                          <div className="truncate relative z-10">
+                            <p className="text-[10px] font-bold text-blue-100 mb-0.5">算法凑足整柜数</p>
+                            <p className="text-xl font-bold leading-none">{processedResult.totalContainers} <span className="text-[10px] font-normal text-blue-200">柜</span></p>
+                          </div>
+                        </div>
+
+                        <div className="bg-white p-3 rounded-xl border border-blue-200 shadow-sm flex items-center gap-3 ring-1 ring-blue-50">
+                          <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center shrink-0">
+                            <IconBarChart3 className="text-blue-600" size={18} />
+                          </div>
+                          <div className="w-full pr-1 truncate">
+                            <p className="text-[10px] font-bold text-slate-500 mb-0.5">ABC 评级概况</p>
+                            <div className="flex items-end gap-1.5 leading-none">
+                              <span className="text-[11px] font-bold text-blue-700" title="A类畅销款">A:{metrics.totalA}</span>
+                              <span className="text-[11px] font-bold text-emerald-700" title="B类平销款">B:{metrics.totalB}</span>
+                              <span className="text-[11px] font-bold text-slate-500" title="C类长尾款">C:{metrics.totalC}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="bg-white p-3 rounded-xl border border-emerald-200 shadow-sm flex items-center gap-3">
+                          <div className="w-9 h-9 bg-emerald-50 rounded-lg flex items-center justify-center shrink-0">
+                            <IconUpload className="text-emerald-600" size={18} />
+                          </div>
+                          <div className="truncate">
+                            <p className="text-[10px] font-bold text-slate-500 mb-0.5">系统排单总量</p>
+                            <p className="text-lg font-bold text-emerald-700 leading-none">{processedResult.containerFilledQty.toLocaleString()} <span className="text-[10px] font-normal text-slate-400">件</span></p>
+                          </div>
+                        </div>
+
+                        <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-sm flex items-center gap-3">
+                          <div className="w-9 h-9 bg-amber-50 rounded-lg flex items-center justify-center shrink-0">
+                            <IconDollarSign className="text-amber-600" size={18} />
+                          </div>
+                          <div className="truncate">
+                            <p className="text-[10px] font-bold text-slate-500 mb-0.5">预计采购资金</p>
+                            <p className="text-lg font-bold text-amber-700 leading-none truncate" title={`¥${metrics.totalCapital.toFixed(2)}`}>¥{(metrics.totalCapital / 10000).toFixed(2)} <span className="text-[10px] font-normal text-slate-400">万</span></p>
+                          </div>
+                        </div>
+
+                        <div className="bg-white p-3 rounded-xl border border-rose-200 shadow-sm flex items-center gap-3">
+                          <div className="w-9 h-9 bg-rose-50 rounded-lg flex items-center justify-center shrink-0">
+                            <IconTag className="text-rose-600" size={18} />
+                          </div>
+                          <div className="truncate">
+                            <p className="text-[10px] font-bold text-slate-500 mb-0.5">死库/滞销清理</p>
+                            <p className="text-lg font-bold text-rose-700 leading-none">{metrics.totalOverstockItems} <span className="text-[10px] font-normal text-slate-400">款待处理</span></p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col flex-1 min-h-[300px]">
+                        <div className="p-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+                          <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                             备货与风险明细表 <span className="text-xs font-normal text-slate-500 ml-2">(包含双轴周转预警计算)</span>
+                          </h3>
+                          <div className="relative">
+                            <IconSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                            <input type="text" placeholder="搜索编号、名称、规格..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} 
+                              className="pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none w-64 font-medium" />
+                          </div>
+                        </div>
+                        
+                        <div className="overflow-auto flex-1 custom-scrollbar">
+                          <table className="w-full text-left border-collapse text-xs whitespace-nowrap">
+                            <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
+                              <tr>
+                                <SortableHeader label="涂料型号" sortKey="itemCode" />
+                                <SortableHeader label="名称与规格" sortKey="itemName" />
+                                <SortableHeader label="层级" sortKey="classLabel" />
+                                
+                                <SortableHeader label="日均发货" sortKey="d" align="right" title="预测日均销量" />
+                                
+                                <SortableHeader label="公司库存" sortKey="currentStock" align="right" className="bg-slate-100 border-l border-slate-200 text-slate-700" title="仓库实存" />
+                                <SortableHeader label="实物周转" sortKey="physicalCoverDays" align="right" className="bg-slate-100 text-slate-700" title="仅按现有库存计算的可售天数" />
+                                
+                                <SortableHeader label="采购在途" sortKey="onOrderStock" align="right" className="bg-emerald-50 text-emerald-700 border-l border-emerald-100" />
+                                <SortableHeader label="可用总库" sortKey="availableStock" align="right" className="bg-blue-50 text-blue-900 border-l border-blue-100 font-bold" />
+                                <SortableHeader label="总库周转" sortKey="totalCoverDays" align="right" className="bg-blue-50 text-blue-800" title="含在途库存的可售天数" />
+                                
+                                <SortableHeader label="系统状态" sortKey="promoLevel" align="center" className="bg-rose-50/50 border-l border-rose-100" />
+                                
+                                <SortableHeader label="红线 / 目标位" sortKey="rop" align="right" className="bg-red-50 text-red-700 font-bold border-l border-red-100" title="防断货红线 / 理想备货总水位" />
+                                
+                                <SortableHeader label="刚需量" sortKey="basePurchase" align="right" className="bg-purple-50 text-purple-800" title="目标水位减去可用总库，并按箱规取整" />
+                                <SortableHeader label="凑柜追加" sortKey="padQty" align="right" className="bg-purple-100/50 text-purple-600" title="为了填满集装箱被自动分配的追加数量" />
+                                <SortableHeader label="最终下单" sortKey="actualPurchase" align="right" className="bg-purple-100 text-purple-900 font-bold border-r border-purple-200" title="实际发送给供应商的订单总量（必定是箱规的倍数）" />
+                                
+                                <SortableHeader label="预估资金" sortKey="initialCapital" align="right" className="bg-amber-50/30 text-amber-800" />
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {sortedData.map((item, index) => (
+                                <tr key={index} className="hover:bg-slate-50/80 transition-colors">
+                                  <td className="py-2.5 px-2 font-medium text-slate-500">{item.itemCode}</td>
+                                  <td className="py-2.5 px-2 font-bold text-slate-800">
+                                      {item.itemName} <span className="text-slate-400 font-normal ml-1">({item.spec})</span>
+                                  </td>
+                                  
+                                  <td className="py-2.5 px-2">
+                                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold shadow-sm border
+                                        ${item.abcClass === 'A' ? 'bg-blue-50 text-blue-700 border-blue-200' : 
+                                          item.abcClass === 'B' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 
+                                          'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                                        {item.classLabel.split(' ')[0]}
+                                    </span>
+                                  </td>
+                                  
+                                  <td className="py-2.5 px-2 text-right text-slate-800 font-bold">
+                                      {item.d.toFixed(1)}
+                                  </td>
+                                  
+                                  {/* --- 核心修改：双轴展示 --- */}
+                                  <td className="py-2.5 px-2 text-right font-medium text-slate-700 border-l border-slate-100 bg-slate-50/30">
+                                      {item.currentStock.toLocaleString()}
+                                      {item.immediateRisk && <span className="ml-1 text-red-500 font-bold text-[10px]" title="实物库存已破红线，若无在途将断货!">(危)</span>}
+                                  </td>
+                                  <td className={`py-2.5 px-2 text-right font-mono bg-slate-50/30 ${item.immediateRisk ? 'text-red-600 font-bold' : 'text-slate-500'}`}>
+                                    {item.physicalCoverDays === Infinity ? '无动销' : Math.round(item.physicalCoverDays)}
+                                  </td>
+
+                                  <td className="py-2.5 px-2 text-right text-emerald-600 font-bold bg-emerald-50/30 border-l border-emerald-50">
+                                      {item.onOrderStock > 0 ? item.onOrderStock.toLocaleString() : <span className="text-emerald-200">-</span>}
+                                  </td>
+
+                                  <td className={`py-2.5 px-2 text-right font-bold bg-blue-50/50 border-l border-blue-100 shadow-inner ${item.isCritical ? 'text-red-600' : 'text-blue-900'}`}>
+                                    {item.availableStock.toLocaleString()}
+                                  </td>
+                                  <td className={`py-2.5 px-2 text-right font-mono bg-blue-50/30 ${item.isCritical ? 'text-red-600 font-bold' : 'text-blue-800'}`}>
+                                    {item.totalCoverDays === Infinity ? '无动销' : Math.round(item.totalCoverDays)}
+                                  </td>
+                                  
+                                  <td className="py-2.5 px-2 text-center text-[10px] border-l border-rose-50">
+                                    {item.promoLevel === 3 ? (
+                                      <span className="inline-block px-2 py-0.5 rounded font-bold bg-slate-200 text-slate-700 border border-slate-300">{item.promoAction}</span>
+                                    ) : item.promoLevel === 2 ? (
+                                      <span className="inline-block px-2 py-0.5 rounded font-bold bg-rose-100 text-rose-700 border border-rose-200">{item.promoAction}</span>
+                                    ) : item.promoLevel === 1 ? (
+                                      <span className="inline-block px-2 py-0.5 rounded font-bold bg-amber-100 text-amber-700 border border-amber-200">{item.promoAction}</span>
+                                    ) : (
+                                      <span className="text-slate-400 font-medium">{item.promoAction}</span>
+                                    )}
+                                  </td>
+
+                                  <td className="py-2.5 px-2 text-right font-bold text-rose-600 bg-rose-50/50 border-l border-rose-100/50 shadow-inner">
+                                    {item.d > 0 && !item.isExcludedQt ? (
+                                        <div className="flex items-center justify-end gap-1.5">
+                                            <span>{item.rop.toLocaleString()}</span>
+                                            <span className="text-[11px] text-slate-400 font-normal">/</span>
+                                            <span className="text-slate-600 font-medium" title="该品类目标备货总水位">{item.targetStock.toLocaleString()}</span>
+                                        </div>
+                                    ) : '-'}
+                                  </td>
+                                  
+                                  <td className="py-2.5 px-2 text-right font-medium text-purple-700 bg-purple-50/30 border-l border-purple-50/50">
+                                    {item.basePurchase > 0 ? item.basePurchase.toLocaleString() : '-'}
+                                  </td>
+
+                                  <td className="py-2.5 px-2 text-right font-bold text-purple-500 bg-purple-50/50">
+                                    {item.padQty > 0 ? `+${item.padQty.toLocaleString()}` : <span className="text-slate-300 opacity-50">-</span>}
+                                  </td>
+
+                                  <td className={`py-2.5 px-2 text-right font-bold border-r border-purple-100/80 ${item.isExcludedQt ? 'bg-slate-50 text-slate-400' : (item.needsRestock ? 'bg-purple-100 text-purple-900 shadow-sm' : 'bg-slate-50 text-slate-300')}`}>
+                                    {item.isExcludedQt ? (
+                                      <span className="text-slate-400 text-[11px] font-normal">停补(建议分装)</span>
+                                    ) : (item.d > 0 ? (
+                                      item.actualPurchase > 0 ? (
+                                        <div className="flex items-center justify-end gap-1.5 text-sm">
+                                          {item.isCritical && <IconAlertCircle size={14} className="text-rose-500 animate-pulse" title="已跌破红线，告急！" />}
+                                          {item.actualPurchase.toLocaleString()}
+                                        </div>
+                                      ) : '暂无需补'
+                                    ) : '-')}
+                                  </td>
+                                  
+                                  <td className="py-2.5 px-2 text-right font-mono font-medium text-amber-700 bg-amber-50/20">
+                                    {item.initialCapital > 0 ? `¥${item.initialCapital.toLocaleString(undefined, {maximumFractionDigits:0})}` : '-'}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          {sortedData.length === 0 && (
+                            <div className="p-10 text-center flex flex-col items-center justify-center opacity-50">
+                                <IconSearch size={40} className="mb-4 text-slate-400" />
+                                <p className="text-slate-500 font-bold">未找到符合条件的涂料型号</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </main>
+              </div>
+            </div>
+          );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f8fafc; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* 动画 */
+        .animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .animate-slide-in-right { animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
+</body>
+</html>

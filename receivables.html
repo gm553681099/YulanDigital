@@ -1,0 +1,2278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>应收账款综合管理与绩效考核系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <!-- 引入 PDF 导出库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background-color: #f3f4f6; }
+        .stat-card { background: white; border-radius: 0.75rem; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e5e7eb; transition: transform 0.2s; }
+        .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .chart-container { background: white; border-radius: 0.75rem; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e5e7eb; height: 520px; }
+        .drag-active { border-color: #4f46e5 !important; background-color: #e0e7ff !important; transform: scale(1.02); }
+        .table-container { max-height: 80vh; overflow-y: auto; }
+        thead th { position: sticky; top: 0; background-color: #f8fafc; z-index: 10; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
+        
+        .tab-btn { transition: all 0.2s ease-in-out; border-bottom: 2px solid transparent; }
+        .tab-active { color: #4f46e5; border-bottom: 2px solid #4f46e5; font-weight: bold; background-color: #e0e7ff; }
+        .tab-inactive { color: #6b7280; background-color: #f9fafb; }
+        .tab-inactive:hover { color: #111827; background-color: #f3f4f6; }
+        
+        details > summary { list-style: none; }
+        details > summary::-webkit-details-marker { display: none; }
+        
+        .data-trace { text-decoration: underline; text-decoration-style: dashed; text-decoration-color: #9ca3af; text-underline-offset: 4px; cursor: help; }
+        .progress-bar-fill { transition: width 1s ease-out; }
+        
+        .custom-scrollbar { overflow-x: auto; scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+        .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
+
+        .feature-card { transition: all 0.3s ease; }
+        .feature-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        
+        /* 导出时的强制样式 */
+        .pdf-export-mode .view-section { margin-bottom: 40px !important; padding-bottom: 20px; border-bottom: 2px dashed #e5e7eb; }
+    </style>
+</head>
+<body class="p-4 md:p-8 relative overflow-x-hidden">
+
+    <!-- 脏数据雷达 Toast (默认隐藏在外侧) -->
+    <div id="diagnosticToast" class="fixed bottom-5 right-5 transform translate-y-full opacity-0 transition-all duration-500 bg-white border-l-4 border-orange-500 shadow-2xl rounded-lg p-4 w-80 z-50">
+        <div class="flex justify-between items-start">
+            <h3 class="font-bold text-gray-800 text-sm flex items-center gap-1">
+                <svg class="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                数据质量扫描雷达
+            </h3>
+            <button onclick="closeDiagnosticToast()" class="text-gray-400 hover:text-gray-600 font-bold">&times;</button>
+        </div>
+        <div id="diagnosticContent" class="text-xs text-gray-600 mt-2 space-y-1"></div>
+    </div>
+
+    <div class="max-w-7xl mx-auto space-y-6">
+        
+        <!-- ================= 全局持久化 Header (完美居中+右侧按钮) ================= -->
+        <div id="globalHeader" class="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-200 relative mb-4">
+            <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 rounded-t-xl"></div>
+            
+            <div class="flex flex-col xl:flex-row justify-between items-center gap-4">
+                <!-- 占位区：保持大屏幕下标题绝对居中 -->
+                <div class="hidden xl:flex flex-1"></div>
+                
+                <!-- 核心标题区 -->
+                <div class="flex flex-col items-center justify-center flex-shrink-0 mt-2 xl:mt-0 text-center">
+                    <div class="flex flex-wrap items-center justify-center gap-3">
+                        <svg class="w-8 h-8 text-indigo-600 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                        <h1 class="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">应收账款综合管理与绩效考核系统</h1>
+                        <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded-full font-bold shadow-sm">高阶智能版 v3.0</span>
+                    </div>
+                    <p id="headerSubtitle" class="text-gray-500 mt-2 text-sm font-medium">内置图表穿透联动、一键全景快照、极速脏数据扫描机制。</p>
+                </div>
+                
+                <!-- 右侧动作按钮区 (激活引擎后显示) -->
+                <div class="flex xl:flex-1 justify-center xl:justify-end items-center w-full xl:w-auto mt-2 xl:mt-0">
+                    <div id="headerActions" class="hidden flex gap-3">
+                        <button id="btn-export-pdf" onclick="exportAllViewsPDF()" class="px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg text-sm font-bold transition shadow-sm flex items-center gap-2 whitespace-nowrap">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            导出全景报告
+                        </button>
+                        <button id="btnReset" onclick="resetSystem()" class="px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-sm font-bold transition shadow-sm border border-indigo-100 flex items-center gap-2 whitespace-nowrap">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                            返回重导
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= 上传与功能介绍区 ================= -->
+        <div id="uploadSection" class="flex flex-col gap-6 transition-all duration-500">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 rounded-xl p-5 feature-card">
+                    <h3 class="font-bold text-indigo-900 flex items-center gap-2 text-lg border-b border-indigo-200 pb-2 mb-3">
+                        <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                        🎯 核心能力矩阵
+                    </h3>
+                    <div class="space-y-3 text-[13px] md:text-sm text-gray-700">
+                        <p class="flex items-center gap-1.5 truncate" title="全盘风险熔断与透视：剥离涉诉与坏账，红黄黑三色穿透预警，自动生成最高危黑榜。"><span class="text-indigo-500 flex-shrink-0">❶</span> <span class="truncate"><strong>全盘风险熔断与透视：</strong>剥离坏账，红黄黑预警并生成高危黑榜。</span></p>
+                        <p class="flex items-center gap-1.5 truncate" title="活水营运精细化管理：剔除不良资产，聚焦正常款，按工程生命周期多维分析资金健康度。"><span class="text-indigo-500 flex-shrink-0">❷</span> <span class="truncate"><strong>活水营运精细化管理：</strong>聚焦正常款，按工程周期分析资金健康度。</span></p>
+                        <p class="flex items-center gap-1.5 truncate" title="高层直管督办与环比：支持双月数据对比秒出降幅榜单，自动提取全盘收款计划，生成高管督办单。"><span class="text-indigo-500 flex-shrink-0">❸</span> <span class="truncate"><strong>高层直管督办与环比：</strong>双月对比秒出榜，全自动生成高层督办单。</span></p>
+                        <p class="flex items-center gap-1.5 truncate" title="防作弊智能绩效核算：摒弃悬崖效应，采用“存量降幅+计划覆盖+计划达成”三维矩阵算分机制。"><span class="text-indigo-500 flex-shrink-0">❹</span> <span class="truncate"><strong>防作弊智能绩效核算：</strong>采用降幅、覆盖与达成的三维矩阵算分。</span></p>
+                    </div>
+                </div>
+
+                <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100 rounded-xl p-5 feature-card">
+                    <h3 class="font-bold text-orange-900 flex items-center gap-2 text-lg border-b border-orange-200 pb-2 mb-3">
+                        <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        📋 财务数据导出规范 (CSV格式)
+                    </h3>
+                    <div class="text-sm text-gray-700">
+                        <p class="mb-2">系统具有超强宽容度，自动模糊识别表头。请确保财务系统导出的报表包含以下核心列：</p>
+                        <ul class="grid grid-cols-2 gap-2 mt-2 font-mono text-xs text-orange-800 bg-white/50 p-3 rounded-lg border border-orange-100/50">
+                            <li class="flex items-center gap-1"><svg class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> 合同名称 / 项目名称</li>
+                            <li class="flex items-center gap-1"><svg class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> 客户类型 / 大区</li>
+                            <li class="flex items-center gap-1"><svg class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> 责任人 / 业务经理</li>
+                            <li class="flex items-center gap-1"><svg class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> 应收款类型 (决定风险)</li>
+                            <li class="flex items-center gap-1"><svg class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> 状态 (反映工程进度)</li>
+                            <li class="flex items-center gap-1"><svg class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> 期末应收款 / 逾期额</li>
+                            <li class="flex items-center gap-1"><svg class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> 发货金额 / 传真收款</li>
+                            <li class="flex items-center gap-1"><svg class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> 当月计划 / 实际收款</li>
+                        </ul>
+                        <p class="mt-2 text-xs text-orange-600">💡 提示：系统原生支持多交款和预收款（负数），会自动抵消风险盘子。</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full mt-2">
+                <div id="dropZonePrev" class="bg-white border-2 border-dashed border-purple-200 rounded-xl p-8 text-center transition-all duration-200 cursor-pointer hover:border-purple-400 hover:bg-purple-50 shadow-sm flex flex-col justify-center items-center h-48 group">
+                    <input type="file" id="fileInputPrev" accept=".csv" class="hidden">
+                    <div id="statusPrev" class="text-gray-500 w-full">
+                        <svg class="mx-auto h-12 w-12 mb-2 text-purple-300 group-hover:text-purple-500 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <p class="font-bold text-lg text-purple-700">1. 上传【上月】数据 (可选)</p>
+                        <p class="text-sm mt-1 text-gray-400">用于解锁双月环比与存量清欠算分</p>
+                    </div>
+                </div>
+
+                <div id="dropZoneCurr" class="bg-white border-2 border-dashed border-indigo-300 rounded-xl p-8 text-center transition-all duration-200 cursor-pointer hover:border-indigo-500 hover:bg-indigo-50 shadow-sm flex flex-col justify-center items-center h-48 relative overflow-hidden group">
+                    <div class="absolute top-0 right-0 bg-indigo-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg shadow-sm">必传项</div>
+                    <input type="file" id="fileInputCurr" accept=".csv" class="hidden">
+                    <div id="statusCurr" class="text-gray-500 w-full">
+                        <svg class="mx-auto h-12 w-12 mb-2 text-indigo-400 group-hover:text-indigo-600 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                        <p class="font-bold text-lg text-indigo-700">2. 上传【本月】数据 (必填)</p>
+                        <p class="text-sm mt-1 text-gray-400">载入本月期末台账，作为全盘核算基准</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 生成按钮 -->
+            <div id="generateActionArea" class="mt-2 flex justify-center hidden opacity-0 transition-opacity duration-500">
+                <button id="btnGenerateDashboard" onclick="processSystem()" class="bg-indigo-600 text-white text-lg font-bold px-12 py-4 rounded-full shadow-lg hover:bg-indigo-700 hover:shadow-indigo-500/50 transition transform hover:-translate-y-1 flex items-center gap-3">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    激活全景数据引擎
+                </button>
+            </div>
+        </div>
+
+        <!-- ================= Main Content Area ================= -->
+        <div id="mainContainer" class="hidden transition-all duration-500">
+            
+            <!-- 导出专属：自动生成的专家诊断报告头 (平时隐藏，仅在导出时渲染) -->
+            <div id="pdf-report-header" class="hidden mb-6 p-8 bg-white border border-gray-200 rounded-xl shadow-sm">
+                <h1 class="text-3xl font-black text-center mb-6 text-gray-900 border-b-2 border-indigo-600 pb-4">应收账款全景资产质检与风控诊断报告</h1>
+                <div class="space-y-5 text-gray-700 leading-relaxed">
+                    <h3 class="text-lg font-bold text-indigo-900 flex items-center gap-2">
+                        <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                        专家按语与风险洞察
+                    </h3>
+                    <p id="pdf-expert-text" class="text-sm indent-8 text-justify"></p>
+                    
+                    <div class="grid grid-cols-2 gap-6 mt-6 bg-slate-50 p-5 rounded-lg border border-slate-100">
+                        <div>
+                            <h4 class="font-bold text-red-700 text-sm mb-2 flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                                核心问题诊断
+                            </h4>
+                            <ul class="list-disc list-outside ml-4 text-xs space-y-2 text-gray-600">
+                                <li><strong>存量逾期板结：</strong>正常款转化为不良资产（待处理、诉讼）的风险在局部放大，账龄呈老龄化趋势。</li>
+                                <li><strong>前端业务失真：</strong>部分责任人当月回款计划覆盖率偏低，存在“悬崖式”怠账与预期管理失真的潜在风险。</li>
+                                <li><strong>系统性坏账隐患：</strong>全盘触发全局信用熔断雷达的客户占据了大量敞口，单一主体崩盘即可引发连锁坏账反应。</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-green-700 text-sm mb-2 flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                风险靶向管控方案
+                            </h4>
+                            <ul class="list-disc list-outside ml-4 text-xs space-y-2 text-gray-600">
+                                <li><strong>执行硬性熔断：</strong>即日起，对触发熔断雷达的客户立即执行“只收不发 / 先款后货”的物理级风控阻断。</li>
+                                <li><strong>法务穿透前置：</strong>针对已陷入深度涉险区（黑名单/破产/诉讼）的资金，跨部门建立“法务-业务”双周联席督办机制。</li>
+                                <li><strong>实施刚性考核：</strong>严格执行系统的“三维智能绩效核算”，将存量清欠降幅与现金流达成率直接硬挂钩至业务薪资系数，打破大锅饭。</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 仪表盘顶栏 Tabs (去除按钮) -->
+            <div id="tab-navigation-bar" class="flex flex-row border-b border-gray-200 mb-4 bg-white rounded-t-xl px-2 pt-4 pb-0 items-end transition-all">
+                <div class="flex overflow-x-auto custom-scrollbar flex-1 min-w-0">
+                    <button onclick="switchTab('dashboard-risk')" id="tab-dashboard-risk" class="tab-btn tab-active px-5 py-3 rounded-t-lg focus:outline-none flex items-center gap-2 whitespace-nowrap">
+                        <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        🔴 全盘风险概览 <span class="text-xs text-gray-400 font-normal">(大盘)</span>
+                    </button>
+                    <button onclick="switchTab('mom')" id="tab-mom" class="tab-btn tab-inactive px-5 py-3 rounded-t-lg focus:outline-none flex items-center gap-2 whitespace-nowrap border-l border-gray-100">
+                        <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+                        📊 关键指标双月环比
+                    </button>
+                    <button onclick="switchTab('dashboard-cash')" id="tab-dashboard-cash" class="tab-btn tab-inactive px-5 py-3 rounded-t-lg focus:outline-none flex items-center gap-2 whitespace-nowrap border-l border-gray-100">
+                        <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        🟢 正常款运营看板 <span class="text-xs text-gray-400 font-normal">(活水)</span>
+                    </button>
+                    <button onclick="switchTab('activity')" id="tab-activity" class="tab-btn tab-inactive px-5 py-3 rounded-t-lg focus:outline-none flex items-center gap-2 whitespace-nowrap border-l border-gray-100">
+                        <svg class="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        ⚡ 当月工程活动 <span class="text-xs text-gray-400 font-normal">(发生额)</span>
+                    </button>
+                    <button onclick="switchTab('supervision')" id="tab-supervision" class="tab-btn tab-inactive px-5 py-3 rounded-t-lg focus:outline-none flex items-center gap-2 whitespace-nowrap border-l border-gray-100">
+                        <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                        <span id="tab-supervision-text">计划督办单</span>
+                    </button>
+                    <button onclick="switchTab('assessment')" id="tab-assessment" class="tab-btn tab-inactive px-5 py-3 rounded-t-lg focus:outline-none flex items-center gap-2 whitespace-nowrap border-l border-gray-100">
+                        <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                        智能刚性考核表
+                    </button>
+                </div>
+            </div>
+
+            <!-- ================= TAB 1: OVERALL RISK DASHBOARD ================= -->
+            <div id="view-dashboard-risk" class="view-section space-y-6 block">
+                <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-xl">
+                    <div class="flex">
+                        <div class="flex-shrink-0"><svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" /></svg></div>
+                        <div class="ml-3"><p class="text-sm text-red-700"><strong>全盘总览视图：</strong> 数据包含正常款、待处理、以及所有的法务执行项。准确反映公司账面 100% 的期末应收总额与风险敞口。</p></div>
+                    </div>
+                </div>
+                <!-- KPIs -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="stat-card border-t-4 border-t-gray-500 cursor-help" title="【计算逻辑】&#10;全盘所有项目的「期末应收款」总和。&#10;&#10;【管理意义】&#10;这是公司账面上的绝对应收净值，已自动将预收款、多交款（负数）与应收款进行了完美抵消。">
+                        <p class="text-sm text-gray-500 font-medium border-b border-dashed border-gray-300 inline-block pb-0.5">全公司期末应收总额 (净值)</p>
+                        <h3 class="text-3xl font-bold text-gray-800 mt-2" id="kpi-total-ar-risk">¥0</h3>
+                        <p class="text-xs text-gray-400 mt-2">已完美自动抵消预收款与核减款</p>
+                    </div>
+                    <div class="stat-card border-t-4 border-t-red-600 bg-red-50/20 cursor-help" title="【计算逻辑】&#10;正常款的「逾期金额」 + 诉讼/破产/黑名单等不良项目的全部「期末应收款」。&#10;&#10;【管理意义】&#10;反映公司当前真正的流动资金失血点。数值越大，说明被无偿占用的资金越多，是公司清欠攻坚的绝对核心盘。">
+                        <p class="text-sm text-red-600 font-medium border-b border-dashed border-red-300 inline-block pb-0.5">全盘总风险敞口 (逾期+涉诉)</p>
+                        <h3 class="text-3xl font-bold text-red-700 mt-2" id="kpi-risk-amt-risk">¥0</h3>
+                        <p class="text-xs text-red-400 mt-2 flex justify-between">
+                            <span>全盘逾期不良率:</span>
+                            <span id="kpi-risk-rate-risk" class="font-bold">0%</span>
+                        </p>
+                    </div>
+                    <div class="stat-card border-t-4 border-t-orange-500 cursor-help" title="【计算逻辑】&#10;精准提取应收类型属于“诉讼、执行、保全、判决、破产”等法务阶段的所有「期末应收款」。&#10;&#10;【管理意义】&#10;这部分资金已脱离常规业务员催收范畴，属于“重症资产”。该金额占比过高，说明前端业务风控失效，只能被动依赖法务兜底。">
+                        <p class="text-sm text-gray-500 font-medium border-b border-dashed border-gray-300 inline-block pb-0.5">深度涉险资金 (诉讼/执行/破产)</p>
+                        <div class="flex items-end gap-2 mt-2">
+                            <h3 class="text-3xl font-bold text-orange-600" id="kpi-litigation-amt-risk">¥0</h3>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-1.5 mt-3 flex">
+                            <div class="bg-orange-500 h-1.5 rounded-l-full" id="kpi-litigation-bar-risk" style="width: 0%"></div>
+                            <div class="bg-transparent h-1.5" style="flex-grow: 1"></div>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-2 flex justify-between">
+                            <span>占总盘子沉没比例:</span>
+                            <span id="kpi-litigation-rate-risk" class="font-bold text-orange-600">0%</span>
+                        </p>
+                    </div>
+                    <div class="stat-card border-t-4 border-t-purple-500 bg-purple-50/30 cursor-help" title="【计算逻辑】&#10;按【客户主体(甲方)】进行全局汇总，若单一客户在公司所有合同项目的累计风险敞口＞50万元，即拉响警报。&#10;&#10;【管理意义】&#10;信用风险是针对“企业法人”而非单体合同！如果客户濒临破产，防范其通过“分散签小单”套取资金，必须跨部门/跨大区进行全局拉黑并熔断新业务。">
+                        <p class="text-sm text-purple-600 font-medium border-b border-dashed border-purple-300 inline-block pb-0.5">全局信用熔断雷达 (>50万)</p>
+                        <div class="flex items-end gap-2 mt-2">
+                            <h3 class="text-3xl font-bold text-purple-700" id="kpi-circuit-breaker-count">0 家</h3>
+                        </div>
+                        <p class="text-xs text-purple-500 mt-2">总占压资金: <span id="kpi-circuit-breaker-amt" class="font-bold">¥0</span></p>
+                    </div>
+                </div>
+
+                <!-- Charts -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="chart-container flex flex-col relative">
+                        <h2 class="text-base font-bold text-gray-800 mb-2">全盘资产分类结构 (净值盘)</h2>
+                        <span class="absolute top-6 right-6 text-[10px] text-gray-400 bg-gray-50 px-2 py-0.5 rounded pointer-events-none">✨点击图表扇区可过滤下方表格</span>
+                        <div id="chartTypeRisk" class="flex-grow w-full h-full cursor-pointer"></div>
+                    </div>
+                    <div class="chart-container flex flex-col relative">
+                        <h2 class="text-base font-bold text-gray-800 mb-2">大区风险预警 (全盘展示)</h2>
+                        <span class="absolute top-6 right-6 text-[10px] text-gray-400 bg-gray-50 px-2 py-0.5 rounded pointer-events-none">✨点击图表柱子可过滤下方表格</span>
+                        <div id="chartRegionRisk" class="flex-grow w-full h-full cursor-pointer"></div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="p-4 border-b border-gray-200 bg-red-50 flex justify-between items-center flex-wrap gap-2">
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-base font-bold text-red-800">全盘最高危项目监控黑榜</h2>
+                            <!-- 图表联动过滤提示标签 -->
+                            <div id="filter-indicator-risk" class="hidden bg-white text-indigo-700 text-xs px-2 py-0.5 rounded border border-indigo-200 flex items-center gap-1 shadow-sm">
+                                <span>🎯 图表联动过滤: <strong id="filter-label-risk"></strong></span>
+                                <button onclick="clearFilter('risk')" class="ml-1 text-gray-400 hover:text-red-500 font-bold px-1" title="清除过滤">✕</button>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button onclick="toggleRiskClientView()" id="btn-risk-client-view" class="px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition shadow-sm flex items-center gap-1 whitespace-nowrap">
+                                <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                                <span id="risk-view-text">📊 按客户透视风险</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="risk-table-container" class="table-container custom-scrollbar">
+                        <table class="w-full text-sm text-left text-gray-600">
+                            <thead class="text-xs text-gray-700 uppercase bg-white border-b border-gray-100">
+                                <tr>
+                                    <th class="px-6 py-4 sticky left-0 bg-white shadow-[1px_0_0_0_#f3f4f6] z-20">
+                                        <div class="flex items-center gap-1 cursor-pointer hover:text-indigo-600 select-none" onclick="handleSort('risk', 'name')">项目名称 <span id="sort-risk-name" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div>
+                                    </th>
+                                    <th class="px-6 py-4"><div class="flex items-center gap-1 cursor-pointer hover:text-indigo-600 select-none" onclick="handleSort('risk', 'client')">客户类型 / 名称 <span id="sort-risk-client" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4"><div class="flex items-center gap-1 cursor-pointer hover:text-indigo-600 select-none" onclick="handleSort('risk', 'type')">应收款类型 <span id="sort-risk-type" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4"><div class="flex items-center gap-1 cursor-pointer hover:text-indigo-600 select-none" onclick="handleSort('risk', 'person')">责任人 <span id="sort-risk-person" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4 text-right text-red-600 font-bold"><div class="flex items-center justify-end gap-1 cursor-pointer hover:text-red-800 select-none" onclick="handleSort('risk', 'ar')">期末应收款 <span id="sort-risk-ar" class="text-red-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableRiskTop10" class="divide-y divide-gray-100"></tbody>
+                        </table>
+                    </div>
+                    
+                    <div id="risk-chart-container" class="hidden p-4">
+                        <div id="chartRiskClient" class="w-full" style="height: 700px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= TAB 2: MOM ANALYSIS ================= -->
+            <div id="view-mom" class="view-section space-y-6 hidden">
+                <div id="mom-empty-state" class="bg-purple-50 border border-purple-100 rounded-xl p-10 text-center">
+                    <svg class="mx-auto h-12 w-12 text-purple-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path></svg>
+                    <h3 class="text-lg font-bold text-purple-800">双月环比分析尚未激活</h3>
+                    <p class="text-gray-500 mt-2 text-sm">请返回首页上传区，补充上传【上个月】的数据文件，系统将自动解锁双月深度环比洞察。</p>
+                </div>
+                
+                <div id="mom-content-state" class="hidden space-y-6">
+                    <div class="bg-purple-50 border-l-4 border-purple-500 p-4 rounded-r-xl">
+                        <div class="flex">
+                            <div class="flex-shrink-0"><svg class="h-5 w-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg></div>
+                            <div class="ml-3"><p class="text-sm text-purple-700"><strong>关键指标双月环比洞察：</strong> 对比上月与本月核心业务数据，自动测算增减幅，直观呈现当月改善或恶化趋势。</p></div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="stat-card border-t-4 border-t-gray-500"><p class="text-sm text-gray-500 font-medium">全盘期末总应收 环比</p><h3 class="text-2xl font-bold text-gray-800 mt-2" id="mom-ar-curr">¥0</h3><div class="mt-2 flex items-center justify-between text-xs"><span class="text-gray-400" id="mom-ar-prev">上月: ¥0</span><span id="mom-ar-diff" class="font-bold px-2 py-0.5 rounded">0%</span></div></div>
+                        <div class="stat-card border-t-4 border-t-yellow-500"><p class="text-sm text-gray-500 font-medium">正常款总逾期额 环比</p><h3 class="text-2xl font-bold text-yellow-600 mt-2" id="mom-overdue-curr">¥0</h3><div class="mt-2 flex items-center justify-between text-xs"><span class="text-gray-400" id="mom-overdue-prev">上月: ¥0</span><span id="mom-overdue-diff" class="font-bold px-2 py-0.5 rounded">0%</span></div></div>
+                        <div class="stat-card border-t-4 border-t-orange-500"><p class="text-sm text-gray-500 font-medium">全盘当月发货额 环比</p><h3 class="text-2xl font-bold text-orange-600 mt-2" id="mom-billing-curr">¥0</h3><div class="mt-2 flex items-center justify-between text-xs"><span class="text-gray-400" id="mom-billing-prev">上月: ¥0</span><span id="mom-billing-diff" class="font-bold px-2 py-0.5 rounded">0%</span></div></div>
+                        <div class="stat-card border-t-4 border-t-green-500"><p class="text-sm text-gray-500 font-medium">全盘当月收款额 环比</p><h3 class="text-2xl font-bold text-green-600 mt-2" id="mom-collection-curr">¥0</h3><div class="mt-2 flex items-center justify-between text-xs"><span class="text-gray-400" id="mom-collection-prev">上月: ¥0</span><span id="mom-collection-diff" class="font-bold px-2 py-0.5 rounded">0%</span></div></div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="chart-container lg:col-span-1 flex flex-col"><h2 class="text-base font-bold text-gray-800 mb-2">核心数据双月走势</h2><div id="chartMoMCompare" class="flex-grow w-full h-full"></div></div>
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden lg:col-span-2 flex flex-col">
+                            <div class="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center"><h2 class="text-base font-bold text-gray-800">责任人存量清欠红黑榜 <span class="text-sm font-normal text-gray-500 ml-2">(点击表头可全盘排序)</span></h2></div>
+                            <div class="overflow-x-auto flex-grow custom-scrollbar">
+                                <table class="w-full text-sm text-left text-gray-600">
+                                    <thead class="text-xs text-gray-700 uppercase bg-white border-b border-gray-100">
+                                        <tr>
+                                            <th class="px-6 py-4">排名</th>
+                                            <th class="px-6 py-4 sticky left-0 bg-white shadow-[1px_0_0_0_#f3f4f6] z-20"><div class="flex items-center gap-1 cursor-pointer hover:text-indigo-600 select-none" onclick="handleSort('mom', 'person')">责任人 <span id="sort-mom-person" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                            <th class="px-6 py-4 text-right"><div class="flex items-center justify-end gap-1 cursor-pointer hover:text-indigo-600 select-none" onclick="handleSort('mom', 'prev')">上月逾期 <span id="sort-mom-prev" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                            <th class="px-6 py-4 text-right"><div class="flex items-center justify-end gap-1 cursor-pointer hover:text-indigo-600 select-none" onclick="handleSort('mom', 'curr')">本月逾期 <span id="sort-mom-curr" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                            <th class="px-6 py-4 text-right text-indigo-600 font-bold"><div class="flex items-center justify-end gap-1 cursor-pointer hover:text-indigo-800 select-none" onclick="handleSort('mom', 'diff')">逾期增减幅度 <span id="sort-mom-diff" class="text-indigo-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tableMomMovers" class="divide-y divide-gray-100"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= TAB 3: NORMAL CASH FLOW DASHBOARD ================= -->
+            <div id="view-dashboard-cash" class="view-section space-y-6 hidden">
+                <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-xl">
+                    <div class="flex">
+                        <div class="flex-shrink-0"><svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg></div>
+                        <div class="ml-3"><p class="text-sm text-green-700"><strong>纯净正常款视图（工程进度透视）：</strong> 已智能剔除诉讼等不良资产。聚焦“正常营运活水”，下方堆积图已使用**高对比渐变色彩体系**来展示工程进度生命周期。</p></div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="stat-card border-t-4 border-t-blue-500"><p class="text-sm text-gray-500 font-medium">正常款期末应收 (活水总盘)</p><h3 class="text-3xl font-bold text-blue-600 mt-2" id="kpi-total-ar-cash">¥0</h3><p class="text-xs text-gray-400 mt-2">可滚动经营的账面资金</p></div>
+                    <div class="stat-card border-t-4 border-t-yellow-500"><p class="text-sm text-gray-500 font-medium">正常款逾期滞留额</p><h3 class="text-3xl font-bold text-yellow-600 mt-2" id="kpi-overdue-cash">¥0</h3><p class="text-xs text-gray-400 mt-2 flex justify-between"><span>正常款营运阻力率:</span><span id="kpi-overdue-rate-cash" class="font-bold text-yellow-700">0%</span></p></div>
+                    <div class="stat-card border-t-4 border-t-green-500"><p class="text-sm text-gray-500 font-medium"><span id="kpi-title-curr-plan-cash">考核月</span>回款达成率</p><h3 class="text-3xl font-bold text-green-600 mt-2" id="kpi-collection-rate-cash">0%</h3><p class="text-xs text-gray-500 mt-1 whitespace-nowrap" id="kpi-actual-amount-cash">已实收 0.00 万 / 承诺 0.00 万</p><div class="w-full bg-gray-200 rounded-full h-1.5 mt-2"><div class="bg-green-500 h-1.5 rounded-full progress-bar-fill" id="kpi-progress-bar-cash" style="width: 0%"></div></div></div>
+                    <div class="stat-card border-t-4 border-t-indigo-500"><p class="text-sm text-gray-500 font-medium"><span id="kpi-title-next-plan-cash">下月</span>现金流预测 (来自正常款)</p><h3 class="text-3xl font-bold text-indigo-600 mt-2" id="kpi-next-plan-cash">¥0</h3><p class="text-xs text-gray-400 mt-2">基于业务提报的下月头寸</p></div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="chart-container flex flex-col relative">
+                        <h2 class="text-base font-bold text-gray-800 mb-2">正常款账龄健康度 (按工程进度展开)</h2>
+                        <span class="absolute top-6 right-6 text-[10px] text-gray-400 bg-gray-50 px-2 py-0.5 rounded pointer-events-none">✨点击图表柱子可过滤下方表格</span>
+                        <div id="chartAgingCash" class="flex-grow w-full h-full cursor-pointer"></div>
+                    </div>
+                    <div class="chart-container flex flex-col relative">
+                        <h2 class="text-base font-bold text-gray-800 mb-2">正常款应收大区分布 (全盘展示)</h2>
+                        <span class="absolute top-6 right-6 text-[10px] text-gray-400 bg-gray-50 px-2 py-0.5 rounded pointer-events-none">✨点击图表柱子可过滤下方表格</span>
+                        <div id="chartRegionCash" class="flex-grow w-full h-full cursor-pointer"></div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="p-4 border-b border-gray-200 bg-yellow-50 flex justify-between items-center">
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-base font-bold text-yellow-800">正常款催收重点跟进名单</h2>
+                            <!-- 图表联动过滤提示标签 -->
+                            <div id="filter-indicator-cash" class="hidden bg-white text-indigo-700 text-xs px-2 py-0.5 rounded border border-indigo-200 flex items-center gap-1 shadow-sm">
+                                <span>🎯 图表联动过滤: <strong id="filter-label-cash"></strong></span>
+                                <button onclick="clearFilter('cash')" class="ml-1 text-gray-400 hover:text-red-500 font-bold px-1" title="清除过滤">✕</button>
+                            </div>
+                        </div>
+                        <span class="text-sm font-normal text-yellow-600">(点击表头可全盘排序)</span>
+                    </div>
+                    <div class="table-container custom-scrollbar">
+                        <table class="w-full text-sm text-left text-gray-600">
+                            <thead class="text-xs text-gray-700 uppercase bg-white border-b border-gray-100">
+                                <tr>
+                                    <th class="px-6 py-4 sticky left-0 bg-white shadow-[1px_0_0_0_#f3f4f6] z-20"><div class="flex items-center gap-1 cursor-pointer hover:text-indigo-600 select-none" onclick="handleSort('cash', 'name')">项目名称 <span id="sort-cash-name" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4"><div class="flex items-center gap-1 cursor-pointer hover:text-indigo-600 select-none" onclick="handleSort('cash', 'client')">客户类型 <span id="sort-cash-client" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4"><div class="flex items-center gap-1 cursor-pointer hover:text-indigo-600 select-none" onclick="handleSort('cash', 'person')">第一责任人 <span id="sort-cash-person" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4 text-right text-yellow-600"><div class="flex items-center justify-end gap-1 cursor-pointer hover:text-yellow-800 select-none" onclick="handleSort('cash', 'overdue')">正常款逾期金额 <span id="sort-cash-overdue" class="text-yellow-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4 text-right"><div class="flex items-center justify-end gap-1 cursor-pointer hover:text-indigo-600 select-none" onclick="handleSort('cash', 'days')">逾期天数 <span id="sort-cash-days" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableCashTop5" class="divide-y divide-gray-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= TAB 4: ACTIVITY DASHBOARD ================= -->
+            <div id="view-activity" class="view-section space-y-6 hidden">
+                <div class="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-xl"><div class="flex"><div class="flex-shrink-0"><svg class="h-5 w-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg></div><div class="ml-3"><p class="text-sm text-orange-700"><strong>全盘工程发生额追踪：</strong> 提取本月全盘所有项目的发货与传真收款活动，统一转换为<span class="font-bold">“万元”</span>清晰呈现。</p></div></div></div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="stat-card border-t-4 border-t-orange-500"><p class="text-sm text-gray-500 font-medium" id="kpi-title-billing">全盘发货总额 (含施工费)</p><div class="flex items-end gap-2 mt-2"><h3 class="text-3xl font-bold text-orange-600" id="kpi-activity-billing">0.00</h3><span class="text-sm text-gray-500 mb-1">万</span></div><p class="text-xs text-gray-500 mt-2">其中: 正常项 <span id="kpi-activity-bill-normal" class="font-bold text-orange-600">0.00</span> 万 | 异常项 <span id="kpi-activity-bill-abnormal">0.00</span> 万</p></div>
+                    <div class="stat-card border-t-4 border-t-green-500"><p class="text-sm text-gray-500 font-medium" id="kpi-title-collection">全盘传真收款总额</p><div class="flex items-end gap-2 mt-2"><h3 class="text-3xl font-bold text-green-600" id="kpi-activity-collection">0.00</h3><span class="text-sm text-gray-500 mb-1">万</span></div><p class="text-xs text-gray-500 mt-2">其中: 正常项 <span id="kpi-activity-coll-normal" class="font-bold text-green-600">0.00</span> 万 | 异常项 <span id="kpi-activity-coll-abnormal">0.00</span> 万</p></div>
+                    <div class="stat-card border-t-4 border-t-blue-500 flex flex-col justify-between"><p class="text-sm text-gray-500 font-medium">全盘资金净流入 (收款 - 发货)</p><div class="flex items-end gap-2 mt-2"><h3 class="text-3xl font-bold text-blue-600" id="kpi-activity-net">0.00</h3><span class="text-sm text-gray-500 mb-1">万</span></div><p class="text-xs text-gray-400 mt-2">正数代表本月资金回笼规模大于新占压</p></div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center flex-wrap gap-2">
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-base font-bold text-gray-800" id="activity-table-title">当月活跃项目明细表 (单位: 万元)</h2>
+                            <!-- 图表联动过滤提示标签 -->
+                            <div id="filter-indicator-activity" class="hidden bg-white text-indigo-700 text-xs px-2 py-0.5 rounded border border-indigo-200 flex items-center gap-1 shadow-sm">
+                                <span>🎯 图表联动过滤: <strong id="filter-label-activity"></strong></span>
+                                <button onclick="clearFilter('activity')" class="ml-1 text-gray-400 hover:text-red-500 font-bold px-1" title="清除过滤">✕</button>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button onclick="toggleActivityView()" id="btn-activity-view" class="px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition shadow-sm flex items-center gap-1 whitespace-nowrap"><svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg><span id="activity-view-text">📊 按客户汇总图</span></button>
+                            <button onclick="toggleActivityThreshold()" id="btn-activity-threshold" class="px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition shadow-sm flex items-center gap-1 whitespace-nowrap"><svg class="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg><span id="activity-threshold-text">过滤微小金额 (>0.5万)</span></button>
+                        </div>
+                    </div>
+                    <div id="activity-table-container" class="table-container custom-scrollbar">
+                        <table class="w-full text-sm text-left text-gray-600">
+                            <thead class="text-xs text-gray-700 uppercase bg-white border-b border-gray-100">
+                                <tr>
+                                    <th class="px-6 py-4 sticky left-0 bg-white shadow-[1px_0_0_0_#f3f4f6] z-20"><div class="flex items-center gap-1 cursor-pointer hover:text-indigo-600 select-none" onclick="handleSort('activity', 'name')">合同名称 <span id="sort-activity-name" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4"><div class="flex items-center gap-1 cursor-pointer hover:text-indigo-600 select-none" onclick="handleSort('activity', 'client')">客户类型 <span id="sort-activity-client" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4"><div class="flex items-center gap-1 cursor-pointer hover:text-indigo-600 select-none" onclick="handleSort('activity', 'person')">责任人 <span id="sort-activity-person" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4 text-right text-orange-600 font-bold" id="th-activity-billing"><div class="flex items-center justify-end gap-1 cursor-pointer hover:text-orange-800 select-none" onclick="handleSort('activity', 'billing')">发货金额(万) <span id="sort-activity-billing" class="text-orange-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4 text-right text-green-600 font-bold" id="th-activity-collection"><div class="flex items-center justify-end gap-1 cursor-pointer hover:text-green-800 select-none" onclick="handleSort('activity', 'collection')">传真收款(万) <span id="sort-activity-collection" class="text-green-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4 text-right text-blue-600 font-bold"><div class="flex items-center justify-end gap-1 cursor-pointer hover:text-blue-800 select-none" onclick="handleSort('activity', 'net')">资金净流入(万) <span id="sort-activity-net" class="text-blue-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableActivityBody" class="divide-y divide-gray-100"></tbody>
+                            <tfoot id="tableActivityFoot"></tfoot>
+                        </table>
+                    </div>
+                    <div id="activity-chart-container" class="hidden p-4 relative">
+                        <span class="absolute top-2 right-6 text-[10px] text-gray-400 bg-gray-50 px-2 py-0.5 rounded pointer-events-none">✨点击图表柱子可过滤下方表格</span>
+                        <div id="chartActivityClient" class="w-full cursor-pointer" style="height: 700px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= TAB 5: SUPERVISION ================= -->
+            <div id="view-supervision" class="view-section space-y-4 hidden">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div><h2 class="text-lg font-bold text-gray-800" id="supervision-main-title">高层直管：收款计划督办台</h2><p class="text-sm text-gray-500 mt-1">提取<span class="font-bold text-indigo-600">全量项目</span>中提报了计划的责任人，支持点击任意表头进行排序。</p></div>
+                        <button onclick="exportSupervisionCSV()" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition shadow-sm flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>导出督办单</button>
+                    </div>
+                    <div class="table-container bg-white custom-scrollbar">
+                        <table class="w-full text-sm text-left text-gray-600">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <!-- Table headers -->
+                                    <th class="px-6 py-4 font-bold sticky left-0 bg-gray-50 shadow-[1px_0_0_0_#e5e7eb] z-20"><div class="flex items-center gap-1 cursor-pointer hover:text-indigo-600 select-none" onclick="handleSort('supervision', 'person')">责任人 <span id="sort-supervision-person" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4 font-bold text-right text-gray-400"><div class="flex items-center justify-end gap-1 cursor-pointer hover:text-gray-600 select-none" onclick="handleSort('supervision', 'riskAmt')">负责风险盘子 <span id="sort-supervision-riskAmt" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4 font-bold text-right text-indigo-700" id="th-plan-curr"><div class="flex items-center justify-end gap-1 cursor-pointer hover:text-indigo-900 select-none" onclick="handleSort('supervision', 'plan')">当月承诺额 <span id="sort-supervision-plan" class="text-indigo-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4 font-bold text-right text-green-700" id="th-actual-curr"><div class="flex items-center justify-end gap-1 cursor-pointer hover:text-green-900 select-none" onclick="handleSort('supervision', 'actual')">实际已回款 <span id="sort-supervision-actual" class="text-green-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4 font-bold text-right text-red-600 bg-red-50/50" id="th-shortfall"><div class="flex items-center justify-end gap-1 cursor-pointer hover:text-red-800 select-none" onclick="handleSort('supervision', 'shortfall')">未达成缺口 <span id="sort-supervision-shortfall" class="text-red-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4 font-bold min-w-[150px]"><div class="flex items-center gap-1 cursor-pointer hover:text-indigo-600 select-none" onclick="handleSort('supervision', 'achieveRate')">考核月进度状态 <span id="sort-supervision-achieveRate" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4 font-bold text-right text-gray-700" id="th-plan-next-main"><div class="flex items-center justify-end gap-1 cursor-pointer hover:text-gray-900 select-none" onclick="handleSort('supervision', 'planNext')">预测下月回款计划 <span id="sort-supervision-planNext" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                </tr>
+                            </thead>
+                            <tbody id="supervisionTableBody" class="divide-y divide-gray-100"></tbody>
+                            <tfoot id="supervisionTableFoot"></tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= TAB 6: PERFORMANCE ASSESSMENT ================= -->
+            <div id="view-assessment" class="view-section space-y-4 hidden">
+                <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex items-center justify-between shadow-sm">
+                    <div>
+                        <h3 class="font-bold text-indigo-900 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                            智能刚性考核表：防作弊与高精度平滑算分引擎
+                        </h3>
+                        <p class="text-xs text-indigo-700/80 mt-1">若已在首页上传了【上个月】数据，系统将自动比对双月差异计算“存量清理分”；若未上传，则自动降级为单月基础评估模式。</p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-indigo-100 overflow-hidden">
+                    <div class="bg-gradient-to-r from-indigo-50 to-blue-50 p-4 border-b border-indigo-100 flex justify-between items-center cursor-pointer hover:from-indigo-100 hover:to-blue-100 transition" onclick="toggleSettings()">
+                        <div class="flex items-center gap-3">
+                            <div class="bg-indigo-600 text-white rounded p-1.5 shadow-sm">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-indigo-900 text-lg">展开设置：全局杠杆调节与高精度算分参数 (主管权限)</h3>
+                            </div>
+                        </div>
+                        <svg id="settings-arrow" class="w-6 h-6 text-indigo-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                    
+                    <div id="assessmentSettings" class="p-6 flex flex-col lg:flex-row gap-8 hidden bg-slate-50">
+                        <!-- 左侧：原理说明与动态公式 -->
+                        <div class="lg:w-2/5 space-y-4">
+                            <div class="bg-indigo-900 text-white p-4 rounded-xl shadow-inner font-mono relative overflow-hidden">
+                                <div class="absolute top-0 right-0 opacity-10 transform translate-x-4 -translate-y-4">
+                                    <svg class="w-24 h-24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                                </div>
+                                <h4 class="text-indigo-200 text-xs mb-2 font-bold uppercase tracking-wider">系统核心运算引擎</h4>
+                                <div class="text-lg font-bold">总得分 = 存量分 + 覆盖分 + 达成分</div>
+                                <div id="formula-display" class="text-sm mt-2 text-indigo-100 opacity-90 border-t border-indigo-700/50 pt-2">
+                                    薪资比例(系数) = 基础值(<b>0.6</b>) + (总得分 ÷ 100 × 浮动比例(<b>0.5</b>))<br>
+                                    <span class="text-xs text-indigo-300">例：满分100则拿满 1.10 系数，0分则拿底线 0.60 系数。</span>
+                                </div>
+                            </div>
+
+                            <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm text-sm text-gray-700 space-y-4">
+                                <h4 class="font-bold text-gray-900 border-b pb-2 flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    高精度平滑算分逻辑说明
+                                </h4>
+                                <div>
+                                    <span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded font-bold mb-1">打破悬崖效应的「线性插值」算法</span>
+                                    <p class="text-xs text-gray-500 leading-relaxed">系统摒弃了传统的“差0.1%直接掉档变0分”的不合理机制。针对覆盖率和达成率，只要达到及格线，系统会在「及格分」与「满分」之间进行**平滑的线性插值计算**。每一分超额努力都会换算为精确的增量小数点得分，绝对公平。</p>
+                                </div>
+                                <div>
+                                    <span class="inline-block bg-red-100 text-red-800 text-xs px-2 py-0.5 rounded font-bold mb-1">计划达成分 (强力防作弊)</span>
+                                    <p class="text-xs text-gray-500 leading-relaxed">如果员工填报的计划覆盖率低于设定极值，说明试图“将计划定得很低以骗取高达成率”，该项得分将被系统强行**一刀切砍半惩罚**！</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 右侧：全局系数与细化参数设置 -->
+                        <div class="lg:w-3/5 flex flex-col justify-between">
+                            
+                            <!-- 新增：全局薪资杠杆设置 -->
+                            <div class="mb-4 bg-white p-3 rounded-xl border border-indigo-200 shadow-sm flex flex-col sm:flex-row items-start sm:items-center gap-3 hover:border-indigo-400 transition">
+                                <h4 class="font-bold text-indigo-900 text-sm whitespace-nowrap"><span class="mr-1">⚖️</span>全局薪资杠杆</h4>
+                                <div class="flex-1 flex gap-3 w-full">
+                                    <div class="w-1/2 relative">
+                                        <label class="text-[10px] font-bold text-gray-500 mb-0.5 block">保底基础系数</label>
+                                        <input type="number" id="coef-base" value="0.6" step="0.1" class="w-full border border-gray-300 rounded p-1.5 text-sm font-bold text-indigo-700 outline-none focus:border-indigo-500 bg-gray-50" onchange="updateFormulaDisplay()">
+                                    </div>
+                                    <div class="w-1/2 relative">
+                                        <label class="text-[10px] font-bold text-gray-500 mb-0.5 block">绩效满分浮动系数</label>
+                                        <input type="number" id="coef-float" value="0.5" step="0.1" class="w-full border border-gray-300 rounded p-1.5 text-sm font-bold text-indigo-700 outline-none focus:border-indigo-500 bg-gray-50" onchange="updateFormulaDisplay()">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h4 class="font-bold text-gray-800 mb-3 text-sm flex items-center gap-2">
+                                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                                细分维度门槛与权重
+                            </h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <!-- D1: 存量清理 -->
+                                <div class="space-y-2 bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex flex-col hover:border-indigo-300 transition">
+                                    <h4 class="font-bold text-gray-800 text-sm border-b border-gray-100 pb-1">① 存量清理</h4>
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 mb-0.5 block">权重分值</label>
+                                        <div class="relative">
+                                            <input type="number" id="weight-d1" value="20" class="w-full border border-gray-300 rounded p-1.5 text-sm font-bold text-gray-700 outline-none focus:border-indigo-500 transition pl-6" onchange="updateTotalWeight()">
+                                            <span class="absolute left-2 top-1.5 text-gray-400 text-xs">分</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex gap-1.5">
+                                        <div class="w-1/2">
+                                            <label class="text-[10px] text-gray-500 mb-0.5 block" title="逾期金额允许微小增加的阈值">容忍微增(%)</label>
+                                            <input type="number" id="d1-inc-thresh" value="5" class="w-full border border-gray-300 rounded p-1 text-xs outline-none bg-gray-50">
+                                        </div>
+                                        <div class="w-1/2">
+                                            <label class="text-[10px] text-gray-500 mb-0.5 block" title="触发微增条件时拿到的基准分比例">微增得分(%)</label>
+                                            <input type="number" id="d1-partial-ratio" value="50" class="w-full border border-gray-300 rounded p-1 text-xs outline-none bg-gray-50">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- D2: 计划覆盖 -->
+                                <div class="space-y-2 bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex flex-col hover:border-indigo-300 transition">
+                                    <h4 class="font-bold text-gray-800 text-sm border-b border-gray-100 pb-1">② 计划覆盖</h4>
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 mb-0.5 block">权重分值</label>
+                                        <div class="relative">
+                                            <input type="number" id="weight-d2" value="30" class="w-full border border-gray-300 rounded p-1.5 text-sm font-bold text-gray-700 outline-none focus:border-indigo-500 transition pl-6" onchange="updateTotalWeight()">
+                                            <span class="absolute left-2 top-1.5 text-gray-400 text-xs">分</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex gap-1">
+                                         <div class="w-1/3">
+                                             <label class="text-[10px] text-gray-500 mb-0.5 block">满分(%)</label>
+                                             <input type="number" id="thresh-d2-high" value="20" class="w-full border border-gray-300 rounded px-1 py-1.5 text-xs outline-none bg-gray-50 text-center">
+                                         </div>
+                                         <div class="w-1/3">
+                                             <label class="text-[10px] text-gray-500 mb-0.5 block">及格(%)</label>
+                                             <input type="number" id="thresh-d2-low" value="10" class="w-full border border-gray-300 rounded px-1 py-1.5 text-xs outline-none bg-gray-50 text-center">
+                                         </div>
+                                         <div class="w-1/3">
+                                             <label class="text-[10px] text-gray-500 mb-0.5 block truncate" title="及格线对应的得分比例">及格分(%)</label>
+                                             <input type="number" id="d2-low-ratio" value="50" class="w-full border border-gray-300 rounded px-1 py-1.5 text-xs outline-none bg-gray-50 text-center text-indigo-600 font-bold">
+                                         </div>
+                                    </div>
+                                    <p class="text-[9px] text-gray-400 mt-1 leading-tight">及格与满分间执行平滑折算。</p>
+                                </div>
+                                
+                                <!-- D3: 计划达成 -->
+                                <div class="space-y-2 bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex flex-col relative hover:border-indigo-300 transition">
+                                    <h4 class="font-bold text-gray-800 text-sm border-b border-gray-100 pb-1">③ 计划达成</h4>
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 mb-0.5 block">权重分值</label>
+                                        <div class="relative">
+                                            <input type="number" id="weight-d3" value="50" class="w-full border border-gray-300 rounded p-1.5 text-sm font-bold text-gray-700 outline-none focus:border-indigo-500 transition pl-6" onchange="updateTotalWeight()">
+                                            <span class="absolute left-2 top-1.5 text-gray-400 text-xs">分</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex gap-1 mb-1">
+                                         <div class="w-1/3">
+                                             <label class="text-[10px] text-gray-500 mb-0.5 block">满分(%)</label>
+                                             <input type="number" id="thresh-d3-high" value="95" class="w-full border border-gray-300 rounded px-1 py-1.5 text-xs outline-none bg-gray-50 text-center">
+                                         </div>
+                                         <div class="w-1/3">
+                                             <label class="text-[10px] text-gray-500 mb-0.5 block">及格(%)</label>
+                                             <input type="number" id="thresh-d3-low" value="90" class="w-full border border-gray-300 rounded px-1 py-1.5 text-xs outline-none bg-gray-50 text-center">
+                                         </div>
+                                         <div class="w-1/3">
+                                             <label class="text-[10px] text-gray-500 mb-0.5 block truncate">及格分(%)</label>
+                                             <input type="number" id="d3-low-ratio" value="60" class="w-full border border-gray-300 rounded px-1 py-1.5 text-xs outline-none bg-gray-50 text-center text-indigo-600 font-bold">
+                                         </div>
+                                    </div>
+                                    <div class="mt-auto bg-red-50 p-1.5 rounded border border-red-100 shadow-sm flex items-center justify-between">
+                                        <label class="text-[9px] text-red-800 font-bold truncate">🚨覆盖率低于</label>
+                                        <div class="flex items-center text-[10px] text-red-700">
+                                            <input type="number" id="anti-gaming-thresh" value="10" class="w-8 px-0.5 py-0.5 border border-red-300 rounded bg-white text-center font-bold">%砍半
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-4 flex flex-col sm:flex-row justify-between items-center pt-3 border-t border-gray-200 gap-4">
+                                <div class="bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm text-sm">
+                                    <span class="text-gray-600 font-bold">三项满分合计需为100分：<span id="total-weight-display" class="font-black text-green-600 text-lg ml-1">100</span></span>
+                                </div>
+                                <button onclick="applyAssessmentSettings()" class="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-blue-600 text-white px-6 py-2.5 rounded-lg shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all font-bold text-sm flex items-center justify-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                    保存配置并重新计算
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mt-4">
+                    <div class="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                        <h2 class="text-lg font-bold text-gray-800">绩效考核计算排行榜 (支持点击表头全盘排序)</h2>
+                        <button onclick="exportAssessmentCSV()" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition shadow-sm flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            导出考核结果 (CSV)
+                        </button>
+                    </div>
+                    <div class="table-container custom-scrollbar">
+                        <table class="w-full text-sm text-left text-gray-600">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th class="px-6 py-4 font-bold sticky left-0 bg-gray-50 shadow-[1px_0_0_0_#e5e7eb] z-20"><div class="flex items-center gap-1 cursor-pointer hover:text-indigo-600 select-none" onclick="handleSort('assessment', 'person')">签约人 <span id="sort-assessment-person" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4 font-bold text-right text-gray-400"><div class="flex items-center justify-end gap-1 cursor-pointer hover:text-gray-600 select-none" onclick="handleSort('assessment', 'pOverdue')">上月逾期 <span id="sort-assessment-pOverdue" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4 font-bold text-right"><div class="flex items-center justify-end gap-1 cursor-pointer hover:text-gray-900 select-none" onclick="handleSort('assessment', 'cOverdue')">本月逾期 <span id="sort-assessment-cOverdue" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4 font-bold text-right"><div class="flex items-center justify-end gap-1 cursor-pointer hover:text-indigo-600 select-none" onclick="handleSort('assessment', 'cov')">覆盖率 <span id="sort-assessment-cov" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4 font-bold text-right"><div class="flex items-center justify-end gap-1 cursor-pointer hover:text-indigo-600 select-none" onclick="handleSort('assessment', 'ach')">达成率 <span id="sort-assessment-ach" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4 font-bold text-center"><div class="flex items-center justify-center gap-1 cursor-pointer hover:text-gray-900 select-none" onclick="handleSort('assessment', 'd1Score')"><span id="th-d1-score">存量分</span> <span id="sort-assessment-d1Score" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4 font-bold text-center"><div class="flex items-center justify-center gap-1 cursor-pointer hover:text-gray-900 select-none" onclick="handleSort('assessment', 'd2Score')"><span id="th-d2-score">覆盖分</span> <span id="sort-assessment-d2Score" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4 font-bold text-center"><div class="flex items-center justify-center gap-1 cursor-pointer hover:text-gray-900 select-none" onclick="handleSort('assessment', 'd3Score')"><span id="th-d3-score">达成分</span> <span id="sort-assessment-d3Score" class="text-gray-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4 font-bold text-center text-indigo-700 bg-indigo-50/50"><div class="flex items-center justify-center gap-1 cursor-pointer hover:text-indigo-900 select-none" onclick="handleSort('assessment', 'total')">总得分 <span id="sort-assessment-total" class="text-indigo-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                    <th class="px-6 py-4 font-bold text-center text-indigo-700 bg-indigo-50/50"><div class="flex items-center justify-center gap-1 cursor-pointer hover:text-indigo-900 select-none" onclick="handleSort('assessment', 'coef')">薪资比例 <span id="sort-assessment-coef" class="text-indigo-300 font-normal text-xs opacity-50">↕</span></div></th>
+                                </tr>
+                            </thead>
+                            <tbody id="assessmentTableBody" class="divide-y divide-gray-100"></tbody>
+                        </table>
+                    </div>
+                    <div class="p-3 bg-indigo-50 border-t border-indigo-100 text-xs text-indigo-800 flex justify-between">
+                        <p id="assessmentNotice" class="font-bold flex items-center gap-2"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data State Globals
+        let rawPrevData = null;
+        let rawCurrData = null;
+        
+        let projectsListRisk = [];
+        let riskClientDataList = [];
+        let riskUniqueTypes = new Set();
+        let projectsListCash = [];
+        let activityDataList = [];
+        let activityClientDataList = [];
+        let activityUniqueTypes = new Set();
+        let supervisionResults = [];
+        let assessmentResults = [];
+        let personMoMList = [];
+        let cashUniqueStatuses = new Set(); 
+        let regionAggCash = {};
+        let agingBucketsGlobal = {};
+        
+        let eChartsInstances = {};
+        let isActivityThresholdActive = false;
+        let isActivityClientView = false;
+        let isRiskClientView = true;
+        let sortState = {};
+        
+        // ===== Cross Filtering State =====
+        let currentFilters = { risk: null, cash: null, activity: null };
+
+        function applyFilter(module, conditions, label) {
+            currentFilters[module] = { conditions, label };
+            document.getElementById(`filter-indicator-${module}`).classList.remove('hidden');
+            document.getElementById(`filter-label-${module}`).innerText = label;
+
+            if(module === 'risk') { isRiskClientView = false; applyRiskClientViewUI(); drawRiskTable(); }
+            if(module === 'cash') drawCashTable();
+            if(module === 'activity') { isActivityClientView = false; toggleActivityView(); drawActivityTable(); }
+        }
+
+        function clearFilter(module) {
+            currentFilters[module] = null;
+            document.getElementById(`filter-indicator-${module}`).classList.add('hidden');
+            
+            if(module === 'risk') drawRiskTable();
+            if(module === 'cash') drawCashTable();
+            if(module === 'activity') drawActivityTable();
+        }
+
+        // --- 1. 强健的底层正则分类色彩与排序体系 ---
+        let typeColorMapCache = {};
+
+        function getTypeSeverityIndex(type) {
+            if (!type) return 50;
+            // 准坏账 绝对置底 (数值最大)
+            if (type.includes('准坏账')) return 99; 
+            
+            // 安全区
+            if (type.includes('正常')) return 1;
+            if (type.includes('生效')) return 2;
+            if (type.includes('未开工')) return 3;
+            if (type.includes('部分发货')) return 4;
+            if (type.includes('质保')) return 5;
+            if (type.includes('中间商')) return 6;
+            
+            // 警示区
+            if (type.includes('待处理')) return 7;
+            
+            // 危机区 (细分)
+            if (type.includes('进行')) return 10;
+            if (type.includes('诉讼') || type.includes('仲裁')) {
+                // 如果括号内有特殊状态需进一步细分
+                if (type.includes('判决') || type.includes('裁决')) return 11;
+                if (type.includes('保全')) return 12;
+                return 10; // 默认诉讼等同于进行中
+            }
+            if (type.includes('法务') || type.includes('判决') || type.includes('裁决')) return 11;
+            if (type.includes('保全')) return 12;
+            
+            // 极端异常
+            if (type.includes('黑名单') || type.includes('破产') || type.includes('失信') || type.includes('坏账')) return 13;
+            
+            // 其它兜底
+            if (type.includes('其他')) return 8;
+            return 50;
+        }
+
+        function getSemanticColorForType(type) {
+            if (!type) return '#9ca3af';
+            if (typeColorMapCache[type]) return typeColorMapCache[type];
+            
+            let assignedColor = '#9ca3af'; 
+            
+            // 准坏账强制纯黑
+            if (type.includes('准坏账')) assignedColor = '#000000';
+            
+            // 绿区及特例色
+            else if (type.includes('正常')) assignedColor = '#34d399';
+            else if (type.includes('生效')) assignedColor = '#0ea5e9'; // 亮天蓝
+            else if (type.includes('部分发货')) assignedColor = '#6366f1'; // 亮靛蓝
+            else if (type.includes('质保')) assignedColor = '#059669';
+            else if (type.includes('中间商')) assignedColor = '#064e3b';
+            
+            // 黄区
+            else if (type.includes('待处理')) assignedColor = '#f59e0b';
+            
+            // 红区渐变
+            else if (type.includes('诉讼') || type.includes('仲裁') || type.includes('进行')) {
+                if (type.includes('判决') || type.includes('裁决') || type.includes('法务')) assignedColor = '#dc2626'; // 深红
+                else if (type.includes('保全')) assignedColor = '#991b1b'; // 暗红
+                else assignedColor = '#f87171'; // 浅珊瑚红 (进行中)
+            }
+            else if (type.includes('法务') || type.includes('判决') || type.includes('裁决')) assignedColor = '#dc2626';
+            else if (type.includes('保全')) assignedColor = '#991b1b';
+            else if (type.includes('黑名单') || type.includes('破产') || type.includes('失信') || type.includes('坏账')) assignedColor = '#450a0a'; // 极暗红
+            
+            typeColorMapCache[type] = assignedColor;
+            return assignedColor;
+        }
+
+        function sortTypesBySeverity(typesArray) {
+            return typesArray.sort((a, b) => getTypeSeverityIndex(a) - getTypeSeverityIndex(b));
+        }
+
+        // --- 2. 正常款：生命周期工程进度的底层解析 ---
+        function getStatusLifecycleIndex(status) {
+            if(!status) return 50;
+            if(status.includes('未生效')) return 1;
+            if(status.includes('生效')) return 2;
+            if(status.includes('未开')) return 3;
+            if(status.includes('部分发货')) return 4;
+            if(status.includes('施工前')) return 5;
+            if(status.includes('施工') || status.includes('进行')) return 6;
+            if(status.includes('完工')) return 7;
+            if(status.includes('验收') || status.includes('竣工')) return 8;
+            if(status.includes('结算中') || status.includes('审价') || status.includes('对账')) return 9;
+            if(status.includes('已结算')) return 10;
+            if(status.includes('质保')) return 11;
+            if(status.includes('其他')) return 12;
+            return 50;
+        }
+
+        function getSemanticStatusColor(status) {
+            if (!status) return '#fde047';
+            if (status.includes('未生效')) return '#cbd5e1'; 
+            if (status.includes('生效')) return '#0ea5e9'; // 亮天蓝
+            if (status.includes('部分发货')) return '#8b5cf6'; // 亮紫 (强对比)
+            if (status.includes('未开')) return '#94a3b8'; 
+            if (status.includes('施工前')) return '#38bdf8'; 
+            if (status.includes('施工') || status.includes('进行')) return '#3b82f6'; 
+            if (status.includes('完工')) return '#6366f1'; 
+            if (status.includes('验收') || status.includes('竣工')) return '#d946ef'; 
+            if (status.includes('结算中') || status.includes('审价') || status.includes('对账')) return '#f59e0b'; 
+            if (status.includes('已结算')) return '#10b981'; 
+            if (status.includes('质保')) return '#064e3b'; 
+            return '#fde047';
+        }
+
+        function sortStatusesByLifecycle(statusesArray) {
+            return statusesArray.sort((a, b) => getStatusLifecycleIndex(a) - getStatusLifecycleIndex(b));
+        }
+
+        let currentMonthName = '考核月';
+        let nextMonthName = '预测下月';
+
+        // --- Generic Sorting ---
+        function sortDataList(list, key, asc) {
+            return list.sort((a, b) => {
+                let valA = a[key], valB = b[key];
+                if (valA === null || valA === undefined) valA = '';
+                if (valB === null || valB === undefined) valB = '';
+                if (typeof valA === 'string' && typeof valB === 'string') return asc ? valA.localeCompare(valB, 'zh-CN') : valB.localeCompare(valA, 'zh-CN');
+                return asc ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
+            });
+        }
+
+        function handleSort(tableId, key) {
+            if (!sortState[tableId]) sortState[tableId] = { key: '', asc: false };
+            let state = sortState[tableId];
+            if (state.key === key) state.asc = !state.asc;
+            else { state.key = key; state.asc = false; }
+            document.querySelectorAll(`[id^="sort-${tableId}-"]`).forEach(el => {
+                el.innerText = '↕'; el.classList.add('opacity-50');
+                el.classList.remove('text-indigo-600', 'text-orange-600', 'text-green-600', 'text-red-600', 'text-blue-600', 'opacity-100', 'text-gray-900');
+            });
+            let activeIcon = document.getElementById(`sort-${tableId}-${key}`);
+            if (activeIcon) {
+                activeIcon.innerText = state.asc ? '↑' : '↓';
+                activeIcon.classList.remove('opacity-50'); activeIcon.classList.add('text-indigo-600', 'opacity-100');
+            }
+            if (tableId === 'risk') { sortDataList(projectsListRisk, key, state.asc); drawRiskTable(); }
+            else if (tableId === 'cash') { sortDataList(projectsListCash, key, state.asc); drawCashTable(); }
+            else if (tableId === 'activity') { sortDataList(activityDataList, key, state.asc); drawActivityTable(); }
+            else if (tableId === 'supervision') { sortDataList(supervisionResults, key, state.asc); drawSupervisionTable(); }
+            else if (tableId === 'assessment') { sortDataList(assessmentResults, key, state.asc); drawAssessmentTable(); }
+            else if (tableId === 'mom') { sortDataList(personMoMList, key, state.asc); drawMomTable(); }
+        }
+
+        // --- Settings Panel ---
+        function toggleSettings() {
+            const panel = document.getElementById('assessmentSettings');
+            const arrow = document.getElementById('settings-arrow');
+            panel.classList.toggle('hidden');
+            arrow.classList.toggle('rotate-180');
+        }
+
+        function updateTotalWeight() {
+            let w1 = parseFloat(document.getElementById('weight-d1').value) || 0;
+            let w2 = parseFloat(document.getElementById('weight-d2').value) || 0;
+            let w3 = parseFloat(document.getElementById('weight-d3').value) || 0;
+            let total = w1 + w2 + w3;
+            let display = document.getElementById('total-weight-display');
+            display.innerText = total;
+            display.className = total === 100 ? "font-black text-green-600 text-lg ml-1" : "font-black text-red-500 text-lg ml-1";
+        }
+
+        function updateFormulaDisplay() {
+            let base = parseFloat(document.getElementById('coef-base').value) || 0.6;
+            let floatC = parseFloat(document.getElementById('coef-float').value) || 0.5;
+            document.getElementById('formula-display').innerHTML = `薪资比例(系数) = 基础值(<b>${base.toFixed(2)}</b>) + (总得分 ÷ 100 × 浮动比例(<b>${floatC.toFixed(2)}</b>))<br><span class="text-xs text-indigo-300">例：满分100则拿满 ${(base + floatC).toFixed(2)} 系数，0分则拿底线 ${base.toFixed(2)} 系数。</span>`;
+        }
+
+        function applyAssessmentSettings() {
+            if (rawCurrData) { 
+                renderAssessment(rawPrevData, rawCurrData); 
+                toggleSettings(); 
+            }
+        }
+        
+        function toggleRiskClientView() {
+            isRiskClientView = !isRiskClientView;
+            applyRiskClientViewUI();
+        }
+
+        function applyRiskClientViewUI() {
+            const btn = document.getElementById('btn-risk-client-view');
+            const tableView = document.getElementById('risk-table-container');
+            const chartView = document.getElementById('risk-chart-container');
+            if(!btn) return; // 容错
+            
+            if (isRiskClientView) {
+                btn.classList.add('bg-indigo-50', 'border-indigo-300', 'text-indigo-700'); btn.classList.remove('bg-white');
+                document.getElementById('risk-view-text').innerText = '返回黑榜明细';
+                tableView.classList.add('hidden'); chartView.classList.remove('hidden');
+                if (projectsListRisk.length > 0) drawRiskClientChart();
+            } else {
+                btn.classList.remove('bg-indigo-50', 'border-indigo-300', 'text-indigo-700'); btn.classList.add('bg-white');
+                document.getElementById('risk-view-text').innerText = '📊 按客户透视风险';
+                tableView.classList.remove('hidden'); chartView.classList.add('hidden');
+            }
+        }
+        
+        function toggleActivityView() {
+            isActivityClientView = !isActivityClientView;
+            const btn = document.getElementById('btn-activity-view');
+            const tableView = document.getElementById('activity-table-container');
+            const chartView = document.getElementById('activity-chart-container');
+            if(!btn) return;
+
+            if (isActivityClientView) {
+                btn.classList.add('bg-indigo-50', 'border-indigo-300', 'text-indigo-700'); btn.classList.remove('bg-white');
+                document.getElementById('activity-view-text').innerText = '返回明细列表';
+                tableView.classList.add('hidden'); chartView.classList.remove('hidden');
+                if (activityDataList.length > 0) drawActivityClientChart();
+            } else {
+                btn.classList.remove('bg-indigo-50', 'border-indigo-300', 'text-indigo-700'); btn.classList.add('bg-white');
+                document.getElementById('activity-view-text').innerText = '📊 按客户汇总图';
+                tableView.classList.remove('hidden'); chartView.classList.add('hidden');
+            }
+        }
+
+        function toggleActivityThreshold() {
+            isActivityThresholdActive = !isActivityThresholdActive;
+            const btn = document.getElementById('btn-activity-threshold');
+            if (isActivityThresholdActive) {
+                btn.classList.add('bg-orange-50', 'text-orange-700'); btn.classList.remove('bg-white');
+                document.getElementById('activity-threshold-text').innerText = '取消过滤 (>0.5万)';
+            } else {
+                btn.classList.remove('bg-orange-50', 'text-orange-700'); btn.classList.add('bg-white');
+                document.getElementById('activity-threshold-text').innerText = '过滤微小金额 (>0.5万)';
+            }
+            if (rawCurrData) renderActivityDashboard(rawCurrData);
+        }
+
+        // --- File Upload Setup ---
+        function setupDropZone(zoneId, inputId, statusId, type) {
+            const zone = document.getElementById(zoneId);
+            const input = document.getElementById(inputId);
+            const status = document.getElementById(statusId);
+
+            zone.addEventListener('click', () => input.click());
+            zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('drag-active'); });
+            zone.addEventListener('dragleave', () => zone.classList.remove('drag-active'));
+            zone.addEventListener('drop', (e) => {
+                e.preventDefault(); zone.classList.remove('drag-active');
+                if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0], type, status);
+            });
+            input.addEventListener('change', (e) => {
+                if (e.target.files.length) handleFile(e.target.files[0], type, status);
+            });
+        }
+
+        setupDropZone('dropZonePrev', 'fileInputPrev', 'statusPrev', 'prev');
+        setupDropZone('dropZoneCurr', 'fileInputCurr', 'statusCurr', 'curr');
+
+        function handleFile(file, type, statusEl) {
+            if (!file.name.endsWith('.csv')) { alert('请上传 CSV 文件！'); return; }
+            let title = type === 'curr' ? '【本月】' : '【上月】';
+            let color = type === 'curr' ? 'text-indigo-600' : 'text-purple-600';
+            statusEl.innerHTML = `<span class="${color} font-bold text-sm">✔️ ${title}已准备就绪: <br/>${file.name}</span>`;
+            
+            Papa.parse(file, {
+                header: false, skipEmptyLines: true,
+                complete: function(results) {
+                    if (type === 'prev') rawPrevData = results.data;
+                    if (type === 'curr') {
+                        rawCurrData = results.data;
+                        document.getElementById('generateActionArea').classList.remove('hidden');
+                        setTimeout(() => document.getElementById('generateActionArea').classList.remove('opacity-0'), 10);
+                    }
+                }
+            });
+        }
+
+        function resetSystem() {
+            rawPrevData = null; rawCurrData = null;
+            projectsListRisk = []; riskClientDataList = []; projectsListCash = []; activityDataList = []; activityClientDataList = []; supervisionResults = []; assessmentResults = []; personMoMList = [];
+            sortState = {}; typeColorMapCache = {}; currentFilters = { risk: null, cash: null, activity: null };
+            
+            document.getElementById('statusPrev').innerHTML = `
+                <svg class="mx-auto h-12 w-12 mb-2 text-purple-300 group-hover:text-purple-500 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <p class="font-bold text-lg text-purple-700">1. 上传【上月】数据 (可选)</p>
+                <p class="text-sm mt-1 text-gray-400">用于解锁双月环比与存量清欠算分</p>
+            `;
+            document.getElementById('statusCurr').innerHTML = `
+                <svg class="mx-auto h-12 w-12 mb-2 text-indigo-400 group-hover:text-indigo-600 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                <p class="font-bold text-lg text-indigo-700">2. 上传【本月】数据 (必填)</p>
+                <p class="text-sm mt-1 text-gray-400">载入本月期末台账，作为全盘核算基准</p>
+            `;
+            
+            document.getElementById('fileInputPrev').value = ""; document.getElementById('fileInputCurr').value = "";
+            document.getElementById('generateActionArea').classList.add('hidden', 'opacity-0');
+            
+            // 恢复首页状态
+            if (document.getElementById('uploadSection')) document.getElementById('uploadSection').classList.remove('hidden');
+            if (document.getElementById('headerActions')) document.getElementById('headerActions').classList.add('hidden');
+            if (document.getElementById('mainContainer')) document.getElementById('mainContainer').classList.add('hidden');
+        }
+
+        function switchTab(tab) {
+            const tabs = ['dashboard-risk', 'mom', 'dashboard-cash', 'activity', 'supervision', 'assessment'];
+            tabs.forEach(t => {
+                const btn = document.getElementById(`tab-${t}`);
+                const view = document.getElementById(`view-${t}`);
+                if (!btn || !view) return;
+                
+                if (t === tab) {
+                    btn.classList.add('tab-active'); btn.classList.remove('tab-inactive', 'bg-gray-50');
+                    view.style.display = 'block';
+                } else {
+                    btn.classList.remove('tab-active'); btn.classList.add('tab-inactive', 'bg-gray-50');
+                    view.style.display = 'none';
+                }
+            });
+            if (tab.includes('dashboard') || tab === 'mom' || tab === 'activity') {
+                setTimeout(() => { Object.values(eChartsInstances).forEach(chart => chart && chart.resize()); }, 50);
+            }
+        }
+
+        function cleanNum(val) {
+            if (val === null || val === undefined || val === '') return 0;
+            let str = String(val).trim();
+            if (!str || str === '-') return 0;
+            let isNegative = str.startsWith('-') || (str.includes('(') && str.includes(')')) || (str.includes('（') && str.includes('）'));
+            let numStr = str.replace(/[^0-9.]/g, '');
+            if (!numStr) return 0;
+            return isNegative ? -parseFloat(numStr) : parseFloat(numStr);
+        }
+
+        function formatCurrency(val) {
+            if(Math.abs(val) >= 100000000) return (val / 100000000).toFixed(2) + ' 亿';
+            if(Math.abs(val) >= 10000) return (val / 10000).toFixed(2) + ' 万';
+            return new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 0 }).format(val);
+        }
+        function formatPercent(num) { return (num * 100).toFixed(1) + '%'; }
+        
+        function getColumnMap(headers, updateGlobalMonth = true) {
+            if (!headers) return null;
+            function cleanStr(s) { return String(s || '').replace(/[\s\r\n]+/g, '').replace(/（/g, '(').replace(/）/g, ')'); }
+            function findCol(exactArr, incArr, excArr = [], mCurrStr = "") {
+                let idx = headers.findIndex(h => h && exactArr.some(e => cleanStr(h) === e));
+                if (idx > -1) return idx;
+                if (mCurrStr && mCurrStr !== "考核月") {
+                    idx = headers.findIndex(h => {
+                        let text = cleanStr(h);
+                        if (!text) return false;
+                        if (excArr.some(ex => text.includes(ex))) return false;
+                        return text.includes(mCurrStr) && incArr.some(inc => text.includes(inc));
+                    });
+                    if (idx > -1) return idx;
+                }
+                idx = headers.findIndex(h => {
+                    let text = cleanStr(h);
+                    if (!text) return false;
+                    if (excArr.some(ex => text.includes(ex))) return false;
+                    return (text.includes('当月') || text.includes('本月')) && incArr.some(inc => text.includes(inc));
+                });
+                if (idx > -1) return idx;
+                for (let i = headers.length - 1; i >= 0; i--) {
+                    let text = cleanStr(headers[i]);
+                    if (!text) continue;
+                    if (excArr.some(ex => text.includes(ex))) continue;
+                    if (incArr.some(inc => text.includes(inc))) return i;
+                }
+                return -1;
+            }
+            
+            let tempColActual = headers.findIndex(h => {
+                let text = cleanStr(h);
+                return text && (text.includes('计划内收款') || text.includes('实际收款') || text.includes('已收金额')) && !text.includes('未');
+            });
+            let mCurr = "考核月", mNext = "预测下月";
+            if (tempColActual > -1) {
+                let match = String(headers[tempColActual]).match(/(\d+)月/);
+                if (match) {
+                    mCurr = match[1] + "月";
+                    mNext = (parseInt(match[1]) === 12 ? 1 : parseInt(match[1]) + 1) + "月";
+                }
+            }
+            if (updateGlobalMonth) { currentMonthName = mCurr; nextMonthName = mNext; }
+
+            return {
+                contractName: findCol(['合同名称', '项目名称'], ['名称', '项目名', '合同名'], ['号', '编号', '代码', '类型', '状态', '区域']),
+                contract: findCol(['合同名称', '合同号', '项目名称'], ['合同', '项目'], ['类型', '状态', '区域']),
+                client: findCol(['客户类型'], ['客户类'], ['名称', '名', '简称']),
+                region: findCol(['所属大区', '所属区域', '区域'], ['大区', '区域'], []),
+                person: findCol(['签约人', '责任人', '业务经理'], ['人', '经理'], []),
+                projType: findCol(['应收款类型', '项目类型'], ['类型', '状态'], ['客户', '发票']),
+                ar: findCol(['期末应收款', '期未应收款', '应收金额', '应收总额'], ['期末', '期未', '应收'], ['期初', '逾期', '类型', '状态', '计划', '目标', '回款', '已收', '未到期', '账龄']),
+                overdue: findCol(['合同逾期金额', '逾期金额', '逾期款'], ['逾期'], ['未逾期', '占比', '率', '天数', '时间', '账龄']),
+                days: findCol(['平均逾期天数', '逾期天数'], ['天数'], []),
+                planCurr: findCol([`${mCurr}收款计划`, '当月计划', '本月收款计划'], [mCurr, '计划'], ['未', '内', mNext, '下月', '次月'], mCurr),
+                actualCurr: findCol(['3月计划内收款', '实际收款', '已收金额'], ['实际收', '计划内收', '已收'], ['未'], mCurr),
+                planNext: findCol([`${mNext}收款计划`, '下月收款计划', '次月计划'], [mNext, '下月', '次月'], ['未'], mNext),
+                billingCurr: findCol(['发货金额(含施工费收入)', '发货金额'], ['发货金额', '施工费收入'], ['未', '累计', '历史', '计划', '目标', '预计', '条件', '余额', '日期', '状态', '比例', '天数', '前期', '上月'], mCurr),
+                faxColl: findCol(['传真收款', '本月传真收款'], ['传真收'], ['计划', '预计', '目标', '累计', '号码', '电话', '联系', '传真号', '号', '前期', '上月', '历史'], mCurr),
+                status: findCol(['合同状态', '项目状态', '工程状态', '状态'], ['状态'], ['类型', '客户', '发票', '日期', '时间', '说明'])
+            };
+        }
+
+        // ================= 数据质量诊断模块 =================
+        function runDiagnostics(data, cols) {
+            let total = 0, missingPerson = 0, missingClient = 0;
+            for(let i=1; i<data.length; i++) {
+                if(data[i].length < 2) continue;
+                let head = data[i].slice(0,5).join('');
+                if(head.includes('合计') || head.includes('总计')) continue;
+                total++;
+                
+                if (cols.person > -1 && !String(data[i][cols.person]).trim()) missingPerson++;
+                if (cols.client > -1 && !String(data[i][cols.client]).trim()) missingClient++;
+            }
+            if(missingPerson > 0 || missingClient > 0) {
+                document.getElementById('diagnosticContent').innerHTML = `
+                    <p class="font-bold text-gray-700 mb-2 border-b pb-1">极速扫描了 ${total} 条数据记录：</p>
+                    ${missingPerson > 0 ? `<p class="text-orange-600 flex items-start gap-1"><span class="font-bold">⚠️</span> 发现 <span class="font-black text-red-500">${missingPerson}</span> 条数据【责任人】为空</p>` : ''}
+                    ${missingClient > 0 ? `<p class="text-orange-600 flex items-start gap-1"><span class="font-bold">⚠️</span> 发现 <span class="font-black text-red-500">${missingClient}</span> 条数据【客户】为空</p>` : ''}
+                    <div class="mt-2 bg-gray-50 p-2 rounded border border-gray-200 text-gray-500 leading-tight">
+                        这会导致部分考核分数遗漏或图表无法溯源，建议在源表格中补全。
+                    </div>
+                `;
+                let toast = document.getElementById('diagnosticToast');
+                toast.classList.remove('translate-y-full', 'opacity-0');
+                // 10秒后自动隐藏
+                setTimeout(() => closeDiagnosticToast(), 10000);
+            }
+        }
+        function closeDiagnosticToast() {
+            document.getElementById('diagnosticToast').classList.add('translate-y-full', 'opacity-0');
+        }
+
+        // ================= PDF 全卷导出模块 =================
+        function exportAllViewsPDF() {
+            const btn = document.getElementById('btn-export-pdf');
+            let originalHTML = btn.innerHTML;
+            btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg> 渲染长卷中...`;
+            btn.disabled = true;
+
+            // 1. 隐藏页签导航栏，保持 PDF 清爽
+            const tabNav = document.getElementById('tab-navigation-bar');
+            if(tabNav) tabNav.style.display = 'none';
+
+            // 2. 强制展开所有视图模块
+            const views = ['view-dashboard-risk', 'view-mom', 'view-dashboard-cash', 'view-activity', 'view-supervision', 'view-assessment'];
+            const container = document.getElementById('mainContainer');
+            container.classList.add('pdf-export-mode');
+
+            views.forEach(v => {
+                let el = document.getElementById(v);
+                if(el) el.style.display = 'block';
+            });
+
+            // 动态截取数据生成专家报告文本
+            let arTotal = document.getElementById('kpi-total-ar-risk').innerText;
+            let riskTotal = document.getElementById('kpi-risk-amt-risk').innerText;
+            let litTotal = document.getElementById('kpi-litigation-amt-risk').innerText;
+            let breakerCount = document.getElementById('kpi-circuit-breaker-count').innerText;
+            let today = new Date().toLocaleDateString('zh-CN');
+            
+            document.getElementById('pdf-expert-text').innerHTML = `尊敬的管理层：本报告基于 <strong>${today}</strong> 的最新应收账款底表自动生成。数据引擎对全盘资金健康度、风险敞口及团队催收绩效进行了深度透视。当前全公司期末应收净值为 <span class="font-black text-indigo-700 text-base">${arTotal}</span>，其中高危风险总敞口（含逾期及涉诉）达 <span class="font-black text-red-600 text-base">${riskTotal}</span>，深度涉险资金（诉讼/执行/破产等）已沉淀 <span class="font-black text-orange-600 text-base">${litTotal}</span>。系统另侦测到 <span class="font-black text-purple-700 text-base">${breakerCount}</span> 触发了全局信用熔断阀值。从大盘数据结构分布来看，营运活水流动性显著受阻，不良资产在特定客户处呈高密度聚集态势，需即刻展开系统性干预。`;
+            
+            // 显示报告头部
+            document.getElementById('pdf-report-header').classList.remove('hidden');
+
+            // 3. 强制重绘所有 ECharts 实例，防止因原本隐藏导致的尺寸压缩
+            Object.values(eChartsInstances).forEach(chart => chart && chart.resize());
+
+            // 给浏览器一点点时间完成 DOM 渲染
+            setTimeout(() => {
+                const element = document.getElementById('mainContainer');
+                
+                const opt = {
+                    margin:       [10, 10, 10, 10],
+                    filename:     `全景分析报告_${new Date().toISOString().slice(0,10)}.pdf`,
+                    image:        { type: 'jpeg', quality: 0.98 },
+                    // 使用 1400 宽幅保证图表不会被挤压
+                    html2canvas:  { scale: 2, useCORS: true, logging: false, windowWidth: 1400 },
+                    // 采用横向 A3 纸张来承载密集的数据表格和图表
+                    jsPDF:        { unit: 'mm', format: 'a3', orientation: 'landscape' },
+                    pagebreak:    { mode: ['css', 'legacy'] }
+                };
+
+                html2pdf().set(opt).from(element).save().then(() => {
+                    restoreViewAfterExport();
+                    btn.innerHTML = originalHTML;
+                    btn.disabled = false;
+                }).catch(err => {
+                    console.error(err);
+                    restoreViewAfterExport();
+                    btn.innerHTML = originalHTML;
+                    btn.disabled = false;
+                    alert("导出PDF快照失败，请稍后再试。");
+                });
+            }, 500);
+
+            function restoreViewAfterExport() {
+                container.classList.remove('pdf-export-mode');
+                document.getElementById('pdf-report-header').classList.add('hidden'); // 恢复隐藏报告头
+                if(tabNav) tabNav.style.display = '';
+                
+                // 获取当前本该激活的 tab
+                let activeTab = 'dashboard-risk';
+                const activeBtn = document.querySelector('.tab-active');
+                if (activeBtn && activeBtn.id) {
+                    activeTab = activeBtn.id.replace('tab-', '');
+                }
+                
+                // 恢复显示状态
+                views.forEach(v => {
+                    let el = document.getElementById(v);
+                    if(el) el.style.display = 'none';
+                });
+                
+                // 重新激活原 Tab 并刷新尺寸
+                switchTab(activeTab);
+            }
+        }
+
+        function processSystem() {
+            if (!rawCurrData) return;
+
+            // 1. 运行脏数据诊断
+            let headerIdx = rawCurrData.findIndex(row => row && row.length > 2 && getColumnMap(row).contract > -1);
+            if(headerIdx > -1) {
+                runDiagnostics(rawCurrData, getColumnMap(rawCurrData[headerIdx]));
+            }
+
+            // 2. 界面状态切换
+            if (document.getElementById('uploadSection')) document.getElementById('uploadSection').classList.add('hidden');
+            if (document.getElementById('headerActions')) document.getElementById('headerActions').classList.remove('hidden');
+            if (document.getElementById('mainContainer')) document.getElementById('mainContainer').classList.remove('hidden');
+            
+            renderRiskDashboard(rawCurrData);
+            renderCashDashboard(rawCurrData);
+            renderActivityDashboard(rawCurrData);
+            renderSupervision(rawCurrData);
+            renderAssessment(rawPrevData, rawCurrData);
+            renderMoMDashboard(rawPrevData, rawCurrData);
+
+            setTimeout(() => { Object.values(eChartsInstances).forEach(chart => chart && chart.resize()); }, 100);
+        }
+
+        // ================= DASHBOARD 1: RISK & CLIENT =================
+        function drawRiskClientChart() { 
+            if(!eChartsInstances.riskClient) eChartsInstances.riskClient = echarts.init(document.getElementById('chartRiskClient'));
+
+            let sortedClients = [...riskClientDataList].sort((a, b) => b.totalAR - a.totalAR).slice(0, 15);
+            let clientNames = sortedClients.map(c => c.client);
+            let types = sortTypesBySeverity(Array.from(riskUniqueTypes));
+            let seriesData = [];
+
+            types.forEach(type => {
+                let data = sortedClients.map(c => (c.arByType[type] || 0) / 10000);
+                seriesData.push({
+                    name: type, type: 'bar', stack: 'total', barWidth: 16,
+                    itemStyle: { color: getSemanticColorForType(type) },
+                    emphasis: { 
+                        focus: 'series',
+                        label: { show: true, position: 'inside', formatter: (params) => Math.abs(params.value) > 0.1 ? params.value.toFixed(1) : '', color: '#ffffff', fontSize: 13, fontWeight: '900', textBorderColor: '#000000', textBorderWidth: 3 }
+                    },
+                    data: data
+                });
+            });
+
+            eChartsInstances.riskClient.setOption({
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, valueFormatter: v => parseFloat(v).toFixed(2) + ' 万' },
+                legend: { type: 'plain', data: types, width: '90%', bottom: 0, itemGap: 12, textStyle: { fontSize: 12, color: '#374151' } },
+                grid: { left: '3%', right: '4%', bottom: 120, top: '2%', containLabel: true },
+                xAxis: { type: 'value', axisLabel: { formatter: '{value} 万' } },
+                yAxis: { type: 'category', data: clientNames, axisLabel: { width: 150, overflow: 'truncate' }, inverse: true },
+                series: seriesData
+            }, true);
+            eChartsInstances.riskClient.resize();
+            
+            // 绑定跨组件过滤事件 (图表穿透)
+            eChartsInstances.riskClient.off('click');
+            eChartsInstances.riskClient.on('click', params => {
+                applyFilter('risk', { type: params.seriesName, client: params.name }, `客户: ${params.name} | 分类: ${params.seriesName}`);
+            });
+        }
+
+        function drawRiskTable() {
+            const tb = document.getElementById('tableRiskTop10');
+            if (!tb) return;
+            tb.innerHTML = '';
+            
+            // 动态应用图表联动过滤
+            let list = projectsListRisk;
+            if (currentFilters.risk) {
+                let cond = currentFilters.risk.conditions;
+                list = list.filter(p => {
+                    if (cond.type && p.type !== cond.type) return false;
+                    if (cond.region && p.region !== cond.region) return false;
+                    if (cond.client && p.client !== cond.client) return false;
+                    return true;
+                });
+            }
+
+            list.forEach(p => {
+                let badge = '';
+                if(p.type.includes('准坏账')) {
+                    badge = `<span class="bg-black text-white text-xs px-2 py-1 rounded border border-gray-800">${p.type}</span>`;
+                } else if (['一审', '二审', '判决', '执行', '仲裁', '法务', '立案', '涉诉', '纠纷', '诉讼', '失信', '黑名单', '破产'].some(kw => p.type.includes(kw))) {
+                    badge = `<span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded border border-red-200">${p.type}</span>`;
+                } else {
+                    badge = `<span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">${p.type}</span>`;
+                }
+                
+                let clientHtml = p.client;
+                if (p.isCircuitBreaker) clientHtml += `<span class="ml-2 bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0.5 rounded border border-purple-200">🚨触发熔断</span>`;
+
+                let amtColor = p.ar >= 0 ? 'text-red-600' : 'text-green-600';
+
+                tb.innerHTML += `<tr class="hover:bg-red-50 transition bg-white border-b border-gray-50">
+                    <td class="px-6 py-4 font-medium text-gray-900 sticky left-0 bg-white shadow-[1px_0_0_0_#f3f4f6]"><div class="truncate max-w-[250px]" title="${p.name}">${p.name}</div></td>
+                    <td class="px-6 py-4 text-gray-600">${clientHtml}</td><td class="px-6 py-4">${badge}</td><td class="px-6 py-4 font-bold text-gray-700">${p.person}</td>
+                    <td class="px-6 py-4 text-right font-mono font-bold ${amtColor}">${new Intl.NumberFormat('zh-CN',{style:'currency',currency:'CNY'}).format(p.ar)}</td>
+                </tr>`;
+            });
+        }
+
+        function renderRiskDashboard(data) {
+            let headerIdx = data.findIndex(row => row && row.length > 2 && getColumnMap(row).contract > -1);
+            if (headerIdx === -1) return;
+            const cols = getColumnMap(data[headerIdx]);
+
+            let totalAR = 0, totalRisk = 0, totalLitigation = 0;
+            let typeAssetSum = {}, regionARSum = {}, clientARSum = {}, regionAggAR = {}, clientAggAR = {};
+            projectsListRisk = []; riskUniqueTypes = new Set();
+
+            for (let i = headerIdx + 1; i < data.length; i++) {
+                const row = data[i];
+                if (row.length < 2) continue;
+                let rowHeadStr = row.slice(0, 5).join('');
+                if (rowHeadStr.includes('合计') || rowHeadStr.includes('总计')) continue;
+
+                const pType = cols.projType > -1 ? String(row[cols.projType]).replace(/[\s\r\n]+/g, '') : '未分类';
+                const pCli = cols.client > -1 ? (String(row[cols.client]).trim() || '未分类客户') : '未分类客户';
+                const pReg = cols.region > -1 ? (String(row[cols.region]).trim() || '未知区域') : '未知区域';
+                const ar = cols.ar > -1 ? cleanNum(row[cols.ar]) : 0;
+                let overdue = cols.overdue > -1 ? cleanNum(row[cols.overdue]) : 0;
+
+                let isLitigation = ['一审', '二审', '判决', '执行', '仲裁', '法务', '立案', '涉诉', '诉讼', '纠纷', '失信', '黑名单', '破产'].some(kw => pType.includes(kw));
+                
+                let riskAmt = 0;
+                if (isLitigation) {
+                    riskAmt = ar;
+                } else {
+                    riskAmt = overdue;
+                    if (ar < 0) riskAmt = ar; 
+                    else if (overdue < 0) riskAmt = overdue;
+                }
+                
+                totalAR += ar;
+                if(isLitigation) totalLitigation += ar;
+                totalRisk += riskAmt;
+
+                if (ar !== 0) {
+                    typeAssetSum[pType] = (typeAssetSum[pType] || 0) + ar;
+                    
+                    regionARSum[pReg] = (regionARSum[pReg] || 0) + ar;
+                    clientARSum[pCli] = (clientARSum[pCli] || 0) + ar; 
+                    
+                    if (!regionAggAR[pReg]) regionAggAR[pReg] = { region: pReg, totalAR: 0, arByType: {} };
+                    regionAggAR[pReg].totalAR += ar;
+                    regionAggAR[pReg].arByType[pType] = (regionAggAR[pReg].arByType[pType] || 0) + ar;
+
+                    if (!clientAggAR[pCli]) clientAggAR[pCli] = { client: pCli, totalAR: 0, arByType: {} };
+                    clientAggAR[pCli].totalAR += ar;
+                    clientAggAR[pCli].arByType[pType] = (clientAggAR[pCli].arByType[pType] || 0) + ar;
+
+                    const pName = cols.contractName > -1 ? row[cols.contractName] : (cols.contract > -1 ? row[cols.contract] : '无名称');
+                    projectsListRisk.push({ name: pName, client: pCli, region: pReg, type: pType, person: cols.person > -1 ? row[cols.person] : '', ar: ar, riskAmt: riskAmt });
+                    
+                    riskUniqueTypes.add(pType);
+                }
+            }
+            riskClientDataList = Object.values(clientAggAR);
+
+            const CIRCUIT_BREAKER_THRESH = 500000;
+            let breakerCount = 0, breakerAmt = 0;
+            projectsListRisk.forEach(p => { p.isCircuitBreaker = clientARSum[p.client] > CIRCUIT_BREAKER_THRESH; });
+            for(let client in clientARSum) {
+                if(clientARSum[client] > CIRCUIT_BREAKER_THRESH) { breakerCount++; breakerAmt += clientARSum[client]; }
+            }
+
+            document.getElementById('kpi-total-ar-risk').innerText = formatCurrency(totalAR);
+            document.getElementById('kpi-risk-amt-risk').innerText = formatCurrency(totalRisk);
+            document.getElementById('kpi-risk-rate-risk').innerText = totalAR > 0 ? ((Math.max(0, totalRisk)/totalAR)*100).toFixed(1)+'%' : '0%';
+            
+            const litRate = totalAR > 0 ? (Math.max(0, totalLitigation)/totalAR)*100 : 0;
+            document.getElementById('kpi-litigation-amt-risk').innerText = formatCurrency(totalLitigation);
+            document.getElementById('kpi-litigation-rate-risk').innerText = litRate.toFixed(1)+'%';
+            document.getElementById('kpi-litigation-bar-risk').style.width = Math.min(litRate, 100)+'%';
+
+            document.getElementById('kpi-circuit-breaker-count').innerText = `${breakerCount} 家`;
+            document.getElementById('kpi-circuit-breaker-amt').innerText = formatCurrency(breakerAmt);
+
+            if(!eChartsInstances.typeRisk) eChartsInstances.typeRisk = echarts.init(document.getElementById('chartTypeRisk'));
+            if(!eChartsInstances.regionRisk) eChartsInstances.regionRisk = echarts.init(document.getElementById('chartRegionRisk'));
+
+            let pieData = Object.keys(typeAssetSum).map(k => ({ name: k, value: Math.max(0, typeAssetSum[k]) })).filter(item => item.value > 0);
+            eChartsInstances.typeRisk.setOption({
+                tooltip: { trigger: 'item', valueFormatter: v => formatCurrency(v) },
+                legend: { type: 'plain', width: '90%', bottom: 0, itemGap: 12, textStyle: { fontSize: 12, color: '#374151' } },
+                series: [{ name: '期末总应收款', type: 'pie', radius: ['40%', '65%'], center: ['50%', '35%'], data: pieData }],
+                color: pieData.map(d => getSemanticColorForType(d.name))
+            }, true);
+            
+            // 图表联动事件
+            eChartsInstances.typeRisk.off('click');
+            eChartsInstances.typeRisk.on('click', params => {
+                applyFilter('risk', { type: params.name }, `资产分类: ${params.name}`);
+            });
+
+            let sortedRegions = Object.values(regionAggAR).sort((a, b) => a.totalAR - b.totalAR);
+            let regionNames = sortedRegions.map(r => r.region);
+            let types = sortTypesBySeverity(Array.from(riskUniqueTypes));
+            let regionSeriesData = [];
+
+            types.forEach(type => {
+                let data = sortedRegions.map(r => (r.arByType[type] || 0) / 10000);
+                regionSeriesData.push({
+                    name: type, type: 'bar', stack: 'total', barWidth: 16,
+                    itemStyle: { color: getSemanticColorForType(type) },
+                    emphasis: { 
+                        focus: 'series',
+                        label: { show: true, position: 'inside', formatter: (params) => Math.abs(params.value) > 0.1 ? params.value.toFixed(1) : '', color: '#ffffff', fontSize: 13, fontWeight: '900', textBorderColor: '#000000', textBorderWidth: 3 }
+                    },
+                    data: data
+                });
+            });
+
+            eChartsInstances.regionRisk.setOption({
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, valueFormatter: v => parseFloat(v).toFixed(2) + ' 万' },
+                legend: { type: 'plain', data: types, width: '90%', bottom: 0, itemGap: 12, textStyle: { fontSize: 12, color: '#374151' } },
+                grid: { left: '3%', right: '4%', bottom: 120, top: '5%', containLabel: true },
+                xAxis: { type: 'value', axisLabel: { formatter: '{value}万' } },
+                yAxis: { type: 'category', data: regionNames, axisLabel: { interval: 0 } },
+                series: regionSeriesData
+            }, true);
+            
+            eChartsInstances.regionRisk.off('click');
+            eChartsInstances.regionRisk.on('click', params => {
+                applyFilter('risk', { type: params.seriesName, region: params.name }, `大区: ${params.name} | 分类: ${params.seriesName}`);
+            });
+
+            sortDataList(projectsListRisk, 'ar', false); drawRiskTable();
+            applyRiskClientViewUI();
+        }
+
+        // ================= DASHBOARD 3: CASH FLOW =================
+        function drawCashTable() {
+            const tb = document.getElementById('tableCashTop5');
+            if (!tb) return;
+            tb.innerHTML = '';
+            
+            let list = projectsListCash;
+            if (currentFilters.cash) {
+                let cond = currentFilters.cash.conditions;
+                list = list.filter(p => {
+                    if (cond.status && p.status !== cond.status) return false;
+                    if (cond.region && p.region !== cond.region) return false;
+                    if (cond.bucket && p.bucket !== cond.bucket) return false;
+                    return true;
+                });
+            }
+
+            list.forEach(p => {
+                let amtColor = p.overdue >= 0 ? 'text-yellow-600' : 'text-green-600';
+                tb.innerHTML += `<tr class="hover:bg-yellow-50 transition bg-white border-b border-gray-50">
+                    <td class="px-6 py-4 font-medium text-gray-900 sticky left-0 bg-white shadow-[1px_0_0_0_#f3f4f6]"><div class="truncate max-w-[200px]" title="${p.name}">${p.name}</div></td>
+                    <td class="px-6 py-4 text-gray-500">${p.client}</td><td class="px-6 py-4 font-bold text-gray-700">${p.person}</td>
+                    <td class="px-6 py-4 text-right font-mono font-bold ${amtColor}">${new Intl.NumberFormat('zh-CN',{style:'currency',currency:'CNY'}).format(p.overdue)}</td>
+                    <td class="px-6 py-4 text-right text-gray-500">${p.days} 天</td>
+                </tr>`;
+            });
+        }
+
+        function drawAgingCash() {
+            if(!eChartsInstances.agingCash) eChartsInstances.agingCash = echarts.init(document.getElementById('chartAgingCash'));
+            let statuses = sortStatusesByLifecycle(Array.from(cashUniqueStatuses));
+            let agingCategories = Object.keys(agingBucketsGlobal);
+            let agingSeriesData = [];
+            statuses.forEach(status => {
+                let data = agingCategories.map(cat => (agingBucketsGlobal[cat][status] || 0) / 10000);
+                agingSeriesData.push({
+                    name: status, type: 'bar', stack: 'total', barWidth: 16,
+                    itemStyle: { color: getSemanticStatusColor(status) },
+                    emphasis: {
+                        focus: 'series',
+                        label: { show: true, position: 'inside', formatter: (params) => Math.abs(params.value) > 0.1 ? Number(Number(params.value).toFixed(2)) : '', color: '#ffffff', fontSize: 13, fontWeight: '900', textBorderColor: '#000000', textBorderWidth: 3 }
+                    },
+                    data: data
+                });
+            });
+
+            eChartsInstances.agingCash.setOption({
+                tooltip: { trigger: 'axis', axisPointer:{type:'shadow'}, valueFormatter: v => Number(Number(v).toFixed(2)) + ' 万' },
+                legend: { type: 'plain', data: statuses, width: '90%', bottom: 0, itemGap: 12, textStyle: { fontSize: 12, color: '#374151' } },
+                grid: { left: '3%', right: '4%', bottom: 120, top: '8%', containLabel: true },
+                xAxis: { type: 'category', data: agingCategories },
+                yAxis: { type: 'value', axisLabel: { formatter: v => Number(Number(v).toFixed(2)) + '万' } },
+                series: agingSeriesData
+            }, true);
+            
+            eChartsInstances.agingCash.off('click');
+            eChartsInstances.agingCash.on('click', params => {
+                applyFilter('cash', { status: params.seriesName, bucket: params.name }, `账龄: ${params.name} | 状态: ${params.seriesName}`);
+            });
+        }
+
+        function drawRegionCash() {
+            if(!eChartsInstances.regionCash) eChartsInstances.regionCash = echarts.init(document.getElementById('chartRegionCash'));
+            let statuses = sortStatusesByLifecycle(Array.from(cashUniqueStatuses));
+            
+            let sortedCashRegions = Object.values(regionAggCash).sort((a, b) => a.totalAR - b.totalAR);
+            let cashRegionNames = sortedCashRegions.map(r => r.region);
+            let regionCashSeriesData = [];
+
+            statuses.forEach(status => {
+                let data = sortedCashRegions.map(r => (r.arByStatus[status] || 0) / 10000);
+                regionCashSeriesData.push({
+                    name: status, type: 'bar', stack: 'total', barWidth: 16,
+                    itemStyle: { color: getSemanticStatusColor(status) },
+                    emphasis: {
+                        focus: 'series',
+                        label: { show: true, position: 'inside', formatter: (params) => Math.abs(params.value) > 0.1 ? Number(Number(params.value).toFixed(2)) : '', color: '#ffffff', fontSize: 13, fontWeight: '900', textBorderColor: '#000000', textBorderWidth: 3 }
+                    },
+                    data: data
+                });
+            });
+
+            eChartsInstances.regionCash.setOption({
+                tooltip: { trigger: 'axis', axisPointer:{type:'shadow'}, valueFormatter: v => Number(Number(v).toFixed(2)) + ' 万' },
+                legend: { type: 'plain', data: statuses, width: '90%', bottom: 0, itemGap: 12, textStyle: { fontSize: 12, color: '#374151' } },
+                grid: { left: '3%', right: '4%', bottom: 120, top: '5%', containLabel: true },
+                xAxis: { type: 'value', axisLabel: { formatter: v => Number(Number(v).toFixed(2)) + '万' } },
+                yAxis: { type: 'category', data: cashRegionNames, axisLabel: { interval: 0 } },
+                series: regionCashSeriesData
+            }, true);
+
+            eChartsInstances.regionCash.off('click');
+            eChartsInstances.regionCash.on('click', params => {
+                applyFilter('cash', { status: params.seriesName, region: params.name }, `大区: ${params.name} | 状态: ${params.seriesName}`);
+            });
+        }
+
+        function renderCashDashboard(data) {
+            let headerIdx = data.findIndex(row => row && row.length > 2 && getColumnMap(row).contract > -1);
+            if (headerIdx === -1) return;
+            const cols = getColumnMap(data[headerIdx]);
+
+            document.getElementById('kpi-title-curr-plan-cash').innerText = `${currentMonthName}`;
+            document.getElementById('kpi-title-next-plan-cash').innerText = `${nextMonthName}`;
+
+            let totalAR = 0, totalOverdue = 0, totalPlan = 0, totalActual = 0, totalNextPlan = 0;
+            agingBucketsGlobal = { '未逾期/无数据': {}, '3个月以内': {}, '半年内': {}, '一年内': {}, '一年以上': {} };
+            regionAggCash = {}; 
+            cashUniqueStatuses = new Set();
+            projectsListCash = [];
+
+            for (let i = headerIdx + 1; i < data.length; i++) {
+                const row = data[i];
+                if (row.length < 2) continue;
+                let rowHeadStr = row.slice(0, 5).join('');
+                if (rowHeadStr.includes('合计') || rowHeadStr.includes('总计')) continue;
+
+                const pType = cols.projType > -1 ? String(row[cols.projType]).replace(/[\s\r\n]+/g, '') : '';
+                if (pType !== '正常' && pType !== '正常款') continue;
+
+                const ar = cols.ar > -1 ? cleanNum(row[cols.ar]) : 0;
+                let overdue = cols.overdue > -1 ? cleanNum(row[cols.overdue]) : 0;
+                if (ar < 0 && overdue === 0) overdue = ar;
+
+                totalAR += ar; totalOverdue += overdue;
+                totalPlan += cols.planCurr > -1 ? cleanNum(row[cols.planCurr]) : 0;
+                totalActual += cols.actualCurr > -1 ? cleanNum(row[cols.actualCurr]) : 0;
+                totalNextPlan += cols.planNext > -1 ? cleanNum(row[cols.planNext]) : 0;
+
+                const pReg = cols.region > -1 ? (String(row[cols.region]).trim() || '未知区域') : '未知区域';
+                const pCli = cols.client > -1 ? (String(row[cols.client]).trim() || '未知客户') : '未知客户';
+                const pDays = cols.days > -1 ? cleanNum(row[cols.days]) : 0;
+                const pStatus = cols.status > -1 ? (String(row[cols.status]).trim() || '未知状态') : '未知状态';
+                
+                if (ar !== 0) {
+                    if (!regionAggCash[pReg]) regionAggCash[pReg] = { region: pReg, totalAR: 0, arByStatus: {} };
+                    regionAggCash[pReg].totalAR += ar;
+                    regionAggCash[pReg].arByStatus[pStatus] = (regionAggCash[pReg].arByStatus[pStatus] || 0) + ar;
+                    cashUniqueStatuses.add(pStatus);
+
+                    let notOverdue = ar - overdue;
+                    if (notOverdue !== 0) {
+                        agingBucketsGlobal['未逾期/无数据'][pStatus] = (agingBucketsGlobal['未逾期/无数据'][pStatus] || 0) + notOverdue;
+                        cashUniqueStatuses.add(pStatus);
+                    }
+                    if (overdue !== 0) {
+                        let bucket = '一年以上';
+                        if(pDays <= 0) bucket = '未逾期/无数据'; 
+                        else if(pDays <= 90) bucket = '3个月以内';
+                        else if(pDays <= 180) bucket = '半年内';
+                        else if(pDays <= 360) bucket = '一年内';
+                        
+                        agingBucketsGlobal[bucket][pStatus] = (agingBucketsGlobal[bucket][pStatus] || 0) + overdue;
+                        cashUniqueStatuses.add(pStatus);
+                    }
+                }
+                const pName = cols.contractName > -1 ? row[cols.contractName] : (cols.contract > -1 ? row[cols.contract] : '无名称');
+                if (overdue !== 0) {
+                    let bucket = '一年以上';
+                    if(pDays <= 0) bucket = '未逾期/无数据'; else if(pDays <= 90) bucket = '3个月以内'; else if(pDays <= 180) bucket = '半年内'; else if(pDays <= 360) bucket = '一年内';
+                    projectsListCash.push({ name: pName, client: pCli, region: pReg, status: pStatus, bucket: bucket, person: cols.person > -1 ? row[cols.person] : '', overdue: overdue, days: pDays });
+                }
+            }
+
+            document.getElementById('kpi-total-ar-cash').innerText = formatCurrency(totalAR);
+            document.getElementById('kpi-overdue-cash').innerText = formatCurrency(totalOverdue);
+            document.getElementById('kpi-overdue-rate-cash').innerText = totalAR > 0 ? ((Math.max(0, totalOverdue)/totalAR)*100).toFixed(1)+'%' : '0%';
+            
+            const collRate = totalPlan > 0 ? (totalActual/totalPlan)*100 : 0;
+            document.getElementById('kpi-collection-rate-cash').innerText = collRate.toFixed(1)+'%';
+            document.getElementById('kpi-actual-amount-cash').innerText = `已实收 ${(totalActual/10000).toFixed(2)} 万 / 承诺 ${(totalPlan/10000).toFixed(2)} 万`;
+            document.getElementById('kpi-progress-bar-cash').style.width = Math.min(collRate, 100)+'%';
+            document.getElementById('kpi-next-plan-cash').innerText = formatCurrency(totalNextPlan);
+
+            drawAgingCash();
+            drawRegionCash();
+            sortDataList(projectsListCash, 'overdue', false); drawCashTable();
+        }
+
+        // ================= DASHBOARD 4: ACTIVITY =================
+        function drawActivityClientChart() { 
+            if(!eChartsInstances.activityClient) eChartsInstances.activityClient = echarts.init(document.getElementById('chartActivityClient'));
+            let sortedClients = [...activityClientDataList].sort((a, b) => b.totalAR - a.totalAR).slice(0, 15);
+            let clientNames = sortedClients.map(c => c.client);
+            let types = sortTypesBySeverity(Array.from(activityUniqueTypes));
+            let seriesData = [];
+
+            types.forEach(type => {
+                let data = sortedClients.map(c => (c.arByType[type] || 0) / 10000);
+                seriesData.push({
+                    name: type, type: 'bar', stack: 'total', barWidth: 16,
+                    itemStyle: { color: getSemanticColorForType(type) },
+                    emphasis: { focus: 'series', label: { show: true, position: 'inside', formatter: (params) => Math.abs(params.value) > 0.1 ? params.value.toFixed(1) : '', color: '#ffffff', fontSize: 13, fontWeight: '900', textBorderColor: '#000000', textBorderWidth: 3 } },
+                    data: data
+                });
+            });
+
+            eChartsInstances.activityClient.setOption({
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, valueFormatter: v => parseFloat(v).toFixed(2) + ' 万' },
+                legend: { type: 'plain', data: types, width: '90%', bottom: 0, itemGap: 12, textStyle: { fontSize: 12, color: '#374151' } },
+                grid: { left: '3%', right: '4%', bottom: 120, top: '5%', containLabel: true },
+                xAxis: { type: 'value', axisLabel: { formatter: '{value} 万' } },
+                yAxis: { type: 'category', data: clientNames, axisLabel: { width: 150, overflow: 'truncate' }, inverse: true },
+                series: seriesData
+            }, true);
+            eChartsInstances.activityClient.resize();
+
+            eChartsInstances.activityClient.off('click');
+            eChartsInstances.activityClient.on('click', params => {
+                applyFilter('activity', { type: params.seriesName, client: params.name }, `客户: ${params.name} | 分类: ${params.seriesName}`);
+            });
+        }
+
+        function drawActivityTable() {
+            const formatWan = (v) => (v / 10000).toFixed(2);
+            const tb = document.getElementById('tableActivityBody');
+            if (!tb) return;
+            tb.innerHTML = '';
+
+            let list = activityDataList;
+            if (currentFilters.activity) {
+                let cond = currentFilters.activity.conditions;
+                list = list.filter(p => {
+                    if (cond.type && p.type !== cond.type) return false;
+                    if (cond.client && p.client !== cond.client) return false;
+                    return true;
+                });
+            }
+
+            list.forEach(p => {
+                let netClass = p.net >= 0 ? "text-green-600" : "text-red-600";
+                let typeBadge = p.type !== '正常' && p.type !== '正常款' ? `<span class="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-red-50 text-red-500 border border-red-100">${p.type}</span>` : '';
+                tb.innerHTML += `<tr class="hover:bg-orange-50/30 transition bg-white border-b border-gray-50">
+                    <td class="px-6 py-4 font-medium text-gray-900 sticky left-0 bg-white shadow-[1px_0_0_0_#f3f4f6]"><div class="truncate max-w-[200px]" title="${p.name}">${p.name} ${typeBadge}</div></td>
+                    <td class="px-6 py-4 text-gray-500">${p.client}</td><td class="px-6 py-4 font-bold text-gray-700">${p.person}</td>
+                    <td class="px-6 py-4 text-right font-mono text-orange-600">${p.billing !== 0 ? formatWan(p.billing) : '-'}</td>
+                    <td class="px-6 py-4 text-right font-mono font-bold text-green-600">${p.collection !== 0 ? formatWan(p.collection) : '-'}</td>
+                    <td class="px-6 py-4 text-right font-mono font-bold ${netClass}">${formatWan(p.net)}</td>
+                </tr>`;
+            });
+        }
+
+        function renderActivityDashboard(data) {
+            let headerIdx = data.findIndex(row => row && row.length > 2 && getColumnMap(row).contract > -1);
+            if (headerIdx === -1) return;
+            const cols = getColumnMap(data[headerIdx]);
+
+            document.getElementById('activity-table-title').innerText = `${currentMonthName}活跃项目明细表 (单位: 万元)`;
+            
+            let totalBilling = 0, totalCollection = 0, normalBilling = 0, normalCollection = 0, displayBilling = 0, displayCollection = 0;
+            activityDataList = []; let clientAgg = {}; activityUniqueTypes = new Set();
+
+            for (let i = headerIdx + 1; i < data.length; i++) {
+                const row = data[i];
+                if (row.length < 2) continue;
+                let rowHeadStr = row.slice(0, 5).join('');
+                if (rowHeadStr.includes('合计') || rowHeadStr.includes('总计')) continue;
+
+                const pType = cols.projType > -1 ? String(row[cols.projType]).replace(/[\s\r\n]+/g, '') : '';
+                let isNormal = (pType === '正常' || pType === '正常款');
+                let billing = cols.billingCurr > -1 ? cleanNum(row[cols.billingCurr]) : 0;
+                let collection = cols.faxColl > -1 ? cleanNum(row[cols.faxColl]) : 0;
+                let ar = cols.ar > -1 ? cleanNum(row[cols.ar]) : 0;
+
+                if (billing === 0 && collection === 0) continue;
+
+                totalBilling += billing; totalCollection += collection;
+                if (isNormal) { normalBilling += billing; normalCollection += collection; }
+                if (isActivityThresholdActive && Math.abs(billing) <= 5000 && Math.abs(collection) <= 5000) continue; 
+
+                displayBilling += billing; displayCollection += collection;
+
+                const pName = cols.contractName > -1 ? row[cols.contractName] : (cols.contract > -1 ? row[cols.contract] : '无名称');
+                const pCli = cols.client > -1 ? String(row[cols.client]).trim() : '未知客户';
+                const pPerson = cols.person > -1 ? String(row[cols.person]).trim() : '';
+
+                activityDataList.push({ name: pName, client: pCli, person: pPerson, type: pType, billing: billing, collection: collection, net: collection - billing });
+                
+                if (!clientAgg[pCli]) clientAgg[pCli] = { client: pCli, totalAR: 0, arByType: {} };
+                clientAgg[pCli].totalAR += ar;
+                clientAgg[pCli].arByType[pType] = (clientAgg[pCli].arByType[pType] || 0) + ar;
+                activityUniqueTypes.add(pType);
+            }
+            activityClientDataList = Object.values(clientAgg);
+
+            const formatWan = (v) => (v / 10000).toFixed(2);
+            document.getElementById('kpi-activity-billing').innerText = formatWan(totalBilling);
+            document.getElementById('kpi-activity-bill-normal').innerText = formatWan(normalBilling);
+            document.getElementById('kpi-activity-bill-abnormal').innerText = formatWan(totalBilling - normalBilling);
+            
+            document.getElementById('kpi-activity-collection').innerText = formatWan(totalCollection);
+            document.getElementById('kpi-activity-coll-normal').innerText = formatWan(normalCollection);
+            document.getElementById('kpi-activity-coll-abnormal').innerText = formatWan(totalCollection - normalCollection);
+            
+            const net = totalCollection - totalBilling;
+            const netEl = document.getElementById('kpi-activity-net');
+            netEl.innerText = formatWan(net);
+            netEl.className = net >= 0 ? "text-3xl font-bold text-green-600 mt-2" : "text-3xl font-bold text-red-600 mt-2";
+
+            const tf = document.getElementById('tableActivityFoot');
+            if (tf) {
+                let displayNet = displayCollection - displayBilling;
+                let displayNetClass = displayNet >= 0 ? "text-green-600" : "text-red-600";
+                tf.innerHTML = `
+                    <tr class="bg-orange-50/60 font-bold text-gray-900 border-t-2 border-orange-200">
+                        <td class="px-6 py-4 sticky left-0 bg-orange-50/60 shadow-[1px_0_0_0_#fed7aa] z-20" colspan="3">${isActivityThresholdActive ? "当前过滤列表汇总" : "全盘合计汇总"}</td>
+                        <td class="px-6 py-4 text-right font-mono text-orange-600">${formatWan(displayBilling)}</td>
+                        <td class="px-6 py-4 text-right font-mono text-green-600">${formatWan(displayCollection)}</td>
+                        <td class="px-6 py-4 text-right font-mono ${displayNetClass}">${formatWan(displayNet)}</td>
+                    </tr>
+                `;
+            }
+            
+            activityDataList.sort((a, b) => (Math.abs(b.collection) + Math.abs(b.billing)) - (Math.abs(a.collection) + Math.abs(a.billing)));
+            drawActivityTable();
+            if (isActivityClientView) drawActivityClientChart();
+        }
+
+        // ================= MOM =================
+        function extractOverallMetrics(data) { 
+            let headerIdx = data.findIndex(row => row && row.length > 2 && getColumnMap(row, false).contract > -1);
+            if (headerIdx === -1) return null;
+            const cols = getColumnMap(data[headerIdx], false);
+            let metrics = { totalAR: 0, normalOverdue: 0, normalBilling: 0, normalCollection: 0, persons: {} };
+            
+            for (let i = headerIdx + 1; i < data.length; i++) {
+                const row = data[i];
+                if (row.length < 2) continue;
+                let rowHeadStr = row.slice(0, 5).join('');
+                if (rowHeadStr.includes('合计') || rowHeadStr.includes('总计')) continue;
+
+                const pType = cols.projType > -1 ? String(row[cols.projType]).replace(/[\s\r\n]+/g, '') : '';
+                const person = cols.person > -1 ? String(row[cols.person]).trim() : '';
+                
+                let ar = cols.ar > -1 ? cleanNum(row[cols.ar]) : 0;
+                let overdue = cols.overdue > -1 ? Math.max(cleanNum(row[cols.overdue]), 0) : 0;
+                let billing = cols.billingCurr > -1 ? cleanNum(row[cols.billingCurr]) : 0;
+                let collection = cols.faxColl > -1 ? cleanNum(row[cols.faxColl]) : 0;
+
+                metrics.totalAR += ar;
+                if (pType === '正常' || pType === '正常款') {
+                    metrics.normalOverdue += overdue; metrics.normalBilling += billing; metrics.normalCollection += collection;
+                    if (person) {
+                        if (!metrics.persons[person]) metrics.persons[person] = { overdue: 0 };
+                        metrics.persons[person].overdue += overdue;
+                    }
+                }
+            }
+            return metrics;
+        }
+
+        function renderMoMKPI(idPrefix, prevVal, currVal, higherIsBetter) {
+            document.getElementById(idPrefix + '-curr').innerText = formatCurrency(currVal);
+            document.getElementById(idPrefix + '-prev').innerText = `上月: ${formatCurrency(prevVal)}`;
+            
+            let diff = currVal - prevVal;
+            let pct = prevVal !== 0 ? (diff / prevVal) * 100 : 0;
+            let el = document.getElementById(idPrefix + '-diff');
+            
+            let signStr = diff > 0 ? '+' : ''; 
+            el.innerText = `${signStr}${formatCurrency(diff)} (${signStr}${pct.toFixed(1)}%)`;
+            
+            if (diff > 0) el.className = higherIsBetter ? "font-bold px-2 py-0.5 rounded bg-green-100 text-green-700" : "font-bold px-2 py-0.5 rounded bg-red-100 text-red-700";
+            else if (diff < 0) el.className = higherIsBetter ? "font-bold px-2 py-0.5 rounded bg-red-100 text-red-700" : "font-bold px-2 py-0.5 rounded bg-green-100 text-green-700";
+            else { el.className = "font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-600"; el.innerText = "持平"; }
+        }
+        
+        function drawMomTable() {
+            const tb = document.getElementById('tableMomMovers');
+            if (!tb) return;
+            tb.innerHTML = '';
+            personMoMList.forEach((item, index) => {
+                let diffClass = item.diff > 0 ? "text-red-600" : (item.diff < 0 ? "text-green-600" : "text-gray-600");
+                let sign = item.diff > 0 ? "+" : "";
+                tb.innerHTML += `<tr class="hover:bg-purple-50/30 transition bg-white border-b border-gray-50">
+                    <td class="px-6 py-4 font-bold text-gray-400 w-12">${index + 1}</td>
+                    <td class="px-6 py-4 font-bold text-gray-800 sticky left-0 bg-white shadow-[1px_0_0_0_#f3f4f6]">${item.person}</td>
+                    <td class="px-6 py-4 text-right text-gray-500 font-mono">${formatCurrency(item.prev)}</td>
+                    <td class="px-6 py-4 text-right font-mono font-bold text-gray-800">${formatCurrency(item.curr)}</td>
+                    <td class="px-6 py-4 text-right font-mono font-bold ${diffClass}">${sign}${formatCurrency(item.diff)}</td>
+                </tr>`;
+            });
+        }
+
+        function renderMoMDashboard(prevRaw, currRaw) {
+            const emptyState = document.getElementById('mom-empty-state');
+            const contentState = document.getElementById('mom-content-state');
+            
+            if (!prevRaw || !currRaw) {
+                emptyState.classList.remove('hidden'); contentState.classList.add('hidden');
+                return;
+            }
+            emptyState.classList.add('hidden'); contentState.classList.remove('hidden');
+            
+            let prevMetrics = extractOverallMetrics(prevRaw);
+            let currMetrics = extractOverallMetrics(currRaw);
+            if(!prevMetrics || !currMetrics) return;
+
+            renderMoMKPI('mom-ar', prevMetrics.totalAR, currMetrics.totalAR, false); 
+            renderMoMKPI('mom-overdue', prevMetrics.normalOverdue, currMetrics.normalOverdue, false); 
+            renderMoMKPI('mom-billing', prevMetrics.normalBilling, currMetrics.normalBilling, true); 
+            renderMoMKPI('mom-collection', prevMetrics.normalCollection, currMetrics.normalCollection, true);
+
+            personMoMList = [];
+            const allPersons = new Set([...Object.keys(prevMetrics.persons), ...Object.keys(currMetrics.persons)]);
+            allPersons.forEach(p => {
+                let prev = prevMetrics.persons[p] ? prevMetrics.persons[p].overdue : 0;
+                let curr = currMetrics.persons[p] ? currMetrics.persons[p].overdue : 0;
+                if (prev === 0 && curr === 0) return;
+                personMoMList.push({ person: p, prev: prev, curr: curr, diff: curr - prev });
+            });
+            sortDataList(personMoMList, 'diff', true); drawMomTable();
+
+            if(!eChartsInstances.momCompare) eChartsInstances.momCompare = echarts.init(document.getElementById('chartMoMCompare'));
+            eChartsInstances.momCompare.setOption({
+                tooltip: { trigger: 'axis', axisPointer:{type:'shadow'}, valueFormatter: v => formatCurrency(v) },
+                legend: { bottom: '0%', itemGap: 10, textStyle: { fontSize: 12, color: '#374151' } },
+                grid: { left: '3%', right: '4%', bottom: '28%', top: '10%', containLabel: true },
+                xAxis: { type: 'category', data: ['期末总盘', '正常款逾期', '当月发货', '当月收款'], axisLabel: { interval: 0, fontSize: 10 } },
+                yAxis: { type: 'value', axisLabel: { formatter: v => (v/10000).toFixed(0)+'万' } },
+                series: [
+                    { 
+                        name: '上月', type: 'bar', barWidth: '30%', data: [prevMetrics.totalAR, prevMetrics.normalOverdue, prevMetrics.normalBilling, prevMetrics.normalCollection],
+                        itemStyle: { color: '#9ca3af', borderRadius: [4, 4, 0, 0] },
+                        emphasis: { focus: 'series', label: { show: true, position: 'top', formatter: p => (p.value/10000).toFixed(1) + '万', color: '#ffffff', fontSize: 13, fontWeight: '900', textBorderColor: '#000000', textBorderWidth: 3 } }
+                    },
+                    { 
+                        name: '本月', type: 'bar', barWidth: '30%', data: [currMetrics.totalAR, currMetrics.normalOverdue, currMetrics.normalBilling, currMetrics.normalCollection],
+                        itemStyle: { color: '#8b5cf6', borderRadius: [4, 4, 0, 0] },
+                        emphasis: { focus: 'series', label: { show: true, position: 'top', formatter: p => (p.value/10000).toFixed(1) + '万', color: '#ffffff', fontSize: 13, fontWeight: '900', textBorderColor: '#000000', textBorderWidth: 3 } }
+                    }
+                ]
+            }, true);
+        }
+
+        // ================= SUPERVISION =================
+        function drawSupervisionTable() {
+            const tb = document.getElementById('supervisionTableBody');
+            if (!tb) return;
+            tb.innerHTML = '';
+            
+            supervisionResults.forEach((item, index) => {
+                let badgeHtml = '', progressColor = 'bg-red-500';
+                if (item.achieveRate >= 1) { badgeHtml = `<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded font-bold">✅ 已100%达标</span>`; progressColor = 'bg-green-500'; }
+                else if (item.achieveRate >= 0.5) { badgeHtml = `<span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded font-bold">⏳ 进度过半</span>`; progressColor = 'bg-yellow-400'; }
+                else { badgeHtml = `<span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded font-bold">⚠️ 严重落后</span>`; }
+
+                tb.innerHTML += `<tr class="hover:bg-gray-50 transition bg-white border-b border-gray-100">
+                    <td class="px-6 py-4 font-bold text-gray-800 sticky left-0 bg-white shadow-[1px_0_0_0_#f3f4f6]">
+                        <div class="flex items-center gap-2"><span class="text-gray-400 text-xs w-4">${index + 1}.</span>${item.person}</div>
+                    </td>
+                    <td class="px-6 py-4 text-right text-gray-400 font-mono">${formatCurrency(item.riskAmt)}</td>
+                    <td class="px-6 py-4 text-right font-mono font-bold text-indigo-700">${formatCurrency(item.plan)}</td>
+                    <td class="px-6 py-4 text-right font-mono font-bold text-green-700">${formatCurrency(item.actual)}</td>
+                    <td class="px-6 py-4 text-right font-mono font-bold text-red-600 bg-red-50/30">${item.shortfall > 0 ? formatCurrency(item.shortfall) : '-'}</td>
+                    <td class="px-6 py-4">
+                        <div class="flex flex-col gap-1.5 min-w-[150px]">
+                            <div class="flex justify-between items-center text-xs"><span class="font-bold text-gray-700">${formatPercent(item.achieveRate)}</span>${badgeHtml}</div>
+                            <div class="w-full bg-gray-200 rounded-full h-1.5"><div class="${progressColor} h-1.5 rounded-full progress-bar-fill" style="width: ${Math.min(item.achieveRate * 100, 100)}%"></div></div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-right font-mono font-bold text-gray-700">${formatCurrency(item.planNext)}</td>
+                </tr>`;
+            });
+        }
+        
+        function renderSupervision(data) {
+            let headerIdx = data.findIndex(row => row && row.length > 2 && getColumnMap(row).contract > -1);
+            if (headerIdx === -1) return;
+            const cols = getColumnMap(data[headerIdx]);
+
+            document.getElementById('supervision-main-title').innerText = `高层直管：${currentMonthName}计划督办台`;
+            document.getElementById('tab-supervision-text').innerText = `${currentMonthName}计划督办单`;
+
+            let agg = {};
+            for (let i = headerIdx + 1; i < data.length; i++) {
+                const row = data[i];
+                if (row.length < 2) continue;
+                let rowHeadStr = row.slice(0, 5).join('');
+                if (rowHeadStr.includes('合计') || rowHeadStr.includes('总计')) continue;
+                
+                const person = String((cols.person > -1 ? row[cols.person] : '') || '').trim();
+                if (!person) continue;
+
+                const ar = cols.ar > -1 ? cleanNum(row[cols.ar]) : 0;
+                let overdue = cols.overdue > -1 ? Math.max(cleanNum(row[cols.overdue]), 0) : 0;
+                let pType = cols.projType > -1 ? String(row[cols.projType]).trim() : '';
+                
+                let isLitigation = ['一审', '二审', '判决', '执行', '仲裁', '法务', '立案', '结案', '涉诉', '纠纷', '诉讼', '失信', '黑名单', '破产'].some(kw => pType.includes(kw));
+                let riskAmt = isLitigation ? ar : overdue; // 统一为风险敞口取值
+
+                if (!agg[person]) agg[person] = { riskAmt: 0, plan: 0, actual: 0, planNext: 0 };
+                agg[person].riskAmt += riskAmt;
+                if (cols.planCurr > -1) agg[person].plan += cleanNum(row[cols.planCurr]);
+                if (cols.actualCurr > -1) agg[person].actual += cleanNum(row[cols.actualCurr]);
+                if (cols.planNext > -1) agg[person].planNext += cleanNum(row[cols.planNext]);
+            }
+
+            supervisionResults = Object.keys(agg).map(p => {
+                let s = agg[p]; s.person = p; s.shortfall = Math.max(0, s.plan - s.actual); s.achieveRate = s.plan > 0 ? (s.actual / s.plan) : 0; return s;
+            }).filter(item => item.plan > 0 || item.actual > 0 || item.planNext > 0); 
+
+            let sumRiskAmt = 0, sumPlan = 0, sumActual = 0, sumShortfall = 0, sumPlanNext = 0;
+            supervisionResults.forEach((item) => { sumRiskAmt += item.riskAmt; sumPlan += item.plan; sumActual += item.actual; sumShortfall += item.shortfall; sumPlanNext += item.planNext; });
+            
+            const tf = document.getElementById('supervisionTableFoot');
+            if (tf) {
+                let sumAchieveRate = sumPlan > 0 ? (sumActual / sumPlan) : 0;
+                tf.innerHTML = `
+                    <tr class="bg-indigo-50/80 font-bold text-indigo-900 border-t-2 border-indigo-200">
+                        <td class="px-6 py-4 sticky left-0 bg-indigo-50/80 shadow-[1px_0_0_0_#c7d2fe] z-20">合计汇总</td>
+                        <td class="px-6 py-4 text-right font-mono">${formatCurrency(sumRiskAmt)}</td>
+                        <td class="px-6 py-4 text-right font-mono">${formatCurrency(sumPlan)}</td>
+                        <td class="px-6 py-4 text-right font-mono text-green-700">${formatCurrency(sumActual)}</td>
+                        <td class="px-6 py-4 text-right font-mono text-red-600">${sumShortfall > 0 ? formatCurrency(sumShortfall) : '-'}</td>
+                        <td class="px-6 py-4"><div class="flex items-center gap-2"><span class="font-bold text-indigo-700">${formatPercent(sumAchieveRate)}</span></div></td>
+                        <td class="px-6 py-4 text-right font-mono font-bold text-gray-800">${formatCurrency(sumPlanNext)}</td>
+                    </tr>
+                `;
+            }
+
+            sortDataList(supervisionResults, 'shortfall', false); drawSupervisionTable();
+        }
+
+        // ================= ASSESSMENT LOGIC =================
+        function drawAssessmentTable() {
+            const tb = document.getElementById('assessmentTableBody');
+            if (!tb) return;
+            tb.innerHTML = '';
+            
+            let w1 = parseFloat(document.getElementById('weight-d1').value) || 20;
+            let w2 = parseFloat(document.getElementById('weight-d2').value) || 30;
+            let w3 = parseFloat(document.getElementById('weight-d3').value) || 50;
+
+            assessmentResults.forEach(item => {
+                let baseCoef = parseFloat(document.getElementById('coef-base').value) || 0.6;
+                let cClass = item.coef >= (baseCoef + 0.3) ? "text-green-600" : (item.coef <= (baseCoef + 0.1) ? "text-red-600" : "text-gray-900");
+                
+                let d1Badge = item.d1Score >= w1*0.9 ? 'bg-green-100 text-green-800' : (item.d1Score > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800');
+                let d2Badge = item.d2Score >= w2*0.9 ? 'bg-green-100 text-green-800' : (item.d2Score > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800');
+                let d3Badge = item.antiGamingPenalty ? 'bg-red-200 text-red-900 border border-red-400 cursor-help' : (item.d3Score >= w3*0.9 ? 'bg-green-100 text-green-800' : (item.d3Score > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'));
+
+                tb.innerHTML += `<tr class="hover:bg-indigo-50 transition bg-white border-b border-gray-50">
+                    <td class="px-6 py-4 font-bold text-gray-800 sticky left-0 bg-white shadow-[1px_0_0_0_#f3f4f6] group-hover:bg-indigo-50">${item.person}</td>
+                    <td class="px-6 py-4 text-right text-gray-400 font-mono">${item.pOverdue !== null ? formatCurrency(item.pOverdue) : '-'}</td>
+                    <td class="px-6 py-4 text-right font-mono text-gray-800">${formatCurrency(item.cOverdue)}</td>
+                    <td class="px-6 py-4 text-right text-indigo-600 font-medium"><span class="data-trace" title="覆盖率 = 本月计划额 ÷ 本月逾期额">${formatPercent(item.cov)}</span></td>
+                    <td class="px-6 py-4 text-right text-indigo-600 font-medium"><span class="data-trace" title="达成率 = 实际收款 ÷ 本月计划额">${formatPercent(item.ach)}</span></td>
+                    <td class="px-6 py-4 text-center"><span class="px-2 py-1 rounded-full text-xs font-bold ${d1Badge} cursor-help" title="${item.d1Tooltip}">${item.d1Score.toFixed(1)}</span></td>
+                    <td class="px-6 py-4 text-center"><span class="px-2 py-1 rounded-full text-xs font-bold ${d2Badge} cursor-help" title="${item.d2Tooltip}">${item.d2Score.toFixed(1)}</span></td>
+                    <td class="px-6 py-4 text-center"><span class="px-2 py-1 rounded-full text-xs font-bold ${d3Badge} cursor-help" title="${item.d3Tooltip}">${item.d3Score.toFixed(1)}</span></td>
+                    <td class="px-6 py-4 text-center font-black text-lg text-indigo-900 bg-indigo-50/50 cursor-help" title="${item.totalTooltip}">${item.total.toFixed(1)}</td>
+                    <td class="px-6 py-4 text-center text-lg font-black bg-indigo-50/50 ${cClass} cursor-help" title="${item.coefTooltip}">${formatPercent(item.coef)}</td>
+                </tr>`;
+            });
+        }
+
+        function aggregateAssessmentData(data) {
+            let headerIdx = data.findIndex(row => row && row.length > 2 && getColumnMap(row, false).contract > -1);
+            if (headerIdx === -1) return null;
+            const cols = getColumnMap(data[headerIdx], false);
+            const agg = {};
+            for (let i = headerIdx + 1; i < data.length; i++) {
+                const row = data[i];
+                if (row.length < 2) continue;
+                let rowHeadStr = row.slice(0, 5).join('');
+                if (rowHeadStr.includes('合计') || rowHeadStr.includes('总计')) continue;
+                let pType = cols.projType > -1 ? String(row[cols.projType]).replace(/[\s\r\n]+/g, '') : '';
+                if (pType !== '正常' && pType !== '正常款') continue; 
+                const person = String((cols.person > -1 ? row[cols.person] : '') || '').trim();
+                if (!person) continue;
+
+                if (!agg[person]) agg[person] = { overdue: 0, plan: 0, actual: 0 };
+                
+                let overdueAmt = cols.overdue > -1 ? cleanNum(row[cols.overdue]) : 0;
+                let arAmt = cols.ar > -1 ? cleanNum(row[cols.ar]) : 0;
+                if (arAmt < 0 && overdueAmt === 0) overdueAmt = arAmt;
+                
+                agg[person].overdue += overdueAmt;
+                if (cols.planCurr > -1) agg[person].plan += cleanNum(row[cols.planCurr]);
+                if (cols.actualCurr > -1) agg[person].actual += cleanNum(row[cols.actualCurr]);
+            }
+            return agg;
+        }
+
+        function renderAssessment(prevRaw, currRaw) {
+            const currData = aggregateAssessmentData(currRaw);
+            const prevData = prevRaw ? aggregateAssessmentData(prevRaw) : null;
+            
+            if (!prevData) {
+                document.getElementById('assessmentNotice').innerHTML = "<span class='text-red-500'>⚠️ 系统提示：未上传上月数据，维度一(存量分)已自动降级为“单月基础评估模式”。</span>";
+            } else {
+                document.getElementById('assessmentNotice').innerHTML = "<span class='text-green-600'>✔️ 系统提示：已检测到双月数据，系统正基于“高精度平滑算分引擎”进行维度评价。</span>";
+            }
+
+            // 获取全局薪资杠杆
+            let baseCoef = parseFloat(document.getElementById('coef-base').value) || 0.6;
+            let floatCoef = parseFloat(document.getElementById('coef-float').value) || 0.5;
+
+            // 获取细分打分参数
+            let w1 = parseFloat(document.getElementById('weight-d1').value) || 20;
+            let w2 = parseFloat(document.getElementById('weight-d2').value) || 30;
+            let w3 = parseFloat(document.getElementById('weight-d3').value) || 50;
+            let totalW = w1 + w2 + w3;
+
+            let d1IncThresh = (parseFloat(document.getElementById('d1-inc-thresh').value) || 5) / 100;
+            let d1PartialRatio = (parseFloat(document.getElementById('d1-partial-ratio').value) || 50) / 100;
+
+            let t2h = (parseFloat(document.getElementById('thresh-d2-high').value) || 20) / 100;
+            let t2l = (parseFloat(document.getElementById('thresh-d2-low').value) || 10) / 100;
+            let d2LowRatio = (parseFloat(document.getElementById('d2-low-ratio').value) || 50) / 100;
+
+            let t3h = (parseFloat(document.getElementById('thresh-d3-high').value) || 95) / 100;
+            let t3l = (parseFloat(document.getElementById('thresh-d3-low').value) || 90) / 100;
+            let d3LowRatio = (parseFloat(document.getElementById('d3-low-ratio').value) || 60) / 100;
+
+            let antiGamingThresh = (parseFloat(document.getElementById('anti-gaming-thresh').value) || 10) / 100;
+
+            document.getElementById('th-d1-score').innerText = `存量分(${w1})`; 
+            document.getElementById('th-d2-score').innerText = `覆盖分(${w2})`; 
+            document.getElementById('th-d3-score').innerText = `达成分(${w3})`;
+
+            assessmentResults = [];
+            for (const [person, currSums] of Object.entries(currData)) {
+                let d1Score = 0, d2Score = 0, d3Score = 0, antiGamingPenalty = false;
+                let d1Tooltip = "", d2Tooltip = "", d3Tooltip = "";
+                const cOverdue = currSums.overdue, pOverdue = prevData && prevData[person] ? prevData[person].overdue : null;
+                const plan = currSums.plan, actual = currSums.actual;
+
+                if (cOverdue <= 0 && plan <= 0 && actual <= 0 && (pOverdue === null || pOverdue <= 0)) continue; 
+
+                // --- 维度一：存量分 (容忍度判定) ---
+                if (pOverdue !== null) { 
+                    if (pOverdue <= 0 && cOverdue <= 0) {
+                        d1Score = w1; 
+                        d1Tooltip = `上月无逾期，本月无逾期\n-> 直接满分: ${w1}`; 
+                    } else if (pOverdue > 0) {
+                        let changePct = (cOverdue - pOverdue) / pOverdue;
+                        if (changePct <= 0) {
+                            d1Score = w1; 
+                            d1Tooltip = `逾期下降或持平 (${(changePct*100).toFixed(1)}%)\n-> 满分: ${d1Score}`;
+                        } else if (changePct <= d1IncThresh) {
+                            d1Score = w1 * d1PartialRatio;
+                            d1Tooltip = `逾期微增 (${(changePct*100).toFixed(1)}% ≤ 容忍限度 ${(d1IncThresh*100).toFixed(1)}%)\n-> 部分得分: ${d1Score.toFixed(1)}`;
+                        } else {
+                            d1Score = 0; 
+                            d1Tooltip = `逾期大幅增加 (${(changePct*100).toFixed(1)}% > 容忍限度 ${(d1IncThresh*100).toFixed(1)}%)\n-> 得分: 0`;
+                        }
+                    } else {
+                        d1Score = 0;
+                        d1Tooltip = `上月无逾期，本月新增逾期\n-> 得分: 0`;
+                    }
+                } else { 
+                    d1Score = (actual > 0 || cOverdue <= 0) ? w1 : 0; 
+                    d1Tooltip = `单月模式: 实际收款 ${(actual/10000).toFixed(2)}万 或 本月逾期很小\n-> 得分: ${d1Score}`; 
+                }
+
+                // --- 维度二：覆盖分 (线性插值算法) ---
+                let cov = cOverdue > 0 ? plan / cOverdue : (plan > 0 ? 1 : 0);
+                if (cov >= t2h) {
+                    d2Score = w2; 
+                    d2Tooltip = `覆盖率: ${(cov*100).toFixed(1)}% (≥${(t2h*100).toFixed(1)}%)\n-> 满分: ${d2Score.toFixed(1)}`;
+                } else if (cov < t2l) {
+                    d2Score = 0; 
+                    d2Tooltip = `覆盖率: ${(cov*100).toFixed(1)}% (<${(t2l*100).toFixed(1)}%)\n-> 不及格: 0`;
+                } else {
+                    let ratio = d2LowRatio + (1 - d2LowRatio) * ((cov - t2l) / (t2h - t2l));
+                    d2Score = w2 * ratio;
+                    d2Tooltip = `覆盖率: ${(cov*100).toFixed(1)}% (处于及格与满分之间)\n-> 线性插值得分: ${d2Score.toFixed(1)}`;
+                }
+                
+                // --- 维度三：达成分 (线性插值算法 + 防作弊) ---
+                let ach = plan > 0 ? actual / plan : 0;
+                let baseD3Score = 0;
+                let d3BaseTooltip = "";
+                
+                if (ach >= t3h) {
+                    baseD3Score = w3; 
+                    d3BaseTooltip = `达成率: ${(ach*100).toFixed(1)}% (≥${(t3h*100).toFixed(1)}%)\n-> 满分: ${baseD3Score.toFixed(1)}`;
+                } else if (ach < t3l) {
+                    baseD3Score = 0; 
+                    d3BaseTooltip = `达成率: ${(ach*100).toFixed(1)}% (<${(t3l*100).toFixed(1)}%)\n-> 不及格: 0`;
+                } else {
+                    let ratio = d3LowRatio + (1 - d3LowRatio) * ((ach - t3l) / (t3h - t3l));
+                    baseD3Score = w3 * ratio;
+                    d3BaseTooltip = `达成率: ${(ach*100).toFixed(1)}% (处于及格与满分之间)\n-> 线性插值得分: ${baseD3Score.toFixed(1)}`;
+                }
+                
+                if (cov < antiGamingThresh && plan > 0) { 
+                    d3Score = baseD3Score * 0.5; 
+                    antiGamingPenalty = true; 
+                    d3Tooltip = d3BaseTooltip + `\n🚨 触发防作弊(覆盖率 < ${(antiGamingThresh*100).toFixed(0)}%) -> 得分被强制砍半: ${d3Score.toFixed(1)}`;
+                } else {
+                    d3Score = baseD3Score;
+                    d3Tooltip = d3BaseTooltip;
+                }
+
+                const total = d1Score + d2Score + d3Score;
+                const coef = baseCoef + (total / totalW * floatCoef);
+
+                let totalTooltip = `算分聚合: 存量(${d1Score.toFixed(1)}) + 覆盖(${d2Score.toFixed(1)}) + 达成(${d3Score.toFixed(1)}) = ${total.toFixed(1)}`;
+                let coefTooltip = `全局薪资杠杆核算:\n基础系数(${baseCoef.toFixed(2)}) + [${total.toFixed(1)} ÷ ${totalW} × 浮动(${floatCoef.toFixed(2)})] = ${coef.toFixed(3)}`;
+
+                assessmentResults.push({ 
+                    person, pOverdue, cOverdue, plan, actual, cov, ach, 
+                    d1Score, d2Score, d3Score, total, coef, antiGamingPenalty,
+                    d1Tooltip, d2Tooltip, d3Tooltip, totalTooltip, coefTooltip 
+                });
+            }
+            sortDataList(assessmentResults, 'total', false); drawAssessmentTable();
+        }
+
+        function exportAssessmentCSV() {
+            if (!assessmentResults || assessmentResults.length === 0) { alert('暂无考核数据可导出！'); return; }
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+            csvContent += `排名,签约人,上月逾期金额,本月逾期金额,计划覆盖率,计划达成率,存量清理分,计划覆盖分,计划达成分,总得分,薪资核算比例,是否触发防作弊惩罚\n`;
+            assessmentResults.forEach((item, index) => {
+                let pOverdueTxt = item.pOverdue !== null ? item.pOverdue.toFixed(2) : '无数据';
+                let antiTxt = item.antiGamingPenalty ? "是(得分砍半)" : "否";
+                let row = [
+                    index + 1, item.person, pOverdueTxt, item.cOverdue.toFixed(2),
+                    (item.cov*100).toFixed(1)+'%', (item.ach*100).toFixed(1)+'%',
+                    item.d1Score.toFixed(1), item.d2Score.toFixed(1), item.d3Score.toFixed(1), item.total.toFixed(1),
+                    (item.coef*100).toFixed(1)+'%', antiTxt
+                ];
+                csvContent += row.join(",") + "\n";
+            });
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `绩效考核排行榜_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function exportSupervisionCSV() {
+            if (!supervisionResults || supervisionResults.length === 0) { alert('暂无督办数据可导出！'); return; }
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+            csvContent += `排名,责任人,负责风险盘子,${currentMonthName}承诺额,实际已回款,未达成缺口,考核月进度状态,预测下月回款计划\n`;
+            supervisionResults.forEach((item, index) => {
+                let statusTxt = item.achieveRate >= 1 ? "已100%达标" : (item.achieveRate >= 0.5 ? "进度过半" : "严重落后");
+                let row = [
+                    index + 1, item.person, item.riskAmt.toFixed(2), item.plan.toFixed(2), item.actual.toFixed(2),
+                    item.shortfall.toFixed(2), `${(item.achieveRate*100).toFixed(1)}% (${statusTxt})`, item.planNext.toFixed(2)
+                ];
+                csvContent += row.join(",") + "\n";
+            });
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `计划督办单_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>

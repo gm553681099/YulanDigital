@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>玉兰家居智能中枢</title>
+    <!-- 引入 Tailwind CSS 进行页面排版和美化 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 确保所有元素平滑过渡 */
+        * { transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms; }
+    </style>
+</head>
+<body class="bg-[#f8f9fb] font-sans antialiased text-slate-900 min-h-screen flex flex-col items-center">
+
+    <!-- 页面主容器 -->
+    <div class="w-full flex flex-col items-center pt-20 pb-10 px-4 sm:px-6 lg:px-8 flex-grow">
+        
+        <!-- 头部标题区域 -->
+        <div class="text-center max-w-4xl mx-auto mb-16 mt-10">
+            <h1 class="text-4xl sm:text-[2.8rem] font-black tracking-tight mb-6 text-slate-900">
+                玉兰家居<span class="text-[#1d4ed8]">智能中枢</span>
+            </h1>
+            <p class="text-lg text-slate-500 max-w-2xl mx-auto font-medium leading-relaxed">
+                整合应收账款、库存规划与涂料补货的数字化作业平台
+            </p>
+        </div>
+
+        <!-- 卡片网格布局 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-6xl px-4">
+            
+            <!-- 卡片 1: 应收账款 -->
+            <div class="bg-white rounded-[1.5rem] p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)] hover:-translate-y-1 flex flex-col group">
+                <div class="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-6 text-[#1d4ed8] group-hover:bg-[#1d4ed8] group-hover:text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                    </svg>
+                </div>
+                <h3 class="text-[1.35rem] font-bold mb-4 text-slate-900 tracking-wide">应收账款系统</h3>
+                <p class="text-slate-500 text-[0.95rem] leading-[1.7] mb-8 flex-grow">全方位的债权追踪与风险预警，深度集成了绩效考核与自动化催款督办。</p>
+                <a href="./receivables.html" class="inline-flex items-center text-[0.95rem] font-bold text-[#1d4ed8] hover:text-blue-800 mt-auto w-fit">
+                    进入应用
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="ml-2 group-hover:translate-x-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                </a>
+            </div>
+
+            <!-- 卡片 2: 库存规划 -->
+            <div class="bg-white rounded-[1.5rem] p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)] hover:-translate-y-1 flex flex-col group">
+                <div class="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-6 text-[#1d4ed8] group-hover:bg-[#1d4ed8] group-hover:text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>
+                    </svg>
+                </div>
+                <h3 class="text-[1.35rem] font-bold mb-4 text-slate-900 tracking-wide">库存规划系统</h3>
+                <p class="text-slate-500 text-[0.95rem] leading-[1.7] mb-8 flex-grow">基于动销算法的精益库存管理，提供从呆滞预警到自动化补货的闭环方案。</p>
+                <a href="./inventory.html" class="inline-flex items-center text-[0.95rem] font-bold text-[#1d4ed8] hover:text-blue-800 mt-auto w-fit">
+                    进入应用
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="ml-2 group-hover:translate-x-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                </a>
+            </div>
+
+            <!-- 卡片 3: 蜜乐涂料 -->
+            <div class="bg-white rounded-[1.5rem] p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)] hover:-translate-y-1 flex flex-col group">
+                <div class="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-6 text-[#1d4ed8] group-hover:bg-[#1d4ed8] group-hover:text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"/>
+                        <path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"/>
+                    </svg>
+                </div>
+                <h3 class="text-[1.35rem] font-bold mb-4 text-slate-900 tracking-wide">蜜乐涂料补货系统</h3>
+                <p class="text-slate-500 text-[0.95rem] leading-[1.7] mb-8 flex-grow">针对进口涂料海运周期的定制化补货中枢，集成了整柜凑单优化与库龄多维分析。</p>
+                <a href="./paint.html" class="inline-flex items-center text-[0.95rem] font-bold text-[#1d4ed8] hover:text-blue-800 mt-auto w-fit">
+                    进入应用
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="ml-2 group-hover:translate-x-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                </a>
+            </div>
+
+        </div>
+
+        <!-- 底部版权信息 -->
+        <div class="mt-20 py-8 border-t border-slate-200 w-full max-w-6xl text-center">
+            <p class="text-slate-400 text-sm font-medium tracking-wide">© 2024 玉兰家居数字化中心 · 智能中枢管理平台</p>
+        </div>
+    </div>
+</body>
+</html>
