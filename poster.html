@@ -14,6 +14,23 @@
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Noto+Serif+SC:wght@200;300;400;500;600;900&display=swap" rel="stylesheet">
     
     <style>
+        /* 根部注册全局文字缩放乘子，默认 1.0 */
+        :root {
+            --text-scale: 1.0;
+            --text-primary-color: #26211e;
+            --text-secondary-color: #615751;
+            --text-tertiary-color: rgba(38, 33, 30, 0.42);
+            --container-bg: #f2ece7;
+            
+            /* 采用中性无色相渐变（纯白到绝对透明），保护底色纯粹，确保文字高亮可读 */
+            --scrim-color-strong: rgba(255, 255, 255, 0.82); 
+            --scrim-color-soft: rgba(255, 255, 255, 0.35);   
+            --scrim-color-transparent: rgba(255, 255, 255, 0); 
+            --text-shadow-subtle: 0 1px 2px rgba(255, 255, 255, 0.4); 
+            
+            --logo-filter: grayscale(1) brightness(0.12) contrast(1.25) opacity(0.9);
+        }
+
         body {
             background-color: #dfdad5;
             display: flex;
@@ -25,18 +42,12 @@
             padding: 1.5rem;
             gap: 1.5rem;
             font-family: 'Noto Serif SC', serif;
-            transition: all 0.5s ease-in-out;
         }
 
-        /* 桌面端布局自适应 */
+        /* 桌面端布局固定自适应：左控制台，右海报 */
         @media (min-width: 1024px) {
-            body.panel-left {
-                flex-direction: row;
-            }
-            body.panel-right {
-                flex-direction: row-reverse;
-            }
             body {
+                flex-direction: row;
                 gap: 4rem;
                 padding: 2rem;
             }
@@ -90,7 +101,7 @@
             user-select: none;
         }
 
-        /* 背景图片：不添加任何CSS颜色滤镜，还原自然原图画质 */
+        /* 背景图片：还原自然原图画质 */
         .bg-image {
             width: 100%;
             height: 100%;
@@ -99,7 +110,7 @@
             position: absolute;
             top: 0;
             left: 0;
-            filter: none !important; /* 彻底杜绝任何底图颜色干扰 */
+            filter: none !important;
             transition: transform 3s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
@@ -112,22 +123,6 @@
         .is-exporting .bg-image {
             transform: none !important;
             transition: none !important;
-        }
-
-        /* 提取全局主题变量 */
-        :root {
-            --text-primary-color: #26211e;
-            --text-secondary-color: #615751;
-            --text-tertiary-color: rgba(38, 33, 30, 0.42);
-            --container-bg: #f2ece7;
-            
-            /* 采用中性无色相渐变（纯白到绝对透明），既保护底色纯粹，又确保文字高亮可读 */
-            --scrim-color-strong: rgba(255, 255, 255, 0.82); 
-            --scrim-color-soft: rgba(255, 255, 255, 0.35);   
-            --scrim-color-transparent: rgba(255, 255, 255, 0); 
-            --text-shadow-subtle: 0 1px 2px rgba(255, 255, 255, 0.4); 
-            
-            --logo-filter: grayscale(1) brightness(0.12) contrast(1.25) opacity(0.9);
         }
 
         .font-eng { font-family: 'Cormorant Garamond', serif; }
@@ -160,15 +155,21 @@
             transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
             z-index: 15;
         }
+        
+        /* ⚡️ 彻底解决细横线拼接Bug：强制所有渐变遮罩为 100% 全画幅图层，不再中途交接拼接 */
         .scrim-layer {
             position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             pointer-events: none;
             transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
             z-index: 5;
         }
         
         /* ---------------------------------
-           🎯 极限制重主标题核心样式声明
+           🎯 极限制重与全局缩放文字重合适配
            ---------------------------------*/
         .title-main {
             font-family: 'Noto Serif SC', serif;
@@ -185,121 +186,128 @@
         #title-part2 {
             font-weight: 900 !important;
         }
+
+        /* 强制覆盖字号以全面配合全局滑块变量 */
+        #subtitle-eng {
+            font-size: calc(11px * var(--text-scale, 1)) !important;
+        }
+        #subtitle-cn {
+            font-size: calc(11px * var(--text-scale, 1)) !important;
+        }
+        #body-text1 {
+            font-size: calc(14.5px * var(--text-scale, 1)) !important;
+        }
+        #body-text2 {
+            font-size: calc(12.5px * var(--text-scale, 1)) !important;
+        }
+        .decor-badge {
+            font-size: calc(11.5px * var(--text-scale, 1)) !important;
+        }
         
         /* ---------------------------------
-           🌟 7 大全新极简无横线布局系统 (Whitespace Architecture)
+           🌟 7 大全新极简无横线布局系统 (支持文字全局缩放)
            ---------------------------------*/
         
-        /* 布局 1：经典极简 (右侧纵排 + 左下横排) */
+        /* 布局 1：经典极简 (已去除 vol.08 及相关标识字，达成纯空灵境界) */
         .layout-1 #block-logo { top: 3.5rem; left: 3rem; transform: none; }
         .layout-1 #block-title { top: 3.5rem; right: 3rem; height: 60%; display: flex; gap: 2.25rem; align-items: flex-start; }
-        .layout-1 .title-main { writing-mode: vertical-rl; font-size: 2.45rem; letter-spacing: 0.48em; line-height: 1.55; }
-        .layout-1 .title-main #title-part2 { margin-top: 4.5rem; }
-        .layout-1 .title-sub-group { writing-mode: vertical-rl; display: flex; flex-direction: column; align-items: center; gap: 1.75rem; margin-top: 1.5rem; }
+        .layout-1 .title-main { writing-mode: vertical-rl; font-size: calc(2.45rem * var(--text-scale, 1)); letter-spacing: 0.48em; line-height: 1.55; }
+        .layout-1 .title-main #title-part2 { margin-top: calc(4.5rem * var(--text-scale, 1)); }
+        .layout-1 .title-sub-group { writing-mode: vertical-rl; display: flex; flex-direction: column; align-items: center; gap: 1.75rem; margin-top: calc(1.5rem * var(--text-scale, 1)); }
         
-        /* ⚡️ 针对 Layout 1 中英文纵排 html2canvas 极致兼容性补丁 */
+        /* ⚡️ Layout 1 中英文纵排物理对齐，随字体缩放等比自适应 */
         .layout-1 #subtitle-eng {
             writing-mode: horizontal-tb !important;
             display: inline-block;
             transform: rotate(90deg);
             transform-origin: center center;
             white-space: nowrap;
-            margin: 3.2rem -2.5rem !important; /* 精确物理对齐，完全解决 html2canvas 导出时英文堆叠变形的问题 */
+            margin: calc(3.2rem * var(--text-scale, 1)) calc(-2.5rem * var(--text-scale, 1)) !important; 
         }
 
         .layout-1 #block-body { bottom: 3.5rem; left: 3rem; width: 62%; }
         .layout-1 .body-content { text-align: justify; writing-mode: horizontal-tb; line-height: 1.95; }
-        .layout-1 .scrim-title { top: 0; right: 0; width: 70%; height: 75%; background: radial-gradient(ellipse at top right, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 55%, var(--scrim-color-transparent) 100%); }
-        .layout-1 .scrim-body { bottom: 0; left: 0; width: 80%; height: 50%; background: radial-gradient(ellipse at bottom left, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 55%, var(--scrim-color-transparent) 100%); }
-        /* 右上角定位出版细节 */
-        .layout-1 #decor-elements { top: 3.5rem; right: 10.5rem; display: flex; flex-direction: column; align-items: flex-end; gap: 0.15rem; }
-        .layout-1 #decor-elements .decor-badge { font-family: 'Cormorant Garamond', serif; font-size: 0.72rem; font-style: italic; letter-spacing: 0.15em; opacity: 0.65; }
+        .layout-1 .scrim-title { background: radial-gradient(ellipse at top right, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 55%, var(--scrim-color-transparent) 75%); }
+        .layout-1 .scrim-body { background: radial-gradient(ellipse at bottom left, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 55%, var(--scrim-color-transparent) 75%); }
+        .layout-1 #decor-elements { display: none !important; } /* 彻底在经典极简方案下屏蔽装饰小文字 */
 
-        /* 布局 2：电影中轴 (极致纯净的完美对称) */
+        /* 布局 2：电影中轴 (全画幅渐变：绝对防止缝隙产生) */
         .layout-2 #block-logo { top: 4rem; left: 50%; transform: translateX(-50%); }
         .layout-2 #block-title { bottom: 4.5rem; left: 0; width: 100%; height: auto; display: flex; flex-direction: column; align-items: center; gap: 1.75rem; }
-        .layout-2 .title-main { writing-mode: horizontal-tb; font-size: 2.15rem; letter-spacing: 0.38em; text-align: center; display: flex; flex-direction: column; gap: 0.75rem; }
+        .layout-2 .title-main { writing-mode: horizontal-tb; font-size: calc(2.15rem * var(--text-scale, 1)); letter-spacing: 0.38em; text-align: center; display: flex; flex-direction: column; gap: 0.75rem; }
         .layout-2 .title-main #title-part2 { margin-top: 0; } 
         .layout-2 .title-sub-group { writing-mode: horizontal-tb; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
         .layout-2 #block-body { top: 9.5rem; left: 50%; transform: translateX(-50%); width: 75%; } 
         .layout-2 .body-content { text-align: center; writing-mode: horizontal-tb; line-height: 2; }
-        .layout-2 .scrim-title { bottom: 0; left: 0; width: 100%; height: 55%; background: linear-gradient(to top, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 45%, var(--scrim-color-transparent) 100%); }
-        .layout-2 .scrim-body { top: 0; left: 0; width: 100%; height: 45%; background: linear-gradient(to bottom, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 45%, var(--scrim-color-transparent) 100%); }
-        /* 底端精细平衡字 */
+        
+        /* ⚡️ 两层全画幅渐变平滑交叠，100% 杜绝因 sub-pixel 导致的渲染细横线 */
+        .layout-2 .scrim-title { background: linear-gradient(to top, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 40%, var(--scrim-color-transparent) 60%); }
+        .layout-2 .scrim-body { background: linear-gradient(to bottom, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 30%, var(--scrim-color-transparent) 50%); }
         .layout-2 #decor-elements { bottom: 2rem; left: 50%; transform: translateX(-50%); display: flex; justify-content: center; width: 100%; }
-        .layout-2 #decor-elements .decor-badge { font-family: 'Cormorant Garamond', serif; font-size: 0.68rem; letter-spacing: 0.45em; opacity: 0.5; }
 
-        /* 布局 3：现代画册 (斜角视线，不含任何修饰线) */
+        /* 布局 3：现代画册 (全画幅径向渐变) */
         .layout-3 #block-logo { bottom: 4rem; left: 3rem; transform: none; }
         .layout-3 #block-title { top: 4rem; left: 3rem; height: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 1.5rem; }
-        .layout-3 .title-main { writing-mode: horizontal-tb; font-size: 2.45rem; letter-spacing: 0.28em; text-align: left; display: flex; flex-direction: column; gap: 0.75rem; }
+        .layout-3 .title-main { writing-mode: horizontal-tb; font-size: calc(2.45rem * var(--text-scale, 1)); letter-spacing: 0.28em; text-align: left; display: flex; flex-direction: column; gap: 0.75rem; }
         .layout-3 .title-main #title-part2 { margin-top: 0; }
         .layout-3 .title-sub-group { writing-mode: horizontal-tb; display: flex; flex-direction: row; align-items: center; gap: 1.2rem; }
         .layout-3 #block-body { bottom: 4rem; right: 3rem; width: 56%; transform: translateX(0); }
         .layout-3 .body-content { text-align: right; writing-mode: horizontal-tb; line-height: 2.05; }
-        .layout-3 .scrim-title { top: 0; left: 0; width: 85%; height: 65%; background: radial-gradient(ellipse at top left, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 50%, var(--scrim-color-transparent) 100%); }
-        .layout-3 .scrim-body { bottom: 0; right: 0; width: 85%; height: 60%; background: radial-gradient(ellipse at bottom right, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 50%, var(--scrim-color-transparent) 100%); }
-        /* 左下角小徽标 */
+        .layout-3 .scrim-title { background: radial-gradient(ellipse at top left, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 50%, var(--scrim-color-transparent) 75%); }
+        .layout-3 .scrim-body { background: radial-gradient(ellipse at bottom right, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 50%, var(--scrim-color-transparent) 75%); }
         .layout-3 #decor-elements { bottom: 6.5rem; left: 3rem; display: flex; flex-direction: column; align-items: flex-start; gap: 0.2rem; }
-        .layout-3 #decor-elements .decor-badge { font-family: 'Cormorant Garamond', serif; font-size: 0.7rem; letter-spacing: 0.25em; opacity: 0.55; font-weight: 500; }
 
-        /* 布局 4：先锋解构 (横纵交汇结构，极净极简) */
+        /* 布局 4：先锋解构 (全画幅径向渐变) */
         .layout-4 #block-logo { top: 4rem; right: 3rem; transform: none; }
         .layout-4 #block-title { bottom: 4rem; right: 3rem; height: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 1.5rem; }
-        .layout-4 .title-main { writing-mode: horizontal-tb; font-size: 2.35rem; letter-spacing: 0.28em; text-align: right; display: flex; flex-direction: column; gap: 0.75rem; }
+        .layout-4 .title-main { writing-mode: horizontal-tb; font-size: calc(2.35rem * var(--text-scale, 1)); letter-spacing: 0.28em; text-align: right; display: flex; flex-direction: column; gap: 0.75rem; }
         .layout-4 .title-main #title-part2 { margin-top: 0; }
         .layout-4 .title-sub-group { writing-mode: horizontal-tb; display: flex; flex-direction: row-reverse; align-items: center; gap: 1.2rem; }
         .layout-4 #block-body { top: 4rem; left: 3rem; width: auto; height: 50%; transform: translateX(0); }
         .layout-4 .body-content { text-align: left; writing-mode: vertical-rl; display: flex; flex-direction: row-reverse; justify-content: flex-start; gap: 1.5rem; line-height: 2.25; }
-        .layout-4 .scrim-title { bottom: 0; right: 0; width: 85%; height: 55%; background: radial-gradient(ellipse at bottom right, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 50%, var(--scrim-color-transparent) 100%); }
-        .layout-4 .scrim-body { top: 0; left: 0; width: 65%; height: 75%; background: radial-gradient(ellipse at top left, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 50%, var(--scrim-color-transparent) 100%); }
-        /* 侧端出版注释 */
+        .layout-4 .scrim-title { background: radial-gradient(ellipse at bottom right, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 50%, var(--scrim-color-transparent) 75%); }
+        .layout-4 .scrim-body { background: radial-gradient(ellipse at top left, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 50%, var(--scrim-color-transparent) 75%); }
         .layout-4 #decor-elements { top: 7.5rem; right: 3rem; display: flex; flex-direction: column; align-items: flex-end; }
-        .layout-4 #decor-elements .decor-badge { font-family: 'Cormorant Garamond', serif; font-size: 0.72rem; letter-spacing: 0.25em; opacity: 0.6; }
 
-        /* 布局 5：美术馆展签 (依靠排版密度的自洽性，彻底拿掉分割线) */
+        /* 布局 5：美术馆展签 */
         .layout-5 #block-logo { top: 4rem; right: 3rem; transform: none; }
         .layout-5 #block-title { bottom: 10rem; left: 3rem; height: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 1.25rem; }
-        .layout-5 .title-main { writing-mode: horizontal-tb; font-size: 2.25rem; letter-spacing: 0.22em; text-align: left; display: flex; flex-direction: column; gap: 0.6rem; }
+        .layout-5 .title-main { writing-mode: horizontal-tb; font-size: calc(2.25rem * var(--text-scale, 1)); letter-spacing: 0.22em; text-align: left; display: flex; flex-direction: column; gap: 0.6rem; }
         .layout-5 .title-main #title-part2 { margin-top: 0; }
         .layout-5 .title-sub-group { writing-mode: horizontal-tb; display: flex; flex-direction: row; align-items: center; gap: 1.2rem; }
         .layout-5 #block-body { bottom: 3rem; left: 3rem; width: 72%; transform: translateX(0); }
         .layout-5 .body-content { text-align: justify; writing-mode: horizontal-tb; line-height: 1.9; }
-        .layout-5 .scrim-title { bottom: 0; left: 0; width: 100%; height: 60%; background: linear-gradient(to top, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 55%, var(--scrim-color-transparent) 100%); }
+        .layout-5 .scrim-title { background: linear-gradient(to top, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 55%, var(--scrim-color-transparent) 75%); }
         .layout-5 .scrim-body { opacity: 0; } 
-        /* 展陈规格细节 */
         .layout-5 #decor-elements { bottom: 3rem; right: 3rem; display: flex; flex-direction: column; align-items: flex-end; }
-        .layout-5 #decor-elements .decor-badge { font-family: 'Cormorant Garamond', serif; font-size: 0.72rem; font-weight: 500; letter-spacing: 0.12em; opacity: 0.5; }
 
-        /* 布局 6：无界视界 (纯文字分栏，无横线区隔，完美跨页感) */
+        /* 布局 6：无界视界 (全画幅渐变：100%防缝隙) */
         .layout-6 #block-logo { top: 4rem; left: 3rem; transform: none; }
         .layout-6 #block-title { top: 7.5rem; left: 3rem; right: 3rem; height: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 1.25rem; }
-        .layout-6 .title-main { writing-mode: horizontal-tb; font-size: 2.55rem; letter-spacing: 0.28em; text-align: left; display: flex; flex-direction: row; flex-wrap: wrap; gap: 0.5rem; }
+        .layout-6 .title-main { writing-mode: horizontal-tb; font-size: calc(2.55rem * var(--text-scale, 1)); letter-spacing: 0.28em; text-align: left; display: flex; flex-direction: row; flex-wrap: wrap; gap: 0.5rem; }
         .layout-6 .title-main #title-part2 { margin-top: 0; }
         .layout-6 .title-sub-group { writing-mode: horizontal-tb; display: flex; flex-direction: row; align-items: center; gap: 1.25rem; }
         .layout-6 #block-body { bottom: 4rem; left: 3rem; right: 3rem; width: auto; transform: none; }
         .layout-6 .body-content { display: flex; flex-direction: row; justify-content: space-between; gap: 2.5rem; text-align: left; writing-mode: horizontal-tb; line-height: 1.95; }
         .layout-6 #body-text1 { width: 48%; }
         .layout-6 #body-text2 { width: 48%; margin-top: 0 !important; }
-        .layout-6 .scrim-title { top: 0; left: 0; width: 100%; height: 50%; background: linear-gradient(to bottom, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 45%, var(--scrim-color-transparent) 100%); }
-        .layout-6 .scrim-body { bottom: 0; left: 0; width: 100%; height: 50%; background: linear-gradient(to top, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 45%, var(--scrim-color-transparent) 100%); }
-        /* 顶部页眉 */
+        
+        .layout-6 .scrim-title { background: linear-gradient(to bottom, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 45%, var(--scrim-color-transparent) 60%); }
+        .layout-6 .scrim-body { background: linear-gradient(to top, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 45%, var(--scrim-color-transparent) 60%); }
         .layout-6 #decor-elements { top: 4rem; right: 3rem; display: flex; align-items: center; gap: 0.5rem; }
-        .layout-6 #decor-elements .decor-badge { font-family: 'Cormorant Garamond', serif; font-size: 0.72rem; letter-spacing: 0.25em; opacity: 0.6; }
 
-        /* 布局 7：独立宣言 (大画册级封面，完全依靠字号对比和气场留白) */
+        /* 布局 7：独立宣言 (全画幅渐变：绝对防止缝隙产生) */
         .layout-7 #block-logo { bottom: 4rem; left: 50%; transform: translateX(-50%); }
         .layout-7 #block-title { top: 6rem; left: 3rem; right: 3rem; height: auto; display: flex; flex-direction: column; align-items: center; gap: 1.75rem; }
-        .layout-7 .title-main { writing-mode: horizontal-tb; font-size: 2.45rem; letter-spacing: 0.38em; text-align: center; display: flex; flex-direction: column; gap: 0.75rem; }
+        .layout-7 .title-main { writing-mode: horizontal-tb; font-size: calc(2.45rem * var(--text-scale, 1)); letter-spacing: 0.38em; text-align: center; display: flex; flex-direction: column; gap: 0.75rem; }
         .layout-7 .title-main #title-part2 { margin-top: 0; }
         .layout-7 .title-sub-group { writing-mode: horizontal-tb; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
         .layout-7 #block-body { top: 19.5rem; left: 50%; transform: translateX(-50%); width: 75%; }
         .layout-7 .body-content { text-align: center; writing-mode: horizontal-tb; line-height: 2; }
-        .layout-7 .scrim-title { top: 0; left: 0; width: 100%; height: 50%; background: linear-gradient(to bottom, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 50%, var(--scrim-color-transparent) 100%); }
-        .layout-7 .scrim-body { bottom: 0; left: 0; width: 100%; height: 55%; background: linear-gradient(to top, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 50%, var(--scrim-color-transparent) 100%); }
-        /* 创办年份印记 */
+        
+        .layout-7 .scrim-title { background: linear-gradient(to bottom, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 40%, var(--scrim-color-transparent) 55%); }
+        .layout-7 .scrim-body { background: linear-gradient(to top, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 40%, var(--scrim-color-transparent) 55%); }
         .layout-7 #decor-elements { top: 3.5rem; left: 50%; transform: translateX(-50%); }
-        .layout-7 #decor-elements .decor-badge { font-family: 'Cormorant Garamond', serif; font-size: 0.72rem; letter-spacing: 0.55em; opacity: 0.55; font-weight: 600; }
 
 
         /* ⚡️ 无 Logo 自适应留白算法 */
@@ -309,65 +317,61 @@
         .layout-7.brand-none #block-body { top: 21.5rem; }
 
         /* ---------------------------------
-           ⚡️ 专属 9:16 画册级自适应精调
+           ⚡️ 专属 9:16 画册级自适应精调 (全高度遮罩自动响应，无需单独指定 Scrim 高度)
            ---------------------------------*/
         .ratio-9-16 .title-main {
-            font-size: 2.1rem !important; 
+            font-size: calc(2.1rem * var(--text-scale, 1)) !important; 
         }
         
         /* 1. 经典极简 */
         .ratio-9-16.layout-1 #block-logo { top: 5rem; left: 3.5rem; }
         .ratio-9-16.layout-1 #block-title { top: 5rem; right: 3.5rem; height: 54%; }
         .ratio-9-16.layout-1 #block-body { bottom: 5rem; left: 3.5rem; width: 68%; }
-        .ratio-9-16.layout-1 .scrim-title { width: 85%; height: 75%; }
-        .ratio-9-16.layout-1 .scrim-body { width: 90%; height: 55%; }
-        .ratio-9-16.layout-1 #decor-elements { top: 5rem; right: 10rem; }
+        .ratio-9-16.layout-1 #decor-elements { display: none !important; }
 
-        /* 2. 电影中轴 */
+        /* 2. 电影中轴 (9:16) */
         .ratio-9-16.layout-2 #block-logo { top: 5rem; }
         .ratio-9-16.layout-2 #block-body { top: 12.5rem; width: 82%; } 
         .ratio-9-16.layout-2 #block-title { bottom: 5rem; }
-        .ratio-9-16.layout-2 .title-main { font-size: 1.85rem !important; }
-        .ratio-9-16.layout-2 .scrim-title { height: 45%; }
-        .ratio-9-16.layout-2 .scrim-body { height: 45%; }
+        .ratio-9-16.layout-2 .title-main { font-size: calc(1.85rem * var(--text-scale, 1)) !important; }
 
         /* 3. 现代画册 */
         .ratio-9-16.layout-3 #block-logo { top: 5rem; left: 3.5rem; bottom: auto; } 
         .ratio-9-16.layout-3 #block-title { top: 10.5rem; left: 3.5rem; }
         .ratio-9-16.layout-3 #block-body { bottom: 5rem; right: 3.5rem; width: 72%; }
-        .ratio-9-16.layout-3 .title-main { font-size: 2.15rem !important; }
+        .ratio-9-16.layout-3 .title-main { font-size: calc(2.15rem * var(--text-scale, 1)) !important; }
         .ratio-9-16.layout-3 #decor-elements { bottom: 5rem; left: 3.5rem; }
 
         /* 4. 先锋解构 */
         .ratio-9-16.layout-4 #block-logo { top: 5rem; right: 3.5rem; }
         .ratio-9-16.layout-4 #block-title { bottom: 5rem; right: 3.5rem; }
         .ratio-9-16.layout-4 #block-body { top: 10rem; left: 3.5rem; height: 42%; } 
-        .ratio-9-16.layout-4 .title-main { font-size: 2.15rem !important; }
+        .ratio-9-16.layout-4 .title-main { font-size: calc(2.15rem * var(--text-scale, 1)) !important; }
         .ratio-9-16.layout-4 #decor-elements { top: 10rem; right: 3.5rem; }
 
         /* 5. 美术馆展签 */
         .ratio-9-16.layout-5 #block-logo { top: 5rem; right: 3.5rem; }
         .ratio-9-16.layout-5 #block-title { bottom: 14rem; left: 3.5rem; }
         .ratio-9-16.layout-5 #block-body { bottom: 5rem; left: 3.5rem; width: 78%; }
-        .ratio-9-16.layout-5 .title-main { font-size: 1.95rem !important; }
+        .ratio-9-16.layout-5 .title-main { font-size: calc(1.95rem * var(--text-scale, 1)) !important; }
         .ratio-9-16.layout-5 #decor-elements { bottom: 5rem; right: 3.5rem; }
 
-        /* 6. 无界视界 */
+        /* 6. 无界视界 (9:16) */
         .ratio-9-16.layout-6 #block-logo { top: 5rem; left: 3.5rem; }
         .ratio-9-16.layout-6 #block-title { top: 10rem; left: 3.5rem; right: 3.5rem; }
         .ratio-9-16.layout-6 #block-body { bottom: 5rem; left: 3.5rem; right: 3.5rem; }
         .ratio-9-16.layout-6 .body-content { flex-direction: column; gap: 0.9rem; } 
         .ratio-9-16.layout-6 #body-text1 { width: 100% !important; }
         .ratio-9-16.layout-6 #body-text2 { width: 100% !important; margin-top: 0.25rem !important; }
-        .ratio-9-16.layout-6 .title-main { font-size: 2.15rem !important; }
+        .ratio-9-16.layout-6 .title-main { font-size: calc(2.15rem * var(--text-scale, 1)) !important; }
         .ratio-9-16.layout-6 #decor-elements { top: 5rem; right: 3.5rem; }
 
-        /* 7. 独立宣言 */
+        /* 7. 独立宣言 (9:16) */
         .ratio-9-16.layout-7 #decor-elements { top: 4.5rem; }
         .ratio-9-16.layout-7 #block-logo { bottom: 5rem; }
         .ratio-9-16.layout-7 #block-title { top: 7.5rem; left: 3.5rem; right: 3.5rem; }
         .ratio-9-16.layout-7 #block-body { top: 23.5rem; left: 50%; transform: translateX(-50%); width: 82%; }
-        .ratio-9-16.layout-7 .title-main { font-size: 2.05rem !important; }
+        .ratio-9-16.layout-7 .title-main { font-size: calc(2.05rem * var(--text-scale, 1)) !important; }
 
         /* 9:16 无 Logo 专属自适应 */
         .ratio-9-16.layout-2.brand-none #block-body { top: 9.5rem !important; }
@@ -397,20 +401,16 @@
         }
     </style>
 </head>
-<body class="panel-left">
+<body>
 
     <!-- ==========================================
-         外部操作控制台
+         外部操作控制台 (已移除“对调面板”和“对调位置”按键)
          ========================================== -->
-    <div class="flex flex-row lg:flex-col gap-4 z-50 flex-wrap justify-center items-center w-full lg:w-48 order-2 lg:order-1 px-4 lg:px-0">
+    <div class="flex flex-row lg:flex-col gap-4 z-50 flex-wrap justify-center items-center w-full lg:w-48 px-4 lg:px-0">
         
-        <!-- 桌面端面板位置对调 -->
+        <!-- 桌面端面板顶部标签 -->
         <div class="hidden lg:flex w-full justify-between items-center px-2 mb-1 text-xs text-[#5e544e] tracking-widest border-b border-[#cbd5e1]/10 pb-2">
             <span>EDITORIAL STUDIO</span>
-            <button onclick="togglePanelPosition()" class="hover:text-black font-semibold flex items-center gap-1 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 5 5-5 5"/><path d="M22 7H9a5 5 0 0 0-5 5v7"/><path d="m7 22-5-5 5-5"/><path d="M2 17h13a5 5 0 0 0 5-5V5"/></svg>
-                对调位置
-            </button>
         </div>
 
         <!-- 1. 品牌切换 Segmented Control -->
@@ -436,33 +436,36 @@
             </button>
         </div>
 
-        <!-- 3. 切换排版按钮 -->
-        <button onclick="toggleLayout(event)" class="cursor-pointer bg-[#f2ece7] hover:bg-white text-[#2b2521] px-5 py-3 rounded-full text-xs font-semibold tracking-widest transition-all shadow-sm flex items-center gap-2 border border-[#d5cfc9] w-auto lg:w-full justify-center">
+        <!-- 3. 全局字体比例缩放 (极简高档滑块) -->
+        <div class="bg-[#f2ece7] p-3 rounded-2xl border border-[#d5cfc9] w-full flex flex-col gap-1 shadow-sm">
+            <div class="flex justify-between items-center text-[11px] text-[#5e544e] font-semibold tracking-wider">
+                <span>整体文字缩放</span>
+                <span id="text-scale-value" class="font-mono bg-[#26211e] text-white px-1.5 py-0.5 rounded text-[10px]">100%</span>
+            </div>
+            <input type="range" id="text-scale-slider" min="0.7" max="1.5" step="0.05" value="1.0" oninput="updateTextScale(this.value)" class="w-full accent-[#26211e] cursor-pointer mt-1 h-1 bg-gray-200 rounded-lg appearance-none">
+        </div>
+
+        <!-- 4. 切换排版按钮 -->
+        <button onclick="toggleLayout(event)" class="cursor-pointer bg-[#f2ece7] hover:bg-white text-[#26211e] px-5 py-3 rounded-full text-xs font-semibold tracking-widest transition-all shadow-sm flex items-center gap-2 border border-[#d5cfc9] w-auto lg:w-full justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16"/><path d="M4 15h16"/><path d="M10 3v18"/></svg>
             <span id="layout-btn-text">经典极简</span>
         </button>
 
         <!-- 更换图片按钮 -->
-        <label for="image-upload" class="cursor-pointer bg-[#f2ece7] hover:bg-white text-[#2b2521] px-5 py-3 rounded-full text-xs font-semibold tracking-widest transition-all shadow-sm flex items-center gap-2 border border-[#d5cfc9] w-auto lg:w-full justify-center font-semibold">
+        <label for="image-upload" class="cursor-pointer bg-[#f2ece7] hover:bg-white text-[#26211e] px-5 py-3 rounded-full text-xs font-semibold tracking-widest transition-all shadow-sm flex items-center gap-2 border border-[#d5cfc9] w-auto lg:w-full justify-center font-semibold">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
             更换底图
         </label>
         <input type="file" id="image-upload" class="hidden" accept="image/*" onchange="previewImage(event)" />
         
         <!-- 修改文案按钮 -->
-        <button onclick="openModal()" class="cursor-pointer bg-[#f2ece7] hover:bg-white text-[#2b2521] px-5 py-3 rounded-full text-xs font-semibold tracking-widest transition-all shadow-sm flex items-center gap-2 border border-[#d5cfc9] w-auto lg:w-full justify-center font-semibold">
+        <button onclick="openModal()" class="cursor-pointer bg-[#f2ece7] hover:bg-white text-[#26211e] px-5 py-3 rounded-full text-xs font-semibold tracking-widest transition-all shadow-sm flex items-center gap-2 border border-[#d5cfc9] w-auto lg:w-full justify-center font-semibold">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
             编辑文案
         </button>
-        
-        <!-- 移动端对调按钮 -->
-        <button onclick="togglePanelPosition()" class="lg:hidden cursor-pointer bg-[#f2ece7] hover:bg-white text-[#2b2521] px-5 py-3 rounded-full text-xs font-semibold tracking-widest transition-all shadow-sm flex items-center gap-2 border border-[#d5cfc9] w-auto justify-center font-semibold">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4-4 4-4"/><path d="M21 17H3"/><path d="m3 3 4 4-4 4"/><path d="M3 7h18"/></svg>
-            对调面板
-        </button>
 
         <!-- 一键下载海报按钮 -->
-        <button onclick="downloadPoster()" class="cursor-pointer bg-[#2b2521] hover:bg-black text-[#f2ece7] px-5 py-3.5 rounded-full text-xs font-bold tracking-widest transition-all shadow-md flex items-center gap-2 border border-black/50 w-auto lg:w-full justify-center lg:mt-6">
+        <button onclick="downloadPoster()" class="cursor-pointer bg-[#26211e] hover:bg-black text-[#f2ece7] px-5 py-3.5 rounded-full text-xs font-bold tracking-widest transition-all shadow-md flex items-center gap-2 border border-black/50 w-auto lg:w-full justify-center lg:mt-6">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
             <span id="download-btn-text">下载海报</span>
         </button>
@@ -470,21 +473,21 @@
     </div>
 
     <!-- ==========================================
-         高级海报外层包装器
+         高级海报外层包装器 (右侧固定海报)
          ========================================== -->
-    <div id="poster-wrapper" class="poster-wrapper ratio-3-4 order-1 lg:order-2 shrink-0">
+    <div id="poster-wrapper" class="poster-wrapper ratio-3-4 shrink-0">
         
         <!-- 海报主体容器 -->
         <div id="poster-capture-area" class="poster-container layout-1 brand-miller">
             
             <!-- 背景底图 (零CSS色彩滤镜污染，原汁原味高质感还原) -->
             <img id="poster-bg"
-                 src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=1200&auto=format&fit=crop"
+                 src="Gemini_Generated_Image_p1cercp1cercp1ce.jpg"
                  alt="Sculptural Spaces Interior"
                  class="bg-image"
                  onerror="this.src='https://images.unsplash.com/photo-1600607686527-6fb886090705?q=80&w=1200&auto=format&fit=crop';"/> 
 
-            <!-- 动态智能局部无偏色渐变过渡层 (纯黑/白基底，完美隔离原图色彩不妥协) -->
+            <!-- 动态智能局部无偏色全画幅渐变过渡层 (彻底解决接缝露空细横线Bug) -->
             <div class="scrim-layer scrim-title"></div>
             <div class="scrim-layer scrim-body"></div>
 
@@ -522,11 +525,8 @@
                 </div>
             </div>
 
-            <!-- 微距说明细节定位 -->
-            <div id="decor-elements" class="text-tertiary select-none">
-                <span class="decor-badge">Vol. 08</span>
-                <span class="decor-badge hidden md:inline">Issue 102</span>
-            </div>
+            <!-- 微距说明细节定位 (经典极简Layout1下由脚本渲染为空，其他方案下正常渲染对应标签) -->
+            <div id="decor-elements" class="text-tertiary select-none"></div>
 
         </div>
     </div>
@@ -614,7 +614,7 @@
             }
         }
 
-        // 重新渲染高精度的 Logo
+        // 重新渲染高精度的 Logo (融入全局文字缩放变量)
         function renderBrand() {
             const logoContainer = document.getElementById('block-logo');
             if (currentBrand === 'none') {
@@ -622,20 +622,29 @@
             } else if (currentBrand === 'miller') {
                 logoContainer.innerHTML = `
                     <div id="brand-logo" class="flex flex-col items-start leading-none tracking-widest transition-all duration-800">
-                        <span class="font-eng font-bold text-[13px] md:text-[14px] text-primary select-none uppercase" style="letter-spacing: 0.32em;">MILLER PAINT</span>
-                        <span class="font-eng font-light text-[7px] md:text-[7.5px] text-secondary mt-1 select-none uppercase tracking-[0.45em]">Established 1890</span>
+                        <span class="font-eng font-bold text-primary select-none uppercase" style="font-size: calc(13px * var(--text-scale, 1)); letter-spacing: 0.32em;">MILLER PAINT</span>
+                        <span class="font-eng font-light text-secondary mt-1 select-none uppercase" style="font-size: calc(7.5px * var(--text-scale, 1)); letter-spacing: 0.45em;">Established 1890</span>
                     </div>
                 `;
             } else {
                 logoContainer.innerHTML = `
-                    <div id="brand-logo" class="flex flex-col items-start leading-none tracking-[0.38em] transition-all duration-800">
-                        <span class="font-eng text-primary font-bold text-[14px] md:text-[15px] select-none">YULAN HOME</span>
-                        <span class="font-eng text-secondary text-[7px] tracking-[0.42em] mt-1 select-none">DESIGN STUDIO</span>
+                    <div id="brand-logo" class="flex flex-col items-start leading-none transition-all duration-800" style="letter-spacing: 0.38em;">
+                        <span class="font-eng text-primary font-bold select-none" style="font-size: calc(14px * var(--text-scale, 1));">YULAN HOME</span>
+                        <span class="font-eng text-secondary mt-1 select-none" style="font-size: calc(7px * var(--text-scale, 1)); letter-spacing: 0.42em;">DESIGN STUDIO</span>
                     </div>
                 `;
             }
             const initialImg = document.getElementById('poster-bg');
             adjustTextColor(initialImg);
+        }
+
+        // 整体文字比例缩放控制函数
+        function updateTextScale(val) {
+            document.getElementById('text-scale-value').innerText = Math.round(val * 100) + '%';
+            // 将比例因子写入 HTML 根属性，无缝作用于所有 calc() 字体规则
+            document.documentElement.style.setProperty('--text-scale', val);
+            // 同步刷新Logo层内部文字尺寸
+            renderBrand();
         }
 
         // 智能色彩亮度与原图保持算法
@@ -700,17 +709,6 @@
                     imgElement.src = e.target.result;
                 };
                 reader.readAsDataURL(file);
-            }
-        }
-
-        function togglePanelPosition() {
-            const body = document.body;
-            if (body.classList.contains('panel-left')) {
-                body.classList.remove('panel-left');
-                body.classList.add('panel-right');
-            } else {
-                body.classList.remove('panel-right');
-                body.classList.add('panel-left');
             }
         }
 
@@ -865,9 +863,9 @@
             container.classList.add(`layout-${currentLayoutIndex + 1}`);
             btnTextSpan.innerText = layoutNames[currentLayoutIndex];
 
-            // 动态控制微缩定位符，强化杂志完成度
+            // 动态控制微缩定位符，经典极简（Layout 1，即 index === 0）彻底不填充，隐藏文字
             if (currentLayoutIndex === 0) {
-                decorContainer.innerHTML = `<span class="decor-badge">Vol. 08</span><span class="decor-badge hidden md:inline">Issue 102</span>`;
+                decorContainer.innerHTML = '';
             } else if (currentLayoutIndex === 1) {
                 decorContainer.innerHTML = `<span class="decor-badge">— ALL RIGHTS RESERVED. —</span>`;
             } else if (currentLayoutIndex === 2) {
@@ -883,7 +881,7 @@
             }
         }
 
-        // 超清印刷级海报下载
+        // 印刷级超高清下载 (强制整型裁剪，完美规避 html2canvas 缝隙线 Bug)
         function downloadPoster() {
             const captureArea = document.getElementById('poster-capture-area');
             const btnText = document.getElementById('download-btn-text');
@@ -891,6 +889,17 @@
 
             btnText.innerText = "超清极致导出中...";
             captureArea.classList.add('is-exporting');
+            
+            // ⚡️ 核心步骤：抓取物理宽高，进行四舍五入整型化锁定。这一步彻底粉碎了 subpixel 浮点数间隙线
+            const originalWidth = captureArea.style.width;
+            const originalHeight = captureArea.style.height;
+            
+            const rect = captureArea.getBoundingClientRect();
+            const intWidth = Math.round(rect.width);
+            const intHeight = Math.round(rect.height);
+            
+            captureArea.style.width = intWidth + 'px';
+            captureArea.style.height = intHeight + 'px';
             
             const isDark = document.documentElement.style.getPropertyValue('--text-primary-color') === 'rgb(250, 247, 245)' || 
                            document.documentElement.style.getPropertyValue('--text-primary-color') === '#ffffff' ||
@@ -900,21 +909,24 @@
             document.fonts.ready.then(() => {
                 setTimeout(() => {
                     html2canvas(captureArea, {
-                        scale: 4.5,            // 极致采样率，完美实现4K视网膜精度
+                        scale: 3.0,            // 3.0倍的高清缩放非常安全，可以彻底规避高版本浏览器超过画布限制时的分块/网格线 Bug
                         useCORS: true,
                         allowTaint: false,
                         logging: false,
                         imageTimeout: 0,
-                        width: captureArea.clientWidth,
-                        height: captureArea.clientHeight,
+                        width: intWidth,
+                        height: intHeight,
                         backgroundColor: themeBgColor
                     }).then(canvas => {
+                        // 还原海报的自适应弹性样式
+                        captureArea.style.width = originalWidth;
+                        captureArea.style.height = originalHeight;
                         captureArea.classList.remove('is-exporting');
 
                         const imgData = canvas.toDataURL('image/jpeg', 0.98);
                         const link = document.createElement('a');
                         link.href = imgData;
-                        link.download = `Poster_${layoutNames[currentLayoutIndex]}_4K_Ultra.jpg`;
+                        link.download = `Poster_${layoutNames[currentLayoutIndex]}_UHD.jpg`;
                         document.body.appendChild(link);
                         link.click();
                         document.body.removeChild(link);
@@ -922,10 +934,12 @@
                         btnText.innerText = originalText;
                     }).catch(err => {
                         console.error("海报生成失败:", err);
+                        captureArea.style.width = originalWidth;
+                        captureArea.style.height = originalHeight;
                         captureArea.classList.remove('is-exporting');
                         btnText.innerText = originalText;
                     });
-                }, 200);
+                }, 250); // 增加延迟，给予字体充足的时间载入和绘制
             });
         }
     </script>
