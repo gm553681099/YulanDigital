@@ -156,7 +156,7 @@
             z-index: 15;
         }
         
-        /* ⚡️ 彻底解决细横线拼接Bug：强制所有渐变遮罩为 100% 全画幅图层，不再中途交接拼接 */
+        /* 彻底解决细横线拼接Bug：强制所有渐变遮罩为 100% 全画幅图层，不再中途交接拼接 */
         .scrim-layer {
             position: absolute;
             top: 0;
@@ -215,7 +215,7 @@
         .layout-1 .title-main #title-part2 { margin-top: calc(4.5rem * var(--text-scale, 1)); }
         .layout-1 .title-sub-group { writing-mode: vertical-rl; display: flex; flex-direction: column; align-items: center; gap: 1.75rem; margin-top: calc(1.5rem * var(--text-scale, 1)); }
         
-        /* ⚡️ Layout 1 中英文纵排物理对齐，随字体缩放等比自适应 */
+        /* ⚡s Layout 1 中英文纵排物理对齐，随字体缩放等比自适应 */
         .layout-1 #subtitle-eng {
             writing-mode: horizontal-tb !important;
             display: inline-block;
@@ -240,7 +240,7 @@
         .layout-2 #block-body { top: 9.5rem; left: 50%; transform: translateX(-50%); width: 75%; } 
         .layout-2 .body-content { text-align: center; writing-mode: horizontal-tb; line-height: 2; }
         
-        /* ⚡️ 两层全画幅渐变平滑交叠，100% 杜绝因 sub-pixel 导致的渲染细横线 */
+        /* ⚡s 两层全画幅渐变平滑交叠，100% 杜绝因 sub-pixel 导致的渲染细横线 */
         .layout-2 .scrim-title { background: linear-gradient(to top, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 40%, var(--scrim-color-transparent) 60%); }
         .layout-2 .scrim-body { background: linear-gradient(to bottom, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 30%, var(--scrim-color-transparent) 50%); }
         .layout-2 #decor-elements { bottom: 2rem; left: 50%; transform: translateX(-50%); display: flex; justify-content: center; width: 100%; }
@@ -310,7 +310,7 @@
         .layout-7 #decor-elements { top: 3.5rem; left: 50%; transform: translateX(-50%); }
 
 
-        /* ⚡️ 无 Logo 自适应留白算法 */
+        /* ⚡s 无 Logo 自适应留白算法 */
         .brand-none #block-logo { display: none !important; }
         .layout-2.brand-none #block-body { top: 6.5rem; }
         .layout-6.brand-none #block-title { top: 4rem; }
@@ -680,8 +680,9 @@
                 root.style.setProperty('--container-bg', '#141211');
                 
                 /* 使用纯色相 neutral 黑色（rgba(0,0,0)）渐变，保护任何冷暖调底图不发生色相畸变 */
-                root.style.setProperty('--scrim-color-strong', 'rgba(0, 0, 0, 0.72)');
-                root.style.setProperty('--scrim-color-soft', 'rgba(0, 0, 0, 0.32)');
+                /* ⚡️ 调整：降低遮罩黑度从 0.72 至 0.45，极大幅度还原深色原图暗部细节，保留呼吸感 */
+                root.style.setProperty('--scrim-color-strong', 'rgba(0, 0, 0, 0.45)');
+                root.style.setProperty('--scrim-color-soft', 'rgba(0, 0, 0, 0.15)');
                 root.style.setProperty('--scrim-color-transparent', 'rgba(0, 0, 0, 0)');
                 root.style.setProperty('--text-shadow-subtle', '0 1px 3px rgba(0, 0, 0, 0.5)');
             } else {
@@ -691,8 +692,9 @@
                 root.style.setProperty('--container-bg', '#f2ece7');
                 
                 /* 使用纯色相 neutral 白色（rgba(255,255,255)）渐变，杜绝色偏 */
-                root.style.setProperty('--scrim-color-strong', 'rgba(255, 255, 255, 0.78)');
-                root.style.setProperty('--scrim-color-soft', 'rgba(255, 255, 255, 0.32)');
+                /* ⚡️ 调整：轻微淡化浅色底图下的遮罩，让画面更通透自然 */
+                root.style.setProperty('--scrim-color-strong', 'rgba(255, 255, 255, 0.72)');
+                root.style.setProperty('--scrim-color-soft', 'rgba(255, 255, 255, 0.25)');
                 root.style.setProperty('--scrim-color-transparent', 'rgba(255, 255, 255, 0)');
                 root.style.setProperty('--text-shadow-subtle', '0 1px 2px rgba(255, 255, 255, 0.4)');
             }
@@ -863,7 +865,7 @@
             container.classList.add(`layout-${currentLayoutIndex + 1}`);
             btnTextSpan.innerText = layoutNames[currentLayoutIndex];
 
-            // 动态控制微缩定位符，经典极简（Layout 1，即 index === 0）彻底不填充，隐藏文字
+            // 动态控制微缩定位符，经典极简（Layout 1）与 美术馆展签（Layout 5）彻底不填充信息
             if (currentLayoutIndex === 0) {
                 decorContainer.innerHTML = '';
             } else if (currentLayoutIndex === 1) {
@@ -873,7 +875,8 @@
             } else if (currentLayoutIndex === 3) {
                 decorContainer.innerHTML = `<span class="decor-badge">[ DECONSTRUCTION ]</span>`;
             } else if (currentLayoutIndex === 4) {
-                decorContainer.innerHTML = `<span class="decor-badge">No. 403-1</span><span class="decor-badge">50 x 70 cm</span>`;
+                // ⚡️ 彻底移除美术馆展签相关的 No. 403-1 和 50 x 70 cm，保持其干净空灵
+                decorContainer.innerHTML = '';
             } else if (currentLayoutIndex === 5) {
                 decorContainer.innerHTML = `<span class="decor-badge">EDITORIAL 2026</span>`;
             } else if (currentLayoutIndex === 6) {
@@ -881,7 +884,7 @@
             }
         }
 
-        // 印刷级超高清下载 (强制整型裁剪，完美规避 html2canvas 缝隙线 Bug)
+        // 印刷级超高清下载 (恢复至极致 5.0 倍数：实现 4K 印刷精度)
         function downloadPoster() {
             const captureArea = document.getElementById('poster-capture-area');
             const btnText = document.getElementById('download-btn-text');
@@ -890,7 +893,6 @@
             btnText.innerText = "超清极致导出中...";
             captureArea.classList.add('is-exporting');
             
-            // ⚡️ 核心步骤：抓取物理宽高，进行四舍五入整型化锁定。这一步彻底粉碎了 subpixel 浮点数间隙线
             const originalWidth = captureArea.style.width;
             const originalHeight = captureArea.style.height;
             
@@ -909,7 +911,7 @@
             document.fonts.ready.then(() => {
                 setTimeout(() => {
                     html2canvas(captureArea, {
-                        scale: 3.0,            // 3.0倍的高清缩放非常安全，可以彻底规避高版本浏览器超过画布限制时的分块/网格线 Bug
+                        scale: 5.0,            // ⚡️ 恢复至 5.0X 超高清视网膜导出，呈现极其锐利的字体边缘
                         useCORS: true,
                         allowTaint: false,
                         logging: false,
@@ -926,7 +928,7 @@
                         const imgData = canvas.toDataURL('image/jpeg', 0.98);
                         const link = document.createElement('a');
                         link.href = imgData;
-                        link.download = `Poster_${layoutNames[currentLayoutIndex]}_UHD.jpg`;
+                        link.download = `Poster_${layoutNames[currentLayoutIndex]}_5K_UltraHD.jpg`;
                         document.body.appendChild(link);
                         link.click();
                         document.body.removeChild(link);
@@ -939,7 +941,7 @@
                         captureArea.classList.remove('is-exporting');
                         btnText.innerText = originalText;
                     });
-                }, 250); // 增加延迟，给予字体充足的时间载入和绘制
+                }, 250); 
             });
         }
     </script>
