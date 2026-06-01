@@ -3,102 +3,179 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>玉兰家居智能中枢</title>
+    <title>玉兰集团智能中枢</title>
     <!-- 引入 Tailwind CSS 进行页面排版和美化 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* 确保所有元素平滑过渡 */
-        * { transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms; }
+        * { transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 250ms; }
+        
+        /* 慢速浮动与呼吸微光动画 */
+        @keyframes float-slow {
+            0%, 100% { transform: translateY(0px) scale(1); }
+            50% { transform: translateY(-20px) scale(1.05); }
+        }
+        @keyframes float-delayed {
+            0%, 100% { transform: translateY(0px) scale(1.02); }
+            50% { transform: translateY(20px) scale(0.95); }
+        }
+        .animate-float-1 { animation: float-slow 15s ease-in-out infinite; }
+        .animate-float-2 { animation: float-delayed 18s ease-in-out infinite; }
     </style>
 </head>
-<body class="bg-[#f8f9fb] font-sans antialiased text-slate-900 min-h-screen flex flex-col items-center">
+<body class="bg-[#f5f7fa] font-sans antialiased text-slate-900 min-h-screen flex flex-col items-center relative overflow-hidden">
+
+    <!-- 背景装饰光斑（柔和液态微光，增强页面深度与高级感） -->
+    <div class="absolute top-10 left-10 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl pointer-events-none animate-float-1"></div>
+    <div class="absolute bottom-20 right-10 w-96 h-96 bg-purple-400/10 rounded-full blur-3xl pointer-events-none animate-float-2"></div>
+    <div class="absolute top-1/2 left-1/3 w-80 h-80 bg-teal-400/5 rounded-full blur-3xl pointer-events-none animate-float-1" style="animation-delay: -5s;"></div>
 
     <!-- 页面主容器 -->
-    <div class="w-full flex flex-col items-center pt-20 pb-10 px-4 sm:px-6 lg:px-8 flex-grow">
+    <div class="w-full flex flex-col items-center pt-16 pb-10 px-4 sm:px-6 lg:px-8 flex-grow z-10">
         
         <!-- 头部标题区域 -->
-        <div class="text-center max-w-4xl mx-auto mb-16 mt-10">
-            <h1 class="text-4xl sm:text-[2.8rem] font-black tracking-tight mb-6 text-slate-900">
-                玉兰家居<span class="text-[#1d4ed8]">智能中枢</span>
+        <div class="text-center max-w-4xl mx-auto mb-14 mt-10">
+            <!-- 动态时间问候微章 -->
+            <div id="greeting-badge" class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/80 backdrop-blur-sm border border-slate-200/80 shadow-[0_4px_12px_rgba(0,0,0,0.02)] text-xs font-semibold text-slate-500 mb-6 tracking-wide">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span id="greeting-text">系统初始化中...</span>
+            </div>
+
+            <h1 class="text-4.5xl sm:text-[3.2rem] font-black tracking-tight mb-6 text-slate-900 leading-tight">
+                玉兰集团<span class="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600">智能中枢</span>
             </h1>
-            <p class="text-lg text-slate-500 max-w-2xl mx-auto font-medium leading-relaxed">
-                整合应收账款、库存规划、涂料补货与海报设计的数字化作业平台
+            <p class="text-lg text-slate-500/90 max-w-2xl mx-auto font-medium leading-relaxed">
+                高精协同、智能排版与精益决策的数字化中枢控制台
             </p>
         </div>
 
-        <!-- 卡片网格布局 - 升级为 4 列响应式布局 -->
+        <!-- 卡片网格布局 - 4 列响应式豪华布局 -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-7xl px-4">
             
             <!-- 卡片 1: 应收账款 -->
-            <div class="bg-white rounded-[1.5rem] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)] hover:-translate-y-1 flex flex-col group">
-                <div class="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-6 text-[#1d4ed8] group-hover:bg-[#1d4ed8] group-hover:text-white">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <div class="bg-white/95 backdrop-blur-sm rounded-[1.6rem] p-7 shadow-[0_4px_25px_rgba(0,0,0,0.02)] border border-slate-100 hover:border-blue-200 hover:shadow-[0_20px_40px_rgba(37,99,235,0.08)] hover:-translate-y-1.5 flex flex-col group relative overflow-hidden">
+                <!-- 顶部彩色流光装饰 -->
+                <div class="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-blue-500 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                
+                <!-- 图标容器 -->
+                <div class="w-14 h-14 bg-blue-50/80 rounded-2xl flex items-center justify-center mb-6 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300 shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
                     </svg>
                 </div>
-                <h3 class="text-[1.25rem] font-bold mb-3 text-slate-900 tracking-wide">应收账款系统</h3>
-                <p class="text-slate-500 text-[0.9rem] leading-[1.6] mb-6 flex-grow">全方位的债权追踪与风险预警，深度集成了绩效考核与自动化催款督办。</p>
-                <a href="./receivables.html" class="inline-flex items-center text-[0.95rem] font-bold text-[#1d4ed8] hover:text-blue-800 mt-auto w-fit">
-                    进入应用
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="ml-2 group-hover:translate-x-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                
+                <h3 class="text-[1.3rem] font-bold mb-3 text-slate-800 tracking-wide">应收账款系统</h3>
+                <p class="text-slate-500/90 text-[0.92rem] leading-[1.65] mb-8 flex-grow">全方位的债权追踪与风险预警，深度集成了绩效考核与自动化催款督办。</p>
+                
+                <!-- 升级版动效按钮 -->
+                <a href="./receivables.html" class="block mt-auto">
+                    <div class="inline-flex items-center justify-between w-full px-4 py-3 rounded-xl bg-slate-50 text-slate-700 font-bold text-[0.92rem] transition-all duration-300 group-hover:bg-blue-600 group-hover:text-white group-hover:shadow-[0_8px_20px_rgba(37,99,235,0.2)]">
+                        <span>进入应收账款</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="transform transition-transform duration-300 group-hover:translate-x-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                    </div>
                 </a>
             </div>
 
             <!-- 卡片 2: 库存规划 -->
-            <div class="bg-white rounded-[1.5rem] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)] hover:-translate-y-1 flex flex-col group">
-                <div class="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-6 text-[#1d4ed8] group-hover:bg-[#1d4ed8] group-hover:text-white">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <div class="bg-white/95 backdrop-blur-sm rounded-[1.6rem] p-7 shadow-[0_4px_25px_rgba(0,0,0,0.02)] border border-slate-100 hover:border-emerald-200 hover:shadow-[0_20px_40px_rgba(16,185,129,0.08)] hover:-translate-y-1.5 flex flex-col group relative overflow-hidden">
+                <!-- 顶部彩色流光装饰 -->
+                <div class="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-emerald-500 to-teal-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                
+                <!-- 图标容器 -->
+                <div class="w-14 h-14 bg-emerald-50/80 rounded-2xl flex items-center justify-center mb-6 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300 shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>
                     </svg>
                 </div>
-                <h3 class="text-[1.25rem] font-bold mb-3 text-slate-900 tracking-wide">库存规划系统</h3>
-                <p class="text-slate-500 text-[0.9rem] leading-[1.6] mb-6 flex-grow">基于动销算法的精益库存管理，提供从呆滞预警到自动化补货的闭环方案。</p>
-                <a href="./inventory.html" class="inline-flex items-center text-[0.95rem] font-bold text-[#1d4ed8] hover:text-blue-800 mt-auto w-fit">
-                    进入应用
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="ml-2 group-hover:translate-x-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                
+                <h3 class="text-[1.3rem] font-bold mb-3 text-slate-800 tracking-wide">库存规划系统</h3>
+                <p class="text-slate-500/90 text-[0.92rem] leading-[1.65] mb-8 flex-grow">基于动销算法的精益库存管理，提供从呆滞预警到自动化补货的闭环方案。</p>
+                
+                <!-- 升级版动效按钮 -->
+                <a href="./inventory.html" class="block mt-auto">
+                    <div class="inline-flex items-center justify-between w-full px-4 py-3 rounded-xl bg-slate-50 text-slate-700 font-bold text-[0.92rem] transition-all duration-300 group-hover:bg-emerald-600 group-hover:text-white group-hover:shadow-[0_8px_20px_rgba(16,185,129,0.2)]">
+                        <span>进入库存规划</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="transform transition-transform duration-300 group-hover:translate-x-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                    </div>
                 </a>
             </div>
 
             <!-- 卡片 3: 蜜乐涂料 -->
-            <div class="bg-white rounded-[1.5rem] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)] hover:-translate-y-1 flex flex-col group">
-                <div class="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-6 text-[#1d4ed8] group-hover:bg-[#1d4ed8] group-hover:text-white">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <div class="bg-white/95 backdrop-blur-sm rounded-[1.6rem] p-7 shadow-[0_4px_25px_rgba(0,0,0,0.02)] border border-slate-100 hover:border-rose-200 hover:shadow-[0_20px_40px_rgba(244,63,94,0.08)] hover:-translate-y-1.5 flex flex-col group relative overflow-hidden">
+                <!-- 顶部彩色流光装饰 -->
+                <div class="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-rose-500 to-orange-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                
+                <!-- 图标容器 -->
+                <div class="w-14 h-14 bg-rose-50/80 rounded-2xl flex items-center justify-center mb-6 text-rose-600 group-hover:bg-rose-600 group-hover:text-white transition-all duration-300 shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"/>
                         <path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"/>
                     </svg>
                 </div>
-                <h3 class="text-[1.25rem] font-bold mb-3 text-slate-900 tracking-wide">蜜乐涂料补货系统</h3>
-                <p class="text-slate-500 text-[0.9rem] leading-[1.6] mb-6 flex-grow">针对进口涂料海运周期的定制化补货中枢，集成了整柜凑单优化与库龄多维分析。</p>
-                <a href="./paint.html" class="inline-flex items-center text-[0.95rem] font-bold text-[#1d4ed8] hover:text-blue-800 mt-auto w-fit">
-                    进入应用
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="ml-2 group-hover:translate-x-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                
+                <h3 class="text-[1.3rem] font-bold mb-3 text-slate-800 tracking-wide">蜜乐涂料补货</h3>
+                <p class="text-slate-500/90 text-[0.92rem] leading-[1.65] mb-8 flex-grow">针对进口涂料海运周期的定制化补货中枢，集成了整柜凑单优化与库龄分析。</p>
+                
+                <!-- 升级版动效按钮 -->
+                <a href="./paint.html" class="block mt-auto">
+                    <div class="inline-flex items-center justify-between w-full px-4 py-3 rounded-xl bg-slate-50 text-slate-700 font-bold text-[0.92rem] transition-all duration-300 group-hover:bg-rose-600 group-hover:text-white group-hover:shadow-[0_8px_20px_rgba(244,63,94,0.2)]">
+                        <span>进入涂料补货</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="transform transition-transform duration-300 group-hover:translate-x-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                    </div>
                 </a>
             </div>
 
             <!-- 卡片 4: 海报排版智能设计系统 -->
-            <div class="bg-white rounded-[1.5rem] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)] hover:-translate-y-1 flex flex-col group">
-                <div class="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-6 text-[#1d4ed8] group-hover:bg-[#1d4ed8] group-hover:text-white">
-                    <!-- 设计/排版相关的 SVG 图标 -->
-                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <div class="bg-white/95 backdrop-blur-sm rounded-[1.6rem] p-7 shadow-[0_4px_25px_rgba(0,0,0,0.02)] border border-slate-100 hover:border-violet-200 hover:shadow-[0_20px_40px_rgba(139,92,246,0.08)] hover:-translate-y-1.5 flex flex-col group relative overflow-hidden">
+                <!-- 顶部彩色流光装饰 -->
+                <div class="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-violet-500 to-fuchsia-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                
+                <!-- 图标容器 -->
+                <div class="w-14 h-14 bg-violet-50/80 rounded-2xl flex items-center justify-center mb-6 text-violet-600 group-hover:bg-violet-600 group-hover:text-white transition-all duration-300 shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
                         <line x1="3" y1="9" x2="21" y2="9"/>
                         <line x1="9" y1="21" x2="9" y2="9"/>
                     </svg>
                 </div>
-                <h3 class="text-[1.25rem] font-bold mb-3 text-slate-900 tracking-wide">海报排版设计系统</h3>
-                <p class="text-slate-500 text-[0.9rem] leading-[1.6] mb-6 flex-grow">智能分析排版比例与美学结构，实现海报宣发物料的高效排版、一键套用与自适应调整。</p>
-                <a href="./poster.html" class="inline-flex items-center text-[0.95rem] font-bold text-[#1d4ed8] hover:text-blue-800 mt-auto w-fit">
-                    进入应用
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="ml-2 group-hover:translate-x-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                
+                <h3 class="text-[1.3rem] font-bold mb-3 text-slate-800 tracking-wide">海报排版设计</h3>
+                <p class="text-slate-500/90 text-[0.92rem] leading-[1.65] mb-8 flex-grow">智能分析结构比例，实现海报等核心物料的快速排版、一键套用与自适应。</p>
+                
+                <!-- 升级版动效按钮 -->
+                <a href="./poster.html" class="block mt-auto">
+                    <div class="inline-flex items-center justify-between w-full px-4 py-3 rounded-xl bg-slate-50 text-slate-700 font-bold text-[0.92rem] transition-all duration-300 group-hover:bg-violet-600 group-hover:text-white group-hover:shadow-[0_8px_20px_rgba(139,92,246,0.2)]">
+                        <span>进入海报排版</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="transform transition-transform duration-300 group-hover:translate-x-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                    </div>
                 </a>
             </div>
 
         </div>
 
         <!-- 底部版权信息 -->
-        <div class="mt-20 py-8 border-t border-slate-200 w-full max-w-7xl text-center">
-            <p class="text-slate-400 text-sm font-medium tracking-wide">© 2026 玉兰家居数字化中心 · 智能中枢管理平台</p>
+        <div class="mt-24 py-8 border-t border-slate-200/60 w-full max-w-7xl text-center z-10">
+            <p class="text-slate-400 text-sm font-semibold tracking-wider">© 2026 玉兰集团数字化中心 · 智能中枢管理平台</p>
         </div>
     </div>
+
+    <!-- 迎宾文本逻辑 -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const textElement = document.getElementById('greeting-text');
+            const hour = new Date().getHours();
+            let greeting = '系统就绪 · 欢迎使用智能中枢';
+            if (hour >= 5 && hour < 12) {
+                greeting = '早上好！美好的一天从高效协同工作开始';
+            } else if (hour >= 12 && hour < 14) {
+                greeting = '中午好！适度休息，保持饱满精力';
+            } else if (hour >= 14 && hour < 18) {
+                greeting = '下午好！继续保持专注与卓越';
+            } else {
+                greeting = '晚上好！今天辛苦了，智能中枢持续守候中';
+            }
+            textElement.textContent = greeting;
+        });
+    </script>
 </body>
 </html>

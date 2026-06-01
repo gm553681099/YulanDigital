@@ -4,8 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sculptural Spaces 杂志级海报 - 大师版</title>
+    <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 html2canvas 库 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- 引入高级衬线字体 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Noto+Serif+SC:wght@200;300;400;500;600;900&display=swap" rel="stylesheet">
@@ -13,7 +16,7 @@
     <style>
         :root {
             --text-scale: 1.0;
-            --scrim-intensity: 0.3;
+            --scrim-intensity: 0.3; /* 默认背景遮罩强度（30%），更加清透 */
             --img-offset-x: 50%;
             --img-offset-y: 50%;
             --text-primary-color: #26211e;
@@ -21,11 +24,15 @@
             --text-tertiary-color: rgba(38, 33, 30, 0.42);
             --container-bg: #f2ece7;
             
+            /* 采用中性无色相渐变（纯白到绝对透明），保护底色纯粹，确保文字高亮可读 */
             --scrim-color-strong: rgba(255, 255, 255, 0.82); 
             --scrim-color-soft: rgba(255, 255, 255, 0.35);   
             --scrim-color-transparent: rgba(255, 255, 255, 0); 
             
+            /* 极轻柔的暖褐色纸质微凹投影 (Paper Press Depth) */
             --text-shadow-subtle: 0 1px 2px rgba(38, 33, 30, 0.12), 0 3px 8px rgba(38, 33, 30, 0.04); 
+            
+            /* 专为超精细Logo定制的微凸高光隔离阴影 */
             --logo-text-shadow: 0 1px 2px rgba(255, 255, 255, 0.9), 0 0 1px rgba(38, 33, 30, 0.15);
             --logo-filter: grayscale(1) brightness(0.12) contrast(1.25) opacity(0.9);
         }
@@ -43,6 +50,7 @@
             font-family: 'Noto Serif SC', serif;
         }
 
+        /* 桌面端布局固定自适应：左控制台，右海报 */
         @media (min-width: 1024px) {
             body {
                 flex-direction: row;
@@ -51,6 +59,7 @@
             }
         }
         
+        /* 智能响应式海报容器外包装 */
         .poster-wrapper {
             position: relative;
             width: 100%;
@@ -60,18 +69,21 @@
             transition: aspect-ratio 0.8s cubic-bezier(0.16, 1, 0.3, 1), height 0.8s cubic-bezier(0.16, 1, 0.3, 1), max-width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
+        /* 3:4 比例状态 */
         .poster-wrapper.ratio-3-4 {
             aspect-ratio: 3 / 4;
             height: 78vh;
             max-width: calc(78vh * 3 / 4);
         }
 
+        /* 9:16 比例状态 */
         .poster-wrapper.ratio-9-16 {
             aspect-ratio: 9 / 16;
             height: 82vh;
             max-width: calc(82vh * 9 / 16);
         }
 
+        /* 移动端特殊适配 */
         @media (max-width: 1023px) {
             .poster-wrapper.ratio-3-4 {
                 height: auto;
@@ -85,6 +97,7 @@
             }
         }
 
+        /* 纯净截图区域 */
         .poster-container {
             position: relative;
             width: 100%;
@@ -94,6 +107,7 @@
             user-select: none;
         }
 
+        /* 背景图片：支持精确的物理位移，高度裁切防变形布局 */
         .bg-image {
             width: 100% !important;
             height: 100% !important;
@@ -106,16 +120,20 @@
             bottom: 0;
             filter: none !important;
             transition: transform 3s cubic-bezier(0.16, 1, 0.3, 1);
+            
+            /* 极限制止画面渲染模糊 */
             image-rendering: -webkit-optimize-contrast;
             image-rendering: crisp-edges;
             transform: translateZ(0);
             backface-visibility: hidden;
         }
 
+        /* 鼠标悬停时激活呼吸感微缩放效果 */
         .poster-container:hover .bg-image {
             transform: scale(1.04) translateZ(0);
         }
 
+        /* ⚡️ 导出防护锁 */
         .is-exporting .bg-image {
             transform: none !important;
             transition: none !important;
@@ -138,6 +156,7 @@
             transition: color 0.8s ease;
         }
         
+        /* 💎 超高清 Logo 次像素渲染微调，确保极精细可见 */
         #brand-logo {
             text-rendering: optimizeLegibility;
             -webkit-font-smoothing: antialiased;
@@ -147,18 +166,21 @@
             text-shadow: var(--logo-text-shadow);
         }
 
+        /* 品牌 Logo 容器定位 */
         #block-logo {
             position: absolute;
             transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
             z-index: 25;
         }
         
+        /* 排版系统样式 */
         #block-title, #block-body, #decor-elements {
             position: absolute;
             transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
             z-index: 15;
         }
         
+        /* 强制所有渐变遮罩为 100% 全画幅图层，采用全局遮罩强度变量控制透明度 */
         .scrim-layer {
             position: absolute;
             top: 0;
@@ -171,16 +193,46 @@
             opacity: var(--scrim-intensity, 0.3); 
         }
         
-        .title-main { font-family: 'Noto Serif SC', serif; }
-        .title-main span { display: block; white-space: normal; word-break: break-all; }
-        #title-part1 { font-weight: 200 !important; }
-        #title-part2 { font-weight: 900 !important; }
-        #subtitle-eng { font-size: calc(11px * var(--text-scale, 1)) !important; }
-        #subtitle-cn { font-size: calc(11px * var(--text-scale, 1)) !important; }
-        #body-text1 { font-size: calc(14.5px * var(--text-scale, 1)) !important; }
-        #body-text2 { font-size: calc(12.5px * var(--text-scale, 1)) !important; }
-        .decor-badge { font-size: calc(11.5px * var(--text-scale, 1)) !important; }
+        /* ---------------------------------
+           🎯 极限制重与全局缩放文字重合适配
+           ---------------------------------*/
+        .title-main {
+            font-family: 'Noto Serif SC', serif;
+        }
+        .title-main span {
+            display: block;
+            white-space: normal; /* 允许长文字优雅地自然换行 */
+            word-break: break-all;
+        }
+        /* “阅尽繁华，归于” 设定为轻灵、纤细的宋体（Weight 200） */
+        #title-part1 {
+            font-weight: 200 !important;
+        }
+        /* “一壁静谧” 采用极富雕刻质感的重黑宋体（Weight 900） */
+        #title-part2 {
+            font-weight: 900 !important;
+        }
 
+        /* 强制覆盖字号以全面配合全局滑块变量 */
+        #subtitle-eng {
+            font-size: calc(11px * var(--text-scale, 1)) !important;
+        }
+        #subtitle-cn {
+            font-size: calc(11px * var(--text-scale, 1)) !important;
+        }
+        #body-text1 {
+            font-size: calc(14.5px * var(--text-scale, 1)) !important;
+        }
+        #body-text2 {
+            font-size: calc(12.5px * var(--text-scale, 1)) !important;
+        }
+        .decor-badge {
+            font-size: calc(11.5px * var(--text-scale, 1)) !important;
+        }
+
+        /* ---------------------------------
+           💎 极简画布内“所见即所得”实时编辑样式（Inline Text Editing Feedback）
+           ---------------------------------*/
         [contenteditable="true"] {
             transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
             border-radius: 4px;
@@ -198,26 +250,51 @@
             outline: none;
             cursor: text;
         }
+        /* 空白文字占位符 */
         [contenteditable="true"]:empty:before {
             content: attr(placeholder);
             color: var(--text-tertiary-color);
             opacity: 0.45;
         }
         
-        /* 10 大排版布局 (保留所有原有样式) */
+        /* ---------------------------------
+           🌟 10 大全新极极简无横线布局系统
+           ---------------------------------*/
+        
+        /* 布局 1：经典极简 */
         .layout-1 #block-logo { top: 3.5rem; left: 3rem; transform: none; }
         .layout-1 #block-title { top: 3.5rem; right: 3rem; height: 60%; display: flex; gap: 2.25rem; align-items: flex-start; }
         .layout-1 .title-main { writing-mode: vertical-rl; font-size: calc(2.45rem * var(--text-scale, 1)); letter-spacing: 0.48em; line-height: 1.55; }
         .layout-1 .title-main #title-part2 { margin-top: calc(4.5rem * var(--text-scale, 1)); }
         .layout-1 .title-sub-group { writing-mode: vertical-rl; display: flex; flex-direction: column; align-items: center; gap: 1.75rem; margin-top: calc(1.5rem * var(--text-scale, 1)); }
-        .layout-1 #subtitle-eng { writing-mode: horizontal-tb !important; display: inline-block; transform: rotate(90deg); transform-origin: center center; white-space: nowrap; margin: calc(3.2rem * var(--text-scale, 1)) calc(-2.5rem * var(--text-scale, 1)) !important; }
-        .layout-1 #subtitle-eng.is-chinese-sub { writing-mode: vertical-rl !important; transform: none !important; margin: 0 !important; display: block !important; white-space: nowrap !important; letter-spacing: 0.35em !important; }
+        
+        /* Layout 1 英文或数字纵排时，执行优雅的90度旋转 */
+        .layout-1 #subtitle-eng {
+            writing-mode: horizontal-tb !important;
+            display: inline-block;
+            transform: rotate(90deg);
+            transform-origin: center center;
+            white-space: nowrap;
+            margin: calc(3.2rem * var(--text-scale, 1)) calc(-2.5rem * var(--text-scale, 1)) !important; 
+        }
+        
+        /* 💎 针对英文副标题检测到实际输入中文时，自动拦截并切换为不旋转的直立竖排状态 */
+        .layout-1 #subtitle-eng.is-chinese-sub {
+            writing-mode: vertical-rl !important;
+            transform: none !important;
+            margin: 0 !important;
+            display: block !important;
+            white-space: nowrap !important;
+            letter-spacing: 0.35em !important;
+        }
+
         .layout-1 #block-body { bottom: 3.5rem; left: 3rem; width: 62%; }
         .layout-1 .body-content { text-align: justify; writing-mode: horizontal-tb; line-height: 1.95; }
         .layout-1 .scrim-title { background: radial-gradient(circle at top right, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 40%, var(--scrim-color-transparent) 80%); }
         .layout-1 .scrim-body { background: radial-gradient(circle at bottom left, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 40%, var(--scrim-color-transparent) 80%); }
         .layout-1 #decor-elements { display: none !important; }
 
+        /* 布局 2：电影中轴 */
         .layout-2 #block-logo { top: 4rem; left: 50%; transform: translateX(-50%); }
         .layout-2 #block-title { bottom: 4.5rem; left: 3rem; right: 3rem; height: auto; display: flex; flex-direction: column; align-items: center; gap: 1.75rem; }
         .layout-2 .title-main { writing-mode: horizontal-tb; font-size: calc(2.15rem * var(--text-scale, 1)); letter-spacing: 0.38em; text-align: center; display: flex; flex-direction: column; gap: 0.75rem; }
@@ -225,10 +302,12 @@
         .layout-2 .title-sub-group { writing-mode: horizontal-tb; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
         .layout-2 #block-body { top: 9.5rem; left: 50%; transform: translateX(-50%); width: 75%; } 
         .layout-2 .body-content { text-align: center; writing-mode: horizontal-tb; line-height: 2; }
+        
         .layout-2 .scrim-title { background: linear-gradient(to top, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 30%, var(--scrim-color-transparent) 60%); }
         .layout-2 .scrim-body { background: linear-gradient(to bottom, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 25%, var(--scrim-color-transparent) 55%); }
         .layout-2 #decor-elements { bottom: 2rem; left: 50%; transform: translateX(-50%); display: flex; justify-content: center; width: 100%; }
 
+        /* 布局 3：现代画册 */
         .layout-3 #block-logo { bottom: 4rem; left: 3rem; transform: none; }
         .layout-3 #block-title { top: 4rem; left: 3rem; right: 3rem; height: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 1.5rem; }
         .layout-3 .title-main { writing-mode: horizontal-tb; font-size: calc(2.45rem * var(--text-scale, 1)); letter-spacing: 0.28em; text-align: left; display: flex; flex-direction: column; gap: 0.75rem; }
@@ -240,6 +319,7 @@
         .layout-3 .scrim-body { background: radial-gradient(circle at bottom right, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 40%, var(--scrim-color-transparent) 80%); }
         .layout-3 #decor-elements { bottom: 6.5rem; left: 3rem; display: flex; flex-direction: column; align-items: flex-start; gap: 0.2rem; }
 
+        /* 布局 4：先锋解构 */
         .layout-4 #block-logo { top: 4rem; right: 3rem; transform: none; }
         .layout-4 #block-title { bottom: 4rem; right: 3rem; left: 3rem; height: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 1.5rem; }
         .layout-4 .title-main { writing-mode: horizontal-tb; font-size: calc(2.35rem * var(--text-scale, 1)); letter-spacing: 0.28em; text-align: right; display: flex; flex-direction: column; gap: 0.75rem; }
@@ -251,6 +331,7 @@
         .layout-4 .scrim-body { background: radial-gradient(circle at top left, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 40%, var(--scrim-color-transparent) 80%); }
         .layout-4 #decor-elements { top: 7.5rem; right: 3rem; display: flex; flex-direction: column; align-items: flex-end; }
 
+        /* 布局 5：美术馆展签 */
         .layout-5 #block-logo { top: 4rem; right: 3rem; transform: none; }
         .layout-5 #block-title { bottom: 11.5rem; left: 3rem; right: 3rem; height: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 1.25rem; }
         .layout-5 .title-main { writing-mode: horizontal-tb; font-size: calc(2.25rem * var(--text-scale, 1)); letter-spacing: 0.22em; text-align: left; display: flex; flex-direction: column; gap: 0.6rem; }
@@ -262,30 +343,47 @@
         .layout-5 .scrim-body { opacity: 0; } 
         .layout-5 #decor-elements { bottom: 3rem; right: 3rem; display: flex; flex-direction: column; align-items: flex-end; }
 
+        /* 布局 6：无界视界 */
         .layout-6 #block-logo { top: 4rem; left: 3rem; transform: none; }
         .layout-6 #block-title { top: 7.5rem; left: 3rem; right: 3rem; height: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 1.25rem; }
-        .layout-6 .title-main { writing-mode: horizontal-tb; font-size: calc(2.55rem * var(--text-scale, 1)); letter-spacing: 0.28em; text-align: left; display: flex; flex-direction: column; gap: 0.5rem; }
+        
+        /* 💎 Layout 6 标题修改为垂直 flex 纵流，100% 杜绝窄屏下的水平折行杂乱 */
+        .layout-6 .title-main { 
+            writing-mode: horizontal-tb; 
+            font-size: calc(2.55rem * var(--text-scale, 1)); 
+            letter-spacing: 0.28em; 
+            text-align: left; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 0.5rem; 
+        }
         .layout-6 .title-main #title-part2 { margin-top: 0; }
         .layout-6 .title-sub-group { writing-mode: horizontal-tb; display: flex; flex-direction: row; align-items: center; gap: 1.25rem; }
         .layout-6 #block-body { bottom: 4rem; left: 3rem; right: 3rem; width: auto; transform: none; }
         .layout-6 .body-content { display: flex; flex-direction: row; justify-content: space-between; gap: 2.5rem; text-align: left; writing-mode: horizontal-tb; line-height: 1.95; }
         .layout-6 #body-text1 { width: 48%; }
         .layout-6 #body-text2 { width: 48%; margin-top: 0 !important; }
+        
         .layout-6 .scrim-title { background: linear-gradient(to bottom, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 35%, var(--scrim-color-transparent) 70%); }
         .layout-6 .scrim-body { background: linear-gradient(to top, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 35%, var(--scrim-color-transparent) 70%); }
         .layout-6 #decor-elements { top: 4rem; right: 3rem; display: flex; align-items: center; gap: 0.5rem; }
 
+        /* 布局 7：独立宣言 */
         .layout-7 #block-logo { bottom: 4rem; left: 50%; transform: translateX(-50%); }
         .layout-7 #block-title { top: 6rem; left: 3rem; right: 3rem; height: auto; display: flex; flex-direction: column; align-items: center; gap: 1.75rem; }
         .layout-7 .title-main { writing-mode: horizontal-tb; font-size: calc(2.45rem * var(--text-scale, 1)); letter-spacing: 0.38em; text-align: center; display: flex; flex-direction: column; gap: 0.75rem; }
         .layout-7 .title-main #title-part2 { margin-top: 0; }
         .layout-7 .title-sub-group { writing-mode: horizontal-tb; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+        
+        /* 💎 极致避撞重构：将 Layout 7 正文段由固定 top 变更为 bottom 底部对齐，实现双端呼吸气场 */
         .layout-7 #block-body { bottom: 7.5rem; left: 50%; transform: translateX(-50%); width: 75%; }
         .layout-7 .body-content { text-align: center; writing-mode: horizontal-tb; line-height: 2; }
+        
         .layout-7 .scrim-title { background: linear-gradient(to bottom, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 30%, var(--scrim-color-transparent) 65%); }
         .layout-7 .scrim-body { background: linear-gradient(to top, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 30%, var(--scrim-color-transparent) 65%); }
         .layout-7 #decor-elements { top: 3.5rem; left: 50%; transform: translateX(-50%); }
 
+        /* 布局 8：诗性留白 (Poetic Silence) */
         .layout-8 #block-logo { top: 3.5rem; left: 3rem; transform: none; }
         .layout-8 #block-title { top: 7.5rem; left: 3rem; height: 60%; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 1.5rem; }
         .layout-8 .title-main { writing-mode: vertical-rl; font-size: calc(2.35rem * var(--text-scale, 1)); letter-spacing: 0.55em; line-height: 1.5; }
@@ -297,10 +395,12 @@
         .layout-8 .scrim-body { background: radial-gradient(circle at bottom right, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 40%, var(--scrim-color-transparent) 80%); }
         .layout-8 #decor-elements { bottom: 3.5rem; left: 3rem; display: flex; flex-direction: column; align-items: flex-start; }
 
+        /* 布局 9：极客包豪斯 (Bauhaus Structural Grid) - 重构防冲突对齐 */
         .layout-9 #block-logo { top: 3.5rem; right: 3rem; transform: none; }
         .layout-9 #block-title { top: 3.5rem; left: 3rem; right: 3rem; height: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 1.25rem; }
         .layout-9 .title-main { writing-mode: horizontal-tb; font-size: calc(2.5rem * var(--text-scale, 1)); letter-spacing: 0.28em; display: flex; flex-direction: column; gap: 0.5rem; }
         .layout-9 .title-main #title-part2 { margin-top: 0; }
+        /* 移除横条实线分割，采用气场留白 */
         .layout-9 .title-sub-group { writing-mode: horizontal-tb; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 1.5rem; max-width: 100%; margin-top: 0.5rem; opacity: 0.85; }
         .layout-9 #block-body { bottom: 4rem; right: 3rem; width: 50%; }
         .layout-9 .body-content { text-align: left; writing-mode: horizontal-tb; line-height: 2.05; }
@@ -308,6 +408,7 @@
         .layout-9 .scrim-body { background: linear-gradient(to top, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 40%, var(--scrim-color-transparent) 80%); }
         .layout-9 #decor-elements { top: 3.5rem; right: 14rem; display: flex; flex-direction: column; align-items: flex-end; }
 
+        /* ⚡️ 布局 10：叙事主义 (Narrative Monolith) - 替代原纵版东方禅意，高阶水平对角视线设计 */
         .layout-10 #block-logo { bottom: 4rem; left: 3rem; transform: none; }
         .layout-10 #block-title { top: 30%; left: 3rem; right: 3rem; height: auto; display: flex; flex-direction: column; gap: 1.25rem; align-items: flex-start; }
         .layout-10 .title-main { writing-mode: horizontal-tb; font-size: calc(2.45rem * var(--text-scale, 1)); letter-spacing: 0.28em; display: flex; flex-direction: column; gap: 0.5rem; }
@@ -319,36 +420,54 @@
         .layout-10 .scrim-body { background: radial-gradient(circle at bottom right, var(--scrim-color-strong) 0%, var(--scrim-color-soft) 40%, var(--scrim-color-transparent) 80%); }
         .layout-10 #decor-elements { bottom: 4rem; left: 16rem; display: flex; }
 
+        /* 💎 无 Logo 时自适应留白高度规避 */
         .brand-none #block-logo { display: none !important; }
         .layout-2.brand-none #block-body { top: 6.5rem; }
         .layout-6.brand-none #block-title { top: 4rem; }
         .layout-7.brand-none #block-body { bottom: 7.5rem; }
         .layout-10.brand-none #block-title { top: 25%; }
 
-        .ratio-9-16 .title-main { font-size: calc(2.1rem * var(--text-scale, 1)) !important; }
+        /* ---------------------------------
+           ⚡️ 专属 9:16 画册级自适应精调 (全面走查 Layout 9 与 10，确保比例缩放安然无恙)
+           ---------------------------------*/
+        .ratio-9-16 .title-main {
+            font-size: calc(2.1rem * var(--text-scale, 1)) !important; 
+        }
+        
+        /* 1. 经典极简 */
         .ratio-9-16.layout-1 #block-logo { top: 5rem; left: 3.5rem; }
         .ratio-9-16.layout-1 #block-title { top: 5rem; right: 3.5rem; height: 54%; }
         .ratio-9-16.layout-1 #block-body { bottom: 5rem; left: 3.5rem; width: 68%; }
         .ratio-9-16.layout-1 #decor-elements { display: none !important; }
+
+        /* 2. 电影中轴 (9:16) */
         .ratio-9-16.layout-2 #block-logo { top: 5rem; }
         .ratio-9-16.layout-2 #block-body { top: 12.5rem; width: 82%; } 
         .ratio-9-16.layout-2 #block-title { bottom: 5rem; }
         .ratio-9-16.layout-2 .title-main { font-size: calc(1.85rem * var(--text-scale, 1)) !important; }
+
+        /* 3. 现代画册 */
         .ratio-9-16.layout-3 #block-logo { top: 5rem; left: 3.5rem; bottom: auto; } 
         .ratio-9-16.layout-3 #block-title { top: 10.5rem; left: 3.5rem; }
         .ratio-9-16.layout-3 #block-body { bottom: 5rem; right: 3.5rem; width: 72%; }
         .ratio-9-16.layout-3 .title-main { font-size: calc(2.15rem * var(--text-scale, 1)) !important; }
         .ratio-9-16.layout-3 #decor-elements { bottom: 5rem; left: 3.5rem; }
+
+        /* 4. 先锋解构 */
         .ratio-9-16.layout-4 #block-logo { top: 5rem; right: 3.5rem; }
         .ratio-9-16.layout-4 #block-title { bottom: 5rem; right: 3.5rem; }
         .ratio-9-16.layout-4 #block-body { top: 10rem; left: 3.5rem; height: 42%; } 
         .ratio-9-16.layout-4 .title-main { font-size: calc(2.15rem * var(--text-scale, 1)) !important; }
         .ratio-9-16.layout-4 #decor-elements { top: 10rem; right: 3.5rem; }
+
+        /* 5. 美术馆展签 */
         .ratio-9-16.layout-5 #block-logo { top: 5rem; right: 3.5rem; }
         .ratio-9-16.layout-5 #block-title { bottom: 14rem; left: 3.5rem; }
         .ratio-9-16.layout-5 #block-body { bottom: 5rem; left: 3.5rem; width: 78%; }
         .ratio-9-16.layout-5 .title-main { font-size: calc(1.95rem * var(--text-scale, 1)) !important; }
         .ratio-9-16.layout-5 #decor-elements { bottom: 5rem; right: 3.5rem; }
+
+        /* 6. 无界视界 (9:16) */
         .ratio-9-16.layout-6 #block-logo { top: 5rem; left: 3.5rem; }
         .ratio-9-16.layout-6 #block-title { top: 10rem; left: 3.5rem; right: 3.5rem; }
         .ratio-9-16.layout-6 #block-body { bottom: 5rem; left: 3.5rem; right: 3.5rem; }
@@ -357,28 +476,37 @@
         .ratio-9-16.layout-6 #body-text2 { width: 100% !important; margin-top: 0.25rem !important; }
         .ratio-9-16.layout-6 .title-main { font-size: calc(2.15rem * var(--text-scale, 1)) !important; }
         .ratio-9-16.layout-6 #decor-elements { top: 5rem; right: 3.5rem; }
+
+        /* 7. 独立宣言 (9:16) */
         .ratio-9-16.layout-7 #decor-elements { top: 4.5rem; }
         .ratio-9-16.layout-7 #block-logo { bottom: 5rem; }
         .ratio-9-16.layout-7 #block-title { top: 7.5rem; left: 3.5rem; right: 3.5rem; }
         .ratio-9-16.layout-7 #block-body { top: 23.5rem; left: 50%; transform: translateX(-50%); width: 82%; }
         .ratio-9-16.layout-7 .title-main { font-size: calc(2.05rem * var(--text-scale, 1)) !important; }
+
+        /* 8. 诗性留白 (9:16) */
         .ratio-9-16.layout-8 #block-logo { top: 5rem; left: 3.5rem; }
         .ratio-9-16.layout-8 #block-title { top: 10rem; left: 3.5rem; }
         .ratio-9-16.layout-8 #block-body { bottom: 5rem; right: 3.5rem; width: 75%; }
         .ratio-9-16.layout-8 .title-main { font-size: calc(2.1rem * var(--text-scale, 1)) !important; }
         .ratio-9-16.layout-8 #decor-elements { bottom: 5rem; left: 3.5rem; }
+
+        /* 💎 Layout 9 (9:16) 网格微调，彻底防撞 */
         .ratio-9-16.layout-9 #block-logo { top: 5rem; right: 3.5rem; }
         .ratio-9-16.layout-9 #block-title { top: 5rem; left: 3.5rem; }
         .ratio-9-16.layout-9 .title-sub-group { width: 100%; }
         .ratio-9-16.layout-9 #block-body { bottom: 5rem; right: 3.5rem; width: 75%; }
         .ratio-9-16.layout-9 .title-main { font-size: calc(2.1rem * var(--text-scale, 1)) !important; }
         .ratio-9-16.layout-9 #decor-elements { top: 5rem; right: 10rem; }
+
+        /* 💎 Layout 10 (9:16) 叙事主义微调，完全无缝防撞 */
         .ratio-9-16.layout-10 #block-logo { bottom: 5rem; left: 3.5rem; }
         .ratio-9-16.layout-10 #block-title { top: 25%; left: 3.5rem; right: 3.5rem; }
         .ratio-9-16.layout-10 #block-body { bottom: 5rem; right: 3.5rem; width: 65%; }
         .ratio-9-16.layout-10 .title-main { font-size: calc(2.1rem * var(--text-scale, 1)) !important; }
         .ratio-9-16.layout-10 #decor-elements { bottom: 5rem; left: 14rem; }
 
+        /* 9:16 无 Logo 专属自适应 */
         .ratio-9-16.layout-2.brand-none #block-body { top: 9.5rem !important; }
         .ratio-9-16.layout-3.brand-none #block-title { top: 5rem !important; }
         .ratio-9-16.layout-4.brand-none #block-body { top: 5rem !important; }
@@ -387,68 +515,119 @@
         .ratio-9-16.layout-8.brand-none #block-title { top: 5rem !important; }
         .ratio-9-16.layout-10.brand-none #block-title { top: 20% !important; }
 
-        @keyframes shine-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .animate-spin-slow { animation: shine-spin 12s linear infinite; }
-        @keyframes shimmer { 100% { transform: translateX(100%); } }
-
-        input[type="range"] { -webkit-appearance: none; width: 100%; height: 3px; background: #e5dfd9; border-radius: 9999px; outline: none; transition: background 0.3s ease; }
-        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #26211e; cursor: pointer; box-shadow: 0 2px 6px rgba(38, 33, 30, 0.25); transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1); }
-        input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.28); }
-        input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #26211e; cursor: pointer; border: none; box-shadow: 0 2px 6px rgba(38, 33, 30, 0.25); transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1); }
-        input[type="range"]::-moz-range-thumb:hover { transform: scale(1.28); }
-
-        .scrollbar-custom::-webkit-scrollbar { width: 8px; }
-        .scrollbar-custom::-webkit-scrollbar-track { background: #eae4dd; border-radius: 99px; }
-        .scrollbar-custom::-webkit-scrollbar-thumb { background: #8a7f76; border-radius: 99px; border: 2px solid #eae4dd; }
-        .scrollbar-custom::-webkit-scrollbar-thumb:hover { background: #615751; }
+        /* 旋转动画与极简UI修饰 */
+        @keyframes shine-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .animate-spin-slow {
+            animation: shine-spin 12s linear infinite;
+        }
 
         /* ---------------------------------
-           💎 拖拽与微调核心专属 CSS
+           💎 控制面板滑块高级样式深度定制 (Apple & Figma SaaS Design)
            ---------------------------------*/
-        .draggable-block {
-            cursor: pointer; /* 提示用户可以交互 */
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 3px;
+            background: #e5dfd9;
+            border-radius: 9999px;
+            outline: none;
+            transition: background 0.3s ease;
         }
-        /* 选中时的优雅虚线框 */
-        .selected-block {
-            outline: 1.5px dashed var(--text-secondary-color) !important;
-            outline-offset: 6px;
-            cursor: grab;
-            border-radius: 2px;
-            z-index: 30 !important; /* 置顶防止被遮挡 */
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #26211e;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(38, 33, 30, 0.25);
+            transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .selected-block:active {
-            cursor: grabbing;
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.28);
         }
-        /* 💡 导出海报时强制消隐选中框，保证无痕纯净 */
-        .is-exporting .selected-block {
-            outline: none !important;
+        input[type="range"]::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #26211e;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 6px rgba(38, 33, 30, 0.25);
+            transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        input[type="range"]::-moz-range-thumb:hover {
+            transform: scale(1.28);
+        }
+
+        /* ---------------------------------
+           💎 专属定制美术馆级优雅滚动条
+           ---------------------------------*/
+        .scrollbar-custom::-webkit-scrollbar {
+            width: 8px;
+        }
+        .scrollbar-custom::-webkit-scrollbar-track {
+            background: #eae4dd;
+            border-radius: 99px;
+        }
+        .scrollbar-custom::-webkit-scrollbar-thumb {
+            background: #8a7f76;
+            border-radius: 99px;
+            border: 2px solid #eae4dd;
+        }
+        .scrollbar-custom::-webkit-scrollbar-thumb:hover {
+            background: #615751;
         }
     </style>
 </head>
 <body>
 
+    <!-- ==========================================
+         外部操作控制台 (全新重构：整合卡片式 Figma 设计面板)
+         ========================================== -->
     <div class="w-full lg:w-56 bg-[#fbf9f6]/95 border border-[#e2dcd5] rounded-3xl p-5 shadow-[0_20px_45px_-12px_rgba(38,33,30,0.1)] flex flex-col gap-4.5 z-50">
         
+        <!-- 卡片顶部标头 -->
         <div class="flex items-center justify-between border-b border-[#cbd5e1]/20 pb-2.5 mb-0.5">
             <span class="text-[10px] font-bold tracking-[0.22em] text-[#615751] uppercase">EDITORIAL STUDIO</span>
             <span class="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
         </div>
 
+        <!-- 1. 品牌与比例设置组合 -->
         <div class="flex flex-col gap-2.5">
             <span class="text-[9px] font-bold tracking-widest text-[#8a7f76] uppercase">Brand & Ratio / 品牌与比例</span>
+            <!-- 品牌切换 Segmented Control -->
             <div class="bg-[#f2ece7] p-1 rounded-full border border-[#d5cfc9] flex w-full shadow-sm gap-0.5">
-                <button id="brand-btn-miller" onclick="setBrand('miller')" class="flex-1 text-center py-1.5 text-[9px] font-bold rounded-full tracking-wider bg-[#26211e] text-white transition-all duration-300">MILLER</button>
-                <button id="brand-btn-yulan" onclick="setBrand('yulan')" class="flex-1 text-center py-1.5 text-[9px] font-bold rounded-full tracking-wider text-[#5e544e] hover:text-black transition-all duration-300">YULAN</button>
-                <button id="brand-btn-none" onclick="setBrand('none')" class="flex-1 text-center py-1.5 text-[9px] font-bold rounded-full tracking-wider text-[#5e544e] hover:text-black transition-all duration-300">无LOGO</button>
+                <button id="brand-btn-miller" onclick="setBrand('miller')" class="flex-1 text-center py-1.5 text-[9px] font-bold rounded-full tracking-wider bg-[#26211e] text-white transition-all duration-300">
+                    MILLER
+                </button>
+                <button id="brand-btn-yulan" onclick="setBrand('yulan')" class="flex-1 text-center py-1.5 text-[9px] font-bold rounded-full tracking-wider text-[#5e544e] hover:text-black transition-all duration-300">
+                    YULAN
+                </button>
+                <button id="brand-btn-none" onclick="setBrand('none')" class="flex-1 text-center py-1.5 text-[9px] font-bold rounded-full tracking-wider text-[#5e544e] hover:text-black transition-all duration-300">
+                    无LOGO
+                </button>
             </div>
+
+            <!-- 比例切换 Segmented Control -->
             <div class="bg-[#f2ece7] p-1 rounded-full border border-[#d5cfc9] flex w-full shadow-sm">
-                <button id="ratio-btn-3-4" onclick="setRatio('3-4')" class="flex-1 text-center py-1.5 text-[10px] font-semibold rounded-full tracking-widest bg-[#26211e] text-white transition-all duration-300">3:4 经典</button>
-                <button id="ratio-btn-9-16" onclick="setRatio('9-16')" class="flex-1 text-center py-1.5 text-[10px] font-semibold rounded-full tracking-widest text-[#5e544e] hover:text-black transition-all duration-300">9:16 画意</button>
+                <button id="ratio-btn-3-4" onclick="setRatio('3-4')" class="flex-1 text-center py-1.5 text-[10px] font-semibold rounded-full tracking-widest bg-[#26211e] text-white transition-all duration-300">
+                    3:4 经典
+                </button>
+                <button id="ratio-btn-9-16" onclick="setRatio('9-16')" class="flex-1 text-center py-1.5 text-[10px] font-semibold rounded-full tracking-widest text-[#5e544e] hover:text-black transition-all duration-300">
+                    9:16 画意
+                </button>
             </div>
         </div>
 
+        <!-- 2. 排版、缩放与遮罩设置组合 -->
         <div class="flex flex-col gap-3.5 border-t border-[#cbd5e1]/15 pt-3.5">
             <span class="text-[9px] font-bold tracking-widest text-[#8a7f76] uppercase">Typography & Mask / 字号与遮罩</span>
+            <!-- 全局字体比例缩放 (滑块) -->
             <div class="flex flex-col gap-1">
                 <div class="flex justify-between items-center text-[10px] text-[#5e544e] font-semibold tracking-wider">
                     <span>整体文字缩放</span>
@@ -456,6 +635,8 @@
                 </div>
                 <input type="range" id="text-scale-slider" min="0.7" max="1.5" step="0.05" value="1.0" oninput="updateTextScale(this.value)" class="cursor-pointer mt-1">
             </div>
+
+            <!-- 背景遮罩强度调节滑块 -->
             <div class="flex flex-col gap-1">
                 <div class="flex justify-between items-center text-[10px] text-[#5e544e] font-semibold tracking-wider">
                     <span>背景遮罩强度</span>
@@ -465,8 +646,10 @@
             </div>
         </div>
 
+        <!-- 3. 底图位移微调滑块组 -->
         <div class="flex flex-col gap-3 border-t border-[#cbd5e1]/15 pt-3.5">
             <span class="text-[9px] font-bold tracking-widest text-[#8a7f76] uppercase">Backdrop / 底图位移微调</span>
+            <!-- X轴位移 -->
             <div class="flex flex-col gap-0.5">
                 <div class="flex justify-between text-[10px] text-gray-500 font-medium">
                     <span>水平偏移</span>
@@ -474,6 +657,7 @@
                 </div>
                 <input type="range" id="offset-x-slider" min="0" max="100" step="1" value="50" oninput="updateImageOffset('x', this.value)" class="cursor-pointer mt-0.5">
             </div>
+            <!-- Y轴位移 -->
             <div class="flex flex-col gap-0.5 mt-0.5">
                 <div class="flex justify-between text-[10px] text-gray-500 font-medium">
                     <span>垂直偏移</span>
@@ -483,21 +667,33 @@
             </div>
         </div>
 
+        <!-- 4. 主动字色覆盖开关 -->
         <div class="flex flex-col gap-2.5 border-t border-[#cbd5e1]/15 pt-3.5">
             <span class="text-[9px] font-bold tracking-widest text-[#8a7f76] uppercase">Theme Colors / 字体反色</span>
             <div class="bg-[#f2ece7] p-0.5 rounded-full flex gap-0.5 border border-[#d5cfc9] shadow-sm">
-                <button id="btn-co-auto" onclick="setTextColorOverride('auto')" class="flex-1 text-center py-1 text-[9px] font-bold rounded-full bg-[#26211e] text-white transition-all duration-300">自动</button>
-                <button id="btn-co-white" onclick="setTextColorOverride('white')" class="flex-1 text-center py-1 text-[9px] font-bold rounded-full text-[#5e544e] hover:text-black transition-all duration-300">亮白</button>
-                <button id="btn-co-dark" onclick="setTextColorOverride('dark')" class="flex-1 text-center py-1 text-[9px] font-bold rounded-full text-[#5e544e] hover:text-black transition-all duration-300">深咖</button>
+                <button id="btn-co-auto" onclick="setTextColorOverride('auto')" class="flex-1 text-center py-1 text-[9px] font-bold rounded-full bg-[#26211e] text-white transition-all duration-300">
+                    自动
+                </button>
+                <button id="btn-co-white" onclick="setTextColorOverride('white')" class="flex-1 text-center py-1 text-[9px] font-bold rounded-full text-[#5e544e] hover:text-black transition-all duration-300">
+                    亮白
+                </button>
+                <button id="btn-co-dark" onclick="setTextColorOverride('dark')" class="flex-1 text-center py-1 text-[9px] font-bold rounded-full text-[#5e544e] hover:text-black transition-all duration-300">
+                    深咖
+                </button>
             </div>
         </div>
 
+        <!-- 5. 核心排版切换与功能交互按钮组 (已新增前进/后退双向排版切换) -->
         <div class="flex flex-col gap-2 border-t border-[#cbd5e1]/15 pt-3.5">
             <span class="text-[9px] font-bold tracking-widest text-[#8a7f76] uppercase">Layouts / 切换排版</span>
+            
+            <!-- 💎 新增双向大师排版切换器 -->
             <div class="flex w-full gap-1.5">
+                <!-- 极简后退按钮 -->
                 <button onclick="prevLayout(event)" class="cursor-pointer bg-[#f2ece7] hover:bg-white text-[#26211e] w-12 rounded-full shadow-sm flex items-center justify-center border border-[#d5cfc9] transition-all duration-300" title="上一个排版">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
                 </button>
+                <!-- 切换排版前进按钮 (修改为 10 套方案) -->
                 <button onclick="toggleLayout(event)" class="relative flex-1 cursor-pointer bg-gradient-to-r from-[#efeae4] to-[#f7f2ed] hover:from-white hover:to-white text-[#26211e] py-2.5 rounded-full text-[10px] font-bold tracking-widest transition-all shadow-sm flex items-center gap-2 border border-[#d5cfc9] w-full justify-center duration-300">
                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-spin-slow text-[#8a7f76]"><path d="M4 9h16"/><path d="M4 15h16"/><path d="M10 3v18"/></svg>
                     <span id="layout-btn-text">经典极简 (1/10)</span>
@@ -505,46 +701,55 @@
                 </button>
             </div>
 
+            <!-- 更换图片与编辑按钮组 -->
             <div class="flex gap-1.5 w-full">
                 <label for="image-upload" class="flex-1 cursor-pointer bg-[#f2ece7] hover:bg-white text-[#26211e] py-2 rounded-full text-[9px] font-bold tracking-wider transition-all shadow-sm flex items-center gap-1 border border-[#d5cfc9] justify-center">
                     <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
                     更换图片
                 </label>
                 <input type="file" id="image-upload" class="hidden" accept="image/*" onchange="previewImage(event)" />
+                
                 <button onclick="openModal()" class="flex-1 cursor-pointer bg-[#f2ece7] hover:bg-white text-[#26211e] py-2 rounded-full text-[9px] font-bold tracking-wider transition-all shadow-sm flex items-center gap-1 border border-[#d5cfc9] justify-center">
                     <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
                     修改文案
                 </button>
             </div>
 
-            <button onclick="generateAICopy()" id="ai-copy-btn" class="cursor-pointer relative overflow-hidden bg-gradient-to-r from-amber-100 to-orange-50 hover:from-amber-200 hover:to-orange-100 text-amber-900 py-2.5 rounded-full text-[10px] font-bold tracking-widest transition-all shadow-sm flex items-center gap-1.5 border border-amber-200/60 w-full justify-center mt-1 mb-0.5">
-                <span class="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-[shimmer_2s_infinite]"></span>
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-amber-600"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
-                <span id="ai-btn-text">AI 洞察画面生成文案</span>
-            </button>
-
+            <!-- 一键下载海报按钮 -->
             <button onclick="downloadPoster()" class="cursor-pointer bg-[#26211e] hover:bg-black text-[#f2ece7] py-3 rounded-full text-[10px] font-bold tracking-widest transition-all shadow-md flex items-center gap-2 border border-black/50 w-full justify-center mt-0.5">
                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
                 <span id="download-btn-text">下载超清海报</span>
             </button>
         </div>
+
     </div>
 
+    <!-- ==========================================
+         高级海报外层包装器 (右侧固定海报)
+         ========================================== -->
     <div id="poster-wrapper" class="poster-wrapper ratio-3-4 shrink-0">
         
+        <!-- 海报主体容器 (完美承载拖拽上传 Dropzone - 二阶段：2.2) -->
         <div id="poster-capture-area" class="poster-container layout-1 brand-miller">
+            
+            <!-- 背景底图 (零CSS色彩滤镜污染，支持抗锯齿平滑渲染，强制 cover 完美裁剪不变形) -->
             <img id="poster-bg"
-                 src="https://images.unsplash.com/photo-1600607686527-6fb886090705?q=80&w=1200&auto=format&fit=crop"
+                 src="Gemini_Generated_Image_p1cercp1cercp1ce.jpg"
                  alt="Sculptural Spaces Interior"
                  class="bg-image"
                  onerror="this.src='https://images.unsplash.com/photo-1600607686527-6fb886090705?q=80&w=1200&auto=format&fit=crop';"/> 
 
+            <!-- 动态智能全画幅渐变过渡层 -->
             <div class="scrim-layer scrim-title"></div>
             <div class="scrim-layer scrim-body"></div>
 
-            <div id="block-logo" class="absolute transition-all duration-800 z-20 draggable-block"></div>
+            <!-- 品牌标识 Logo -->
+            <div id="block-logo" class="absolute transition-all duration-800 z-20">
+                <!-- 由 JS 动态渲染 -->
+            </div>
 
-            <div id="block-title" class="text-primary z-10 draggable-block">
+            <!-- 主排版标题区 (全面接入 Contenteditable 实时画布编辑 - 二阶段：2.1) -->
+            <div id="block-title" class="text-primary z-10">
                 <h1 class="title-main leading-relaxed drop-shadow-sm">
                     <span id="title-part1" contenteditable="true" spellcheck="false" placeholder="输入主标题细体字段...">阅尽繁华，归于</span>
                     <span id="title-part2" contenteditable="true" spellcheck="false" placeholder="输入主标题重黑强调字段...">一壁静谧</span>
@@ -559,7 +764,8 @@
                 </div>
             </div>
 
-            <div id="block-body" class="text-primary z-10 draggable-block">
+            <!-- 正文说明区 (全面接入 Contenteditable 实时画布编辑) -->
+            <div id="block-body" class="text-primary z-10">
                 <div class="body-content">
                     <p id="body-text1" contenteditable="true" spellcheck="false" placeholder="在此处键入海报首段正文细节..." class="text-sm md:text-[15px] leading-loose font-light tracking-[0.2em] drop-shadow-sm">
                         越是极简，越考验涂料的纯度。
@@ -571,36 +777,52 @@
                 </div>
             </div>
 
-            <div id="decor-elements" class="text-tertiary select-none draggable-block"></div>
+            <!-- 微距说明细节定位 (经典极简Layout1下由脚本渲染为空，其他方案下正常渲染对应标签) -->
+            <div id="decor-elements" class="text-tertiary select-none"></div>
 
+            <!-- 拖拽图片上传浮层反馈组件 (二阶段：2.2) -->
             <div id="drag-overlay" class="hidden absolute inset-0 bg-black/65 backdrop-blur-[2px] z-50 flex flex-col justify-center items-center text-white border-4 border-dashed border-white/40 m-6 rounded-2xl transition-all duration-300 pointer-events-none">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mb-2 animate-bounce text-[#dfdad5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                 </svg>
                 <span class="text-xs font-semibold tracking-[0.3em] uppercase text-[#dfdad5] drop-shadow-md">🎯 松开鼠标 更换海报底图</span>
             </div>
+
         </div>
     </div>
 
+    <!-- ==========================================
+         文案编辑控制台 (高级模态框 - 完全还原高保真美学)
+         ========================================== -->
     <div id="text-modal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex justify-center items-center opacity-0 transition-opacity duration-300 p-4 md:p-6">
         <div class="bg-[#f2ece7] p-6 md:p-8 rounded-3xl w-11/12 max-w-xl shadow-[0_30px_70px_-15px_rgba(38,33,30,0.3)] transform scale-95 transition-transform duration-300 flex flex-col max-h-[92vh]" id="text-modal-content">
+            
+            <!-- 模态框标题 (还原设计图：优雅宋体大标题) -->
             <h2 class="text-2xl md:text-3xl font-semibold text-[#2b2521] mb-5 tracking-wide font-serif">编辑海报文案</h2>
+            
+            <!-- 滚动主体容器 (配上高档定制滚动条) -->
             <div class="flex-1 overflow-y-auto pr-2 scrollbar-custom" style="scrollbar-width: thin; scrollbar-color: #8a7f76 #eae4dd;">
+                
+                <!-- 1. 智能一键解析悬浮舱 -->
                 <div class="mb-6 p-5 bg-white/60 rounded-2xl border border-[#cbd5e1]/40 shadow-inner flex flex-col">
                     <div class="flex justify-between items-center mb-3">
-                        <span class="text-xs font-bold text-[#2b2521] flex items-center gap-1 font-serif"><span>⚡</span> 一键粘贴智能解析</span>
+                        <span class="text-xs font-bold text-[#2b2521] flex items-center gap-1 font-serif">
+                            <span>⚡</span> 一键粘贴智能解析
+                        </span>
                         <span class="text-[10px] text-gray-400 tracking-wider">一秒极速拆分布局</span>
                     </div>
-                    <textarea id="input-smart-paste" class="w-full bg-white border border-[#cbd5e1]/70 rounded-xl p-3.5 text-xs h-24 focus:outline-none focus:border-[#2b2521] focus:ring-1 focus:ring-[#2b2521] transition-all resize-none text-[#5e544e]" placeholder="在此直接粘贴完整文案..."></textarea>
+                    <textarea id="input-smart-paste" class="w-full bg-white border border-[#cbd5e1]/70 rounded-xl p-3.5 text-xs h-24 focus:outline-none focus:border-[#2b2521] focus:ring-1 focus:ring-[#2b2521] transition-all resize-none text-[#5e544e]" placeholder="在此直接粘贴完整文案，例如：&#10;主标题：阅尽繁华，归于一壁静谧&#10;副标题：ARTISAN FINISH · 审美不平替&#10;正文：越是极简..."></textarea>
                     <button onclick="autoParseText(event)" class="w-full mt-4 py-3 rounded-xl text-xs bg-[#2b2521] text-[#f2ece7] hover:bg-black transition-all font-bold shadow-md tracking-wider">开始识别并填入下面字段</button>
                 </div>
                 
+                <!-- 装饰分割线 -->
                 <div class="flex items-center gap-4 my-5">
                     <div class="h-px flex-1 bg-[#cbd5e1]/50"></div>
                     <span class="text-[10px] text-gray-400 tracking-widest uppercase font-serif">或手动微调</span>
                     <div class="h-px flex-1 bg-[#cbd5e1]/50"></div>
                 </div>
 
+                <!-- 2. 精准输入字段组 (完全还原高保真造型：底色、圆角、行高与字形对齐) -->
                 <div class="flex flex-col">
                     <label class="block text-xs font-semibold text-[#5e544e] mb-1.5 font-serif">主标题 (第一部分 / 细体)</label>
                     <input type="text" id="input-title1" class="modal-input-premium font-light font-serif">
@@ -608,13 +830,13 @@
                     <label class="block text-xs font-semibold text-[#5e544e] mb-1.5 font-serif">主标题 (第二部分 / 粗体或强调部分)</label>
                     <input type="text" id="input-title2" class="modal-input-premium font-black text-[#2b2521] font-serif">
                     
-                    <label class="block text-xs font-semibold text-[#5e544e] mb-1.5 font-serif">英文副标题</label>
+                    <label class="block text-xs font-semibold text-[#5e544e] mb-1.5 font-serif">英文副标题 (若输入中文，横立排版时将自动直立不旋转)</label>
                     <input type="text" id="input-sub-eng" class="modal-input-premium font-eng font-semibold tracking-wider">
                     
                     <label class="block text-xs font-semibold text-[#5e544e] mb-1.5 font-serif">中文副标题</label>
                     <input type="text" id="input-sub-cn" class="modal-input-premium font-light font-serif">
                     
-                    <label class="block text-xs font-semibold text-[#5e544e] mb-1.5 font-serif">主正文首段</label>
+                    <label class="block text-xs font-semibold text-[#5e544e] mb-1.5 font-serif">主正文首段 (换行可自动转为段落)</label>
                     <textarea id="input-body1" class="modal-input-premium h-24 font-light resize-none scrollbar-custom text-xs leading-relaxed font-serif"></textarea>
 
                     <label class="block text-xs font-semibold text-[#5e544e] mb-1.5 font-serif">正文次段 / 注解段</label>
@@ -622,6 +844,7 @@
                 </div>
             </div>
             
+            <!-- 底部确认栏 (完全还原高保真胶囊排布) -->
             <div class="flex justify-end items-center gap-6 pt-3.5 border-t border-[#cbd5e1]/20">
                 <button onclick="closeModal()" class="text-xs font-semibold text-[#5e544e] hover:text-black transition-colors tracking-widest">取消</button>
                 <button onclick="applyText()" class="px-7 py-3 rounded-full text-xs font-bold bg-[#2b2521] text-white hover:bg-black transition-all shadow-md tracking-widest font-serif">确认排版</button>
@@ -629,33 +852,31 @@
         </div>
     </div>
 
+    <!-- CSS 高阶微雕配置，完全还原手绘圆角和投影色系 -->
     <style>
-        .modal-input-premium { width: 100%; padding: 0.75rem 1rem; margin-bottom: 1.25rem; border: 1px solid #cbd5e1; background-color: #fbf9f6; color: #2b2521; border-radius: 0.75rem; font-size: 0.85rem; transition: all 0.3s ease; }
-        .modal-input-premium:focus { outline: none; border-color: #2b2521; background-color: #ffffff; box-shadow: 0 0 0 1px #2b2521, 0 8px 24px -10px rgba(38, 33, 30, 0.1); }
+        .modal-input-premium {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            margin-bottom: 1.25rem;
+            border: 1px solid #cbd5e1;
+            background-color: #fbf9f6; /* 还原高保真乳白灰底 */
+            color: #2b2521;
+            border-radius: 0.75rem;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+        }
+        .modal-input-premium:focus {
+            outline: none;
+            border-color: #2b2521;
+            background-color: #ffffff;
+            box-shadow: 0 0 0 1px #2b2521, 0 8px 24px -10px rgba(38, 33, 30, 0.1);
+        }
     </style>
 
+    <!-- 脚本逻辑 -->
     <script>
         let currentBrand = 'miller';
-        let textColorOverride = 'auto'; 
-
-        // 💡 保护机制：切换模板或比例时，彻底重置拖拽后的绝对定位坐标，让其回归完美排版状态
-        function resetManualPositions() {
-            const dragIds = ['block-logo', 'block-title', 'block-body', 'decor-elements'];
-            dragIds.forEach(id => {
-                const el = document.getElementById(id);
-                if (el) {
-                    el.style.removeProperty('left');
-                    el.style.removeProperty('top');
-                    el.style.removeProperty('right');
-                    el.style.removeProperty('bottom');
-                    el.style.removeProperty('transform');
-                    el.style.removeProperty('width');
-                    delete el.dataset.positioned;
-                    el.classList.remove('selected-block');
-                }
-            });
-            if (typeof selectedElement !== 'undefined') selectedElement = null;
-        }
+        let textColorOverride = 'auto'; // 'auto', 'white', 'dark'
 
         function setBrand(brand) {
             currentBrand = brand;
@@ -686,6 +907,7 @@
             }
         }
 
+        // 重新渲染高精度的 Logo (融入全局文字缩放变量与次像素渲染抗锯齿)
         function renderBrand() {
             const logoContainer = document.getElementById('block-logo');
             if (currentBrand === 'none') {
@@ -709,17 +931,22 @@
             adjustTextColor(initialImg);
         }
 
+        // 整体文字比例缩放控制函数
         function updateTextScale(val) {
             document.getElementById('text-scale-value').innerText = Math.round(val * 100) + '%';
+            // 将比例因子写入 HTML 根属性，无缝作用于所有 calc() 字体规则
             document.documentElement.style.setProperty('--text-scale', val);
+            // 同步刷新Logo层内部文字尺寸
             renderBrand();
         }
 
+        // 背景遮罩强度调节调节滑块
         function updateScrimIntensity(val) {
             document.getElementById('scrim-intensity-value').innerText = Math.round(val * 100) + '%';
             document.documentElement.style.setProperty('--scrim-intensity', val);
         }
 
+        // 底图位移调节控制函数 (一阶段：1.1)
         function updateImageOffset(axis, val) {
             if (axis === 'x') {
                 document.getElementById('offset-x-value').innerText = val + '%';
@@ -730,8 +957,10 @@
             }
         }
 
+        // 主动字色覆盖设置函数 (一阶段：1.3)
         function setTextColorOverride(mode) {
             textColorOverride = mode;
+            // 更新 UI 按钮激活状态
             ['btn-co-auto', 'btn-co-white', 'btn-co-dark'].forEach(id => {
                 document.getElementById(id).classList.remove('bg-[#26211e]', 'text-white');
                 document.getElementById(id).classList.add('text-[#5e544e]', 'hover:text-black');
@@ -742,16 +971,22 @@
             adjustTextColor(document.getElementById('poster-bg'));
         }
 
+        // 智能检测英文副标题是否包含中文字符，自动调整排版方向
         function checkSubtitleChinese() {
             const subtitleEng = document.getElementById('subtitle-eng');
             if (subtitleEng) {
                 const text = subtitleEng.innerText || subtitleEng.textContent;
+                // 利用正则精确匹配中文字符
                 const hasChinese = /[\u4e00-\u9fa5]/.test(text);
-                if (hasChinese) subtitleEng.classList.add('is-chinese-sub');
-                else subtitleEng.classList.remove('is-chinese-sub');
+                if (hasChinese) {
+                    subtitleEng.classList.add('is-chinese-sub');
+                } else {
+                    subtitleEng.classList.remove('is-chinese-sub');
+                }
             }
         }
 
+        // 智能色彩亮度与原图保持算法
         function calculateBrightness(imageElement) {
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d', { willReadFrequently: true });
@@ -773,31 +1008,49 @@
             }
         }
 
+        // 精控无色偏黑白配方：降低多余雾化遮罩，依靠纸墨微投影与极精细高对比度Logo投影
         function adjustTextColor(imgElement) {
             let mode = calculateBrightness(imgElement);
             const root = document.documentElement;
-            if (textColorOverride === 'white') mode = 'dark'; 
-            else if (textColorOverride === 'dark') mode = 'light'; 
+
+            // ⚡️ 如果用户指定了强制色彩覆盖，则优先执行覆盖逻辑 (一阶段：1.3)
+            if (textColorOverride === 'white') {
+                mode = 'dark'; // 模拟在黑色底图下触发白色文字配置
+            } else if (textColorOverride === 'dark') {
+                mode = 'light'; // 模拟在白色底图下触发深色文字配置
+            }
 
             if (mode === 'dark') {
                 root.style.setProperty('--text-primary-color', '#ffffff');
                 root.style.setProperty('--text-secondary-color', '#e5dfd9');
                 root.style.setProperty('--text-tertiary-color', 'rgba(255, 255, 255, 0.5)');
                 root.style.setProperty('--container-bg', '#12100f');
+                
+                /* 大幅下调强黑色遮罩极限（降至0.45），完美还原原图暗部细节 */
                 root.style.setProperty('--scrim-color-strong', 'rgba(0, 0, 0, 0.45)');
                 root.style.setProperty('--scrim-color-soft', 'rgba(0, 0, 0, 0.15)');
                 root.style.setProperty('--scrim-color-transparent', 'rgba(0, 0, 0, 0)');
+                
+                /* 空气感多重柔和暗影，不脏不生硬，字形完美浮现 */
                 root.style.setProperty('--text-shadow-subtle', '0 2px 8px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.2)');
+                
+                /* 为Logo定制高清晰度的阻尼隔离暗影 */
                 root.style.setProperty('--logo-text-shadow', '0 2px 5px rgba(0,0,0,0.85), 0 0.5px 1px rgba(0,0,0,0.5)');
             } else {
                 root.style.setProperty('--text-primary-color', '#26211e');
                 root.style.setProperty('--text-secondary-color', '#5a514b');
                 root.style.setProperty('--text-tertiary-color', 'rgba(38, 33, 30, 0.5)');
                 root.style.setProperty('--container-bg', '#f2ece7');
+                
+                /* 大幅下调强白色遮罩极限（降至0.72），彻底杜绝白色雾感 */
                 root.style.setProperty('--scrim-color-strong', 'rgba(255, 255, 255, 0.72)');
                 root.style.setProperty('--scrim-color-soft', 'rgba(255, 255, 255, 0.25)');
                 root.style.setProperty('--scrim-color-transparent', 'rgba(255, 255, 255, 0)');
+                
+                /* 采用高雅纸张微凹深度，去除了任何生硬的白光投影 */
                 root.style.setProperty('--text-shadow-subtle', '0 1px 2px rgba(38, 33, 30, 0.12), 0 3px 8px rgba(38, 33, 30, 0.04)');
+                
+                /* 为Logo配置微弱优雅托底阴影，阻断刺眼亮光 */
                 root.style.setProperty('--logo-text-shadow', '0 1px 2px rgba(255, 255, 255, 0.95), 0 0px 1px rgba(38, 33, 30, 0.15)');
             }
         }
@@ -817,7 +1070,6 @@
         }
 
         function setRatio(ratio) {
-            resetManualPositions(); // 比例切换时自动重置坐标，避免错位
             const wrapper = document.getElementById('poster-wrapper');
             const btn34 = document.getElementById('ratio-btn-3-4');
             const btn916 = document.getElementById('ratio-btn-9-16');
@@ -839,118 +1091,14 @@
             }
         }
 
-        // ==========================================
-        // 🎯 核心增强：双重拖拽与键盘微调系统
-        // ==========================================
-        let selectedElement = null;
-        let isDragging = false;
-        let dragStartX = 0, dragStartY = 0;
-        let elStartX = 0, elStartY = 0;
-
+        // 💎 二阶段：2.2 全海报区域拖放图片更换核心监听
+        const dropzone = document.getElementById('poster-capture-area');
+        
         window.addEventListener('DOMContentLoaded', () => {
             renderBrand();
             checkSubtitleChinese();
 
-            const dropArea = document.getElementById('poster-capture-area');
-            const dragOverlay = document.getElementById('drag-overlay');
-
-            // --- 拖拽排版逻辑 ---
-            const draggableIds = ['block-logo', 'block-title', 'block-body', 'decor-elements'];
-            
-            draggableIds.forEach(id => {
-                const el = document.getElementById(id);
-                if (!el) return;
-
-                el.addEventListener('mousedown', function(e) {
-                    // 如果用户正在点击内容进入输入状态，放行原生行为
-                    if (e.target.closest('[contenteditable="true"]') && document.activeElement === e.target) {
-                        return;
-                    }
-
-                    // 切换视觉选中状态
-                    if (selectedElement && selectedElement !== this) {
-                        selectedElement.classList.remove('selected-block');
-                    }
-                    selectedElement = this;
-                    this.classList.add('selected-block');
-
-                    // 将原有相对布局 (Right, Bottom, Transform) 无缝转化为绝对坐标 (Absolute Top, Left)
-                    if (!this.dataset.positioned) {
-                        const rect = this.getBoundingClientRect();
-                        const parentRect = dropArea.getBoundingClientRect();
-                        
-                        this.style.left = (rect.left - parentRect.left) + 'px';
-                        this.style.top = (rect.top - parentRect.top) + 'px';
-                        this.style.right = 'auto';
-                        this.style.bottom = 'auto';
-                        this.style.transform = 'none';
-                        this.style.width = rect.width + 'px'; // 强行锁定原有宽度，防止转 Absolute 后文本折行变宽或变窄
-                        this.dataset.positioned = "true";
-                    }
-
-                    isDragging = true;
-                    dragStartX = e.clientX;
-                    dragStartY = e.clientY;
-                    elStartX = parseFloat(this.style.left) || 0;
-                    elStartY = parseFloat(this.style.top) || 0;
-
-                    e.stopPropagation(); // 阻止冒泡以防取消选中
-                });
-            });
-
-            document.addEventListener('mousemove', function(e) {
-                if (!isDragging || !selectedElement) return;
-                // 实时更新拖动距离
-                const dx = e.clientX - dragStartX;
-                const dy = e.clientY - dragStartY;
-                selectedElement.style.left = (elStartX + dx) + 'px';
-                selectedElement.style.top = (elStartY + dy) + 'px';
-            });
-
-            document.addEventListener('mouseup', function() {
-                isDragging = false;
-            });
-
-            // 点击空白区域取消选中
-            dropArea.addEventListener('mousedown', function(e) {
-                if (e.target === dropArea || e.target.classList.contains('bg-image') || e.target.classList.contains('scrim-layer')) {
-                    if (selectedElement) {
-                        selectedElement.classList.remove('selected-block');
-                        selectedElement = null;
-                    }
-                }
-            });
-
-            // --- 键盘方向键像素级微调 ---
-            document.addEventListener('keydown', function(e) {
-                if (!selectedElement) return;
-
-                // 若当前处于文字编辑状态，禁用方向键位移，让光标正常移动
-                if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.getAttribute('contenteditable') === 'true')) {
-                    return;
-                }
-
-                // 按住 Shift 进行大步进
-                const step = e.shiftKey ? 10 : 1;
-                let moved = false;
-                let currentLeft = parseFloat(selectedElement.style.left) || 0;
-                let currentTop = parseFloat(selectedElement.style.top) || 0;
-
-                switch (e.key) {
-                    case 'ArrowUp': currentTop -= step; moved = true; break;
-                    case 'ArrowDown': currentTop += step; moved = true; break;
-                    case 'ArrowLeft': currentLeft -= step; moved = true; break;
-                    case 'ArrowRight': currentLeft += step; moved = true; break;
-                }
-
-                if (moved) {
-                    e.preventDefault(); // 防止整个网页被卷动
-                    selectedElement.style.left = currentLeft + 'px';
-                    selectedElement.style.top = currentTop + 'px';
-                }
-            });
-
-            // 原有图片拖拽识别替换逻辑
+            // 双向绑定画布 inline contenteditable 文本变化到 modal 输入表单中 (二阶段：2.1)
             const inlineBindings = [
                 { canvasId: 'title-part1', modalId: 'input-title1' },
                 { canvasId: 'title-part2', modalId: 'input-title2' },
@@ -971,8 +1119,20 @@
                 }
             });
 
-            dropArea.addEventListener('dragover', (e) => { e.preventDefault(); dragOverlay.classList.remove('hidden'); });
-            dropArea.addEventListener('dragleave', (e) => { e.preventDefault(); dragOverlay.classList.add('hidden'); });
+            // 拖拽上传底图事件绑定
+            const dropArea = document.getElementById('poster-capture-area');
+            const dragOverlay = document.getElementById('drag-overlay');
+
+            dropArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dragOverlay.classList.remove('hidden');
+            });
+
+            dropArea.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                dragOverlay.classList.add('hidden');
+            });
+
             dropArea.addEventListener('drop', (e) => {
                 e.preventDefault();
                 dragOverlay.classList.add('hidden');
@@ -1029,10 +1189,12 @@
             document.getElementById('body-text1').innerHTML = document.getElementById('input-body1').value.replace(/\n/g, '<br>');
             document.getElementById('body-text2').innerHTML = document.getElementById('input-body2').value.replace(/\n/g, '<br>');
 
+            // 应用中文字符旋转自动拦截检测
             checkSubtitleChinese();
             closeModal();
         }
 
+        // 极速智能解析算法
         function autoParseText(event) {
             const rawText = document.getElementById('input-smart-paste').value;
             if (!rawText.trim()) return;
@@ -1099,82 +1261,49 @@
             setTimeout(() => { btn.innerText = oldText; btn.classList.remove("!bg-emerald-700", "!text-white"); }, 2000);
         }
 
-        async function generateAICopy() {
-            const btn = document.getElementById('ai-copy-btn');
-            const btnText = document.getElementById('ai-btn-text');
-            const originalText = btnText.innerText;
-            btnText.innerText = "✨ 提取空间意境中...";
-            btn.classList.add('opacity-80', 'pointer-events-none');
-
-            const offlineInspirations = [
-                { title1: "剥离浮华，显露", title2: "本质之美", sub_eng: "WABI-SABI AESTHETICS", sub_cn: "时间雕琢的痕迹", body1: "不完美的肌理中，藏着最深刻的宁静。", body2: "拒绝工业化的平滑，让每一道手工涂刮的笔触，\n成为空间里不可复制的艺术品。" },
-                { title1: "少即是多，构筑", title2: "绝对理性", sub_eng: "PURE MINIMALISM", sub_cn: "秩序与自由", body1: "当色彩退位，光影便成了空间的主角。", body2: "以极简的线条与极致的纯色质感，\n重新定义现代居所的奢华尺度。" },
-                { title1: "微距审视，感知", title2: "肌理温度", sub_eng: "TACTILE EXPERIENCE", sub_cn: "触碰真实", body1: "好涂料的质感，是需要用手去阅读的。", body2: "微水泥天然的斑驳感，\n仿佛将自然的粗犷搬进了现代的精致中。" },
-                { title1: "光影流转，雕刻", title2: "空间诗学", sub_eng: "LIGHT & SHADOW", sub_cn: "流动的艺术", body1: "墙面不是边界，而是捕捉光线的立体画布。", body2: "低饱和度的涂层随着日升月落发生微妙的变幻，\n赋予居所永不静止的生命力。" }
-            ];
-
-            try {
-                await new Promise(r => setTimeout(r, 600));
-                const randomData = offlineInspirations[Math.floor(Math.random() * offlineInspirations.length)];
-                updateUIWithData(randomData);
-                showSuccess("✨ 本地灵感降临！");
-            } catch (error) {
-                console.warn(error);
-            }
-
-            function updateUIWithData(data) {
-                document.getElementById('title-part1').innerText = data.title1;
-                document.getElementById('title-part2').innerText = data.title2;
-                document.getElementById('subtitle-eng').innerText = data.sub_eng;
-                document.getElementById('subtitle-cn').innerText = data.sub_cn;
-                document.getElementById('body-text1').innerHTML = data.body1.replace(/\\n/g, '<br>').replace(/\n/g, '<br>');
-                document.getElementById('body-text2').innerHTML = data.body2.replace(/\\n/g, '<br>').replace(/\n/g, '<br>');
-
-                const inputTitle1 = document.getElementById('input-title1');
-                if (inputTitle1) {
-                    inputTitle1.value = data.title1;
-                    document.getElementById('input-title2').value = data.title2;
-                    document.getElementById('input-sub-eng').value = data.sub_eng;
-                    document.getElementById('input-sub-cn').value = data.sub_cn;
-                    document.getElementById('input-body1').value = data.body1.replace(/\\n/g, '\n').replace(/<br>/g, '\n');
-                    document.getElementById('input-body2').value = data.body2.replace(/\\n/g, '\n').replace(/<br>/g, '\n');
-                }
-                checkSubtitleChinese();
-            }
-
-            function showSuccess(msg) {
-                btnText.innerText = msg;
-                setTimeout(() => {
-                    btnText.innerText = originalText;
-                    btn.classList.remove('opacity-80', 'pointer-events-none');
-                }, 2000);
-            }
-        }
-
+        // 10 种排版切换 (已重构 Layout 10，去除所有 formulaic 标签编号噪点)
         const layoutNames = ["经典极简", "电影中轴", "现代画册", "先锋解构", "美术馆展签", "无界视界", "独立宣言", "诗性留白", "极客包豪斯", "叙事主义"];
         let currentLayoutIndex = 0;
 
+        // 💎 新增：排版切换渲染公共流逻辑 (前进与后退共用)
         function updateLayoutUI() {
+            const container = document.getElementById('poster-capture-area');
             const btnTextSpan = document.getElementById('layout-btn-text');
             const decorContainer = document.getElementById('decor-elements');
             
+            // 实时更新当前排版的序号和状态提示，强化交互认知
             btnTextSpan.innerText = `${layoutNames[currentLayoutIndex]} (${currentLayoutIndex + 1}/10)`;
 
-            if (currentLayoutIndex === 0) decorContainer.innerHTML = '';
-            else if (currentLayoutIndex === 1) decorContainer.innerHTML = `<span class="decor-badge">ALL RIGHTS RESERVED</span>`;
-            else if (currentLayoutIndex === 2) decorContainer.innerHTML = `<span class="decor-badge">MUSEUM ARCHIVE</span>`;
-            else if (currentLayoutIndex === 3) decorContainer.innerHTML = `<span class="decor-badge">PERSPECTIVE FOCUS</span>`;
-            else if (currentLayoutIndex === 4) decorContainer.innerHTML = '';
-            else if (currentLayoutIndex === 5) decorContainer.innerHTML = `<span class="decor-badge">SPATIAL EDITORIAL</span>`;
-            else if (currentLayoutIndex === 6) decorContainer.innerHTML = `<span class="decor-badge">ESTABLISHED 1890</span>`;
-            else if (currentLayoutIndex === 7) decorContainer.innerHTML = `<span class="decor-badge">LATITUDE 31.2304° N</span><span class="decor-badge">LONGITUDE 121.4737° E</span>`;
-            else if (currentLayoutIndex === 8) decorContainer.innerHTML = `<span class="decor-badge">STRUCTURAL FORM</span>`;
-            else if (currentLayoutIndex === 9) decorContainer.innerHTML = `<span class="decor-badge">NARRATIVE CONCEPT</span>`;
+            // 动态控制微缩定位符 (针对 10 套方案全面精调：彻底去除了 zen mono, NO.09 等编号及开发性字段)
+            if (currentLayoutIndex === 0) {
+                decorContainer.innerHTML = '';
+            } else if (currentLayoutIndex === 1) {
+                decorContainer.innerHTML = `<span class="decor-badge">ALL RIGHTS RESERVED</span>`;
+            } else if (currentLayoutIndex === 2) {
+                decorContainer.innerHTML = `<span class="decor-badge">MUSEUM ARCHIVE</span>`;
+            } else if (currentLayoutIndex === 3) {
+                decorContainer.innerHTML = `<span class="decor-badge">PERSPECTIVE FOCUS</span>`;
+            } else if (currentLayoutIndex === 4) {
+                decorContainer.innerHTML = '';
+            } else if (currentLayoutIndex === 5) {
+                decorContainer.innerHTML = `<span class="decor-badge">SPATIAL EDITORIAL</span>`;
+            } else if (currentLayoutIndex === 6) {
+                decorContainer.innerHTML = `<span class="decor-badge">ESTABLISHED 1890</span>`;
+            } else if (currentLayoutIndex === 7) {
+                // 诗性留白微缩地理标志
+                decorContainer.innerHTML = `<span class="decor-badge">LATITUDE 31.2304° N</span><span class="decor-badge">LONGITUDE 121.4737° E</span>`;
+            } else if (currentLayoutIndex === 8) {
+                // 极客包豪斯微缩标
+                decorContainer.innerHTML = `<span class="decor-badge">STRUCTURAL FORM</span>`;
+            } else if (currentLayoutIndex === 9) {
+                // 叙事主义微缩标
+                decorContainer.innerHTML = `<span class="decor-badge">NARRATIVE CONCEPT</span>`;
+            }
         }
 
+        // 💎 前进切换排版
         function toggleLayout(event) {
             if (event) event.stopPropagation();
-            resetManualPositions(); // 还原重置拖拽后的坐标，应用原生排版
             const container = document.getElementById('poster-capture-area');
             container.classList.remove(`layout-${currentLayoutIndex + 1}`);
             currentLayoutIndex = (currentLayoutIndex + 1) % layoutNames.length;
@@ -1182,9 +1311,9 @@
             updateLayoutUI();
         }
 
+        // 💎 后退切换排版 (解决退后版式的便捷功能)
         function prevLayout(event) {
             if (event) event.stopPropagation();
-            resetManualPositions(); // 还原重置拖拽后的坐标，应用原生排版
             const container = document.getElementById('poster-capture-area');
             container.classList.remove(`layout-${currentLayoutIndex + 1}`);
             currentLayoutIndex = (currentLayoutIndex - 1 + layoutNames.length) % layoutNames.length;
@@ -1192,13 +1321,11 @@
             updateLayoutUI();
         }
 
+        // 印刷级超高清下载 (恢复至极致 5.0 倍数：实现 4K 印刷精度)
         function downloadPoster() {
+            // ⚡️ 导出安全锁：自动将处于编辑状态聚焦的元素失去焦点，隐藏多余的编辑虚线外边框与光标
             if (document.activeElement && document.activeElement.blur) {
                 document.activeElement.blur();
-            }
-            if (selectedElement) {
-                selectedElement.classList.remove('selected-block'); // 强制关闭选中框
-                selectedElement = null;
             }
 
             const captureArea = document.getElementById('poster-capture-area');
@@ -1210,6 +1337,7 @@
             
             const originalWidth = captureArea.style.width;
             const originalHeight = captureArea.style.height;
+            
             const rect = captureArea.getBoundingClientRect();
             const intWidth = Math.round(rect.width);
             const intHeight = Math.round(rect.height);
@@ -1217,36 +1345,12 @@
             captureArea.style.width = intWidth + 'px';
             captureArea.style.height = intHeight + 'px';
 
+            // ⚡️ 备份并临时强制写入实际的 offset 值，防止 html2canvas 不认识 object-position 变量 (一阶段：1.1 导出防护)
             const bgImg = document.getElementById('poster-bg');
-            const Wc = intWidth;
-            const Hc = intHeight;
-            const Wi = bgImg.naturalWidth;
-            const Hi = bgImg.naturalHeight;
-
-            if (Wi && Hi) {
-                const Rc = Wc / Hc;
-                const Ri = Wi / Hi;
-                let Wnew, Hnew, Lnew, Tnew;
-                
-                const offsetX = parseFloat(document.getElementById('offset-x-slider').value) / 100;
-                const offsetY = parseFloat(document.getElementById('offset-y-slider').value) / 100;
-
-                if (Ri > Rc) {
-                    Hnew = Hc; Wnew = Hc * Ri; Tnew = 0; Lnew = -(Wnew - Wc) * offsetX;
-                } else {
-                    Wnew = Wc; Hnew = Wc / Ri; Lnew = 0; Tnew = -(Hnew - Hc) * offsetY;
-                }
-
-                bgImg.style.setProperty('width', Wnew + 'px', 'important');
-                bgImg.style.setProperty('height', Hnew + 'px', 'important');
-                bgImg.style.setProperty('left', Lnew + 'px', 'important');
-                bgImg.style.setProperty('top', Tnew + 'px', 'important');
-                bgImg.style.setProperty('right', 'auto', 'important');
-                bgImg.style.setProperty('bottom', 'auto', 'important');
-                bgImg.style.setProperty('max-width', 'none', 'important');
-                bgImg.style.setProperty('max-height', 'none', 'important');
-                bgImg.style.setProperty('object-fit', 'fill', 'important');
-            }
+            const originalObjectPosition = bgImg.style.objectPosition;
+            const offsetX = document.getElementById('offset-x-slider').value + '%';
+            const offsetY = document.getElementById('offset-y-slider').value + '%';
+            bgImg.style.objectPosition = `${offsetX} ${offsetY}`;
             
             const isDark = document.documentElement.style.getPropertyValue('--text-primary-color') === 'rgb(250, 247, 245)' || 
                            document.documentElement.style.getPropertyValue('--text-primary-color') === '#ffffff' ||
@@ -1256,7 +1360,7 @@
             document.fonts.ready.then(() => {
                 setTimeout(() => {
                     html2canvas(captureArea, {
-                        scale: 5.0,            
+                        scale: 5.0,            // ⚡️ 恢复至 5.0X 超高清视网膜导出，呈现极其锐利的字体边缘
                         useCORS: true,
                         allowTaint: false,
                         logging: false,
@@ -1265,19 +1369,10 @@
                         height: intHeight,
                         backgroundColor: themeBgColor
                     }).then(canvas => {
+                        // 还原海报的自适应弹性样式和位移
                         captureArea.style.width = originalWidth;
                         captureArea.style.height = originalHeight;
-                        
-                        bgImg.style.removeProperty('width');
-                        bgImg.style.removeProperty('height');
-                        bgImg.style.removeProperty('left');
-                        bgImg.style.removeProperty('top');
-                        bgImg.style.removeProperty('right');
-                        bgImg.style.removeProperty('bottom');
-                        bgImg.style.removeProperty('max-width');
-                        bgImg.style.removeProperty('max-height');
-                        bgImg.style.removeProperty('object-fit');
-                        
+                        bgImg.style.objectPosition = originalObjectPosition;
                         captureArea.classList.remove('is-exporting');
 
                         const imgData = canvas.toDataURL('image/jpeg', 0.98);
@@ -1293,17 +1388,7 @@
                         console.error("海报生成失败:", err);
                         captureArea.style.width = originalWidth;
                         captureArea.style.height = originalHeight;
-                        
-                        bgImg.style.removeProperty('width');
-                        bgImg.style.removeProperty('height');
-                        bgImg.style.removeProperty('left');
-                        bgImg.style.removeProperty('top');
-                        bgImg.style.removeProperty('right');
-                        bgImg.style.removeProperty('bottom');
-                        bgImg.style.removeProperty('max-width');
-                        bgImg.style.removeProperty('max-height');
-                        bgImg.style.removeProperty('object-fit');
-                        
+                        bgImg.style.objectPosition = originalObjectPosition;
                         captureArea.classList.remove('is-exporting');
                         btnText.innerText = originalText;
                     });
