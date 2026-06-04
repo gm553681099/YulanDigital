@@ -1,0 +1,1559 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="pageTitle">返利券数据统计分析看板</title>
+    <!-- Tailwind CSS for modern modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PapaParse for local robust CSV compilation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- ChartJS for rich visual dashboards -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Html2Canvas for elegant dashboard screenshots -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .drag-over {
+            border-color: #3b82f6 !important;
+            background-color: #eff6ff !important;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
+
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        
+        <!-- ==================== UPLOAD SCREEN (Initial State) ==================== -->
+        <div id="uploadScreen" class="flex flex-col items-center justify-center min-h-[80vh] px-4">
+            <div class="text-center mb-8">
+                <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight"><i class="fas fa-chart-pie text-blue-600 mr-3"></i>返利券数据统计分析系统</h1>
+                <p class="text-slate-500 mt-3 text-lg max-w-2xl">导入返利券（E券）CSV报表，系统会自动分析年份区间并自动更新看板标题，时间同步校准为当前系统时间</p>
+            </div>
+
+            <!-- Drag & Drop Zone -->
+            <div id="dropZone" class="w-full max-w-2xl bg-white rounded-2xl border-2 border-dashed border-slate-300 hover:border-blue-400 p-12 transition-all duration-300 text-center cursor-pointer shadow-md hover:shadow-lg relative">
+                <input type="file" id="csvFileInput" accept=".csv" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                <div class="space-y-6">
+                    <div class="mx-auto w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center shadow-inner">
+                        <i class="fas fa-file-invoice-dollar text-4xl text-blue-500"></i>
+                    </div>
+                    <div>
+                        <p class="text-xl font-semibold text-slate-800">将您的 CSV 账单拖拽到此处，或 <span class="text-blue-600 underline">点击浏览文件</span></p>
+                        <p class="text-slate-400 text-sm mt-2">支持 25.X.X 或 2026/X/X 等各种异构财务日期格式的合并大表</p>
+                    </div>
+                    <div class="border-t border-slate-100 pt-6">
+                        <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-md">
+                            <i class="fas fa-history text-green-600"></i> 穿透联动：导入后点击任意柱状或条状色块，即可在下方关联显示明细账单
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Demo Data Option -->
+            <div class="mt-6 text-center">
+                <span class="text-sm text-slate-500">没有数据文件？</span>
+                <button id="loadDemoDataBtn" class="text-sm text-blue-600 font-semibold hover:text-blue-800 underline hover:no-underline transition-colors ml-1">
+                    <i class="fas fa-magic mr-1"></i>加载演示（模拟包含“蜜乐”的2025与2026双年合并）数据体验
+                </button>
+            </div>
+        </div>
+
+        <!-- ==================== LOADING STATE ==================== -->
+        <div id="loading" class="hidden flex-col items-center justify-center min-h-[60vh]">
+            <div class="relative flex items-center justify-center">
+                <div class="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-blue-600"></div>
+                <i class="fas fa-sync text-2xl text-blue-600 absolute animate-pulse"></i>
+            </div>
+            <p class="mt-6 text-slate-600 font-medium">正在识别表格、自适应对齐年份并拉取系统时间...</p>
+        </div>
+
+        <!-- ==================== DASHBOARD CONTENT ==================== -->
+        <div id="dashboardContent" class="hidden space-y-6">
+            
+            <!-- Dashboard Controls Header -->
+            <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between pb-6 border-b border-slate-200 gap-4" data-html2canvas-ignore="true">
+                <div class="flex items-center gap-4">
+                    <button id="backToUploadBtn" class="bg-white hover:bg-slate-100 text-slate-700 font-medium py-2 px-3.5 border border-slate-200 rounded-lg shadow-sm transition-all text-sm flex items-center gap-2">
+                        <i class="fas fa-arrow-left"></i> 重新上传
+                    </button>
+                    <div>
+                        <span class="text-xs font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2.5 py-1 rounded" id="dataRangeBadge">多年度合并分析模式</span>
+                        <h2 class="text-lg font-bold text-slate-900 mt-1">返利券多维穿透大屏</h2>
+                    </div>
+                </div>
+                
+                <!-- Quick filter search segment -->
+                <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                    <div class="flex items-center bg-white border border-slate-200 rounded-lg p-1 shadow-sm">
+                        <button id="filterMileBtn" class="bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold py-1.5 px-4 rounded-md transition-all text-xs flex items-center gap-1.5">
+                            <i class="fas fa-filter"></i> 蜜乐专项分析
+                        </button>
+                        <button id="clearGlobalFilterBtn" class="hidden text-xs text-slate-500 hover:text-slate-800 px-2.5 transition-colors">
+                            清除过滤
+                        </button>
+                    </div>
+                    <div class="relative w-full sm:w-64">
+                        <input type="text" id="globalSearchInput" placeholder="输入客户、券名称或代码检索..." class="w-full text-xs pl-8 pr-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 transition-colors shadow-sm bg-white" />
+                        <i class="fas fa-search text-slate-400 absolute left-2.5 top-3.5 text-xs"></i>
+                    </div>
+                    <button id="downloadImgBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg shadow-sm transition-colors text-sm flex items-center gap-2">
+                        <i class="fas fa-camera"></i> 一键下载为长图 (汇报专用)
+                    </button>
+                </div>
+            </div>
+
+            <div id="captureArea" class="space-y-6 p-2 rounded-xl">
+                <!-- Header Title block in captured image -->
+                <div class="bg-gradient-to-r from-blue-900 to-indigo-950 rounded-2xl p-6 text-white shadow-md flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h1 class="text-3xl font-extrabold tracking-tight">
+                            <i class="fas fa-chart-line mr-3 text-blue-400"></i><span id="headerYearTitle">多年度 </span>返利券数据统计分析看板
+                        </h1>
+                        <p class="text-blue-200 text-sm mt-2 opacity-90">数据已统一合并，点击下方图表色块即可穿透调出对应明细流水</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs text-blue-200 block">数据分析截止时间 (同步系统)</span>
+                        <span class="text-sm font-semibold tracking-wider bg-blue-800/40 px-3 py-1 rounded border border-blue-700/50 block mt-1" id="reportDate">2026-06-03</span>
+                    </div>
+                </div>
+
+                <!-- DYNAMIC YEARLY KPI CONTAINER -->
+                <div id="kpiRowsContainer" class="space-y-6">
+                    <!-- Dynamic Rows will be inserted here -->
+                </div>
+
+                <!-- Monthly Claim vs Expiry Trend Charts -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Column 1: Overall Doughnut -->
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 col-span-1 flex flex-col justify-between">
+                        <div>
+                            <div class="flex justify-between items-start">
+                                <h3 class="text-base font-bold text-slate-800 mb-1">统一券池总分配状态</h3>
+                                <span class="text-[10px] bg-slate-100 text-slate-500 py-0.5 px-2 rounded-full"><i class="fas fa-mouse-pointer mr-1"></i>点击色块可下钻</span>
+                            </div>
+                            <p class="text-xs text-slate-400 mb-4">全部上传年度存量资产的总使用与沉淀率</p>
+                        </div>
+                        <div class="relative h-64 flex items-center justify-center">
+                            <canvas id="statusChart"></canvas>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 text-center text-xs mt-4 pt-4 border-t border-slate-50">
+                            <div class="cursor-pointer hover:bg-slate-50 p-1 rounded transition-colors" onclick="simulateChartClick('statusChart', 0)">
+                                <span class="block font-bold text-emerald-600" id="summaryUsedPercent">0%</span>
+                                <span class="text-slate-400 underline decoration-dotted">总已核销</span>
+                            </div>
+                            <div class="cursor-pointer hover:bg-slate-50 p-1 rounded transition-colors" onclick="simulateChartClick('statusChart', 1)">
+                                <span class="block font-bold text-amber-600" id="summaryValidPercent">0%</span>
+                                <span class="text-slate-400 underline decoration-dotted">总待核销</span>
+                            </div>
+                            <div class="cursor-pointer hover:bg-slate-50 p-1 rounded transition-colors" onclick="simulateChartClick('statusChart', 2)">
+                                <span class="block font-bold text-rose-600" id="summaryExpiredPercent">0%</span>
+                                <span class="text-slate-400 underline decoration-dotted">总已过期</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Column 2 & 3: Monthly Claims and Expiring Trend -->
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 col-span-1 lg:col-span-2">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
+                            <div>
+                                <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                                    <span>跨年度「核销使用」与「过期作废」趋势图</span>
+                                    <span class="text-[10px] font-normal bg-blue-50 text-blue-600 py-0.5 px-2 rounded-full"><i class="fas fa-mouse-pointer mr-1"></i>点击柱状色块可穿透明细</span>
+                                </h3>
+                                <p class="text-xs text-slate-400 mt-0.5">时间轴连续展示，绿色反映各月消耗热度，黄色和红色揭示过期受损峰值</p>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-3 text-xs">
+                                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 bg-emerald-500 inline-block rounded-full"></span>已使用</span>
+                                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 bg-rose-500 inline-block rounded-full"></span>已到期作废</span>
+                                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 bg-amber-500 inline-block rounded-full"></span>未来将过期</span>
+                            </div>
+                        </div>
+                        <div class="relative h-[280px]">
+                            <canvas id="doubleTrendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Types Bar Chart -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                                <span>各类型/活动券 状态明细对比（跨年汇总）</span>
+                                <span class="text-[10px] font-normal bg-blue-50 text-blue-600 py-0.5 px-2 rounded-full"><i class="fas fa-mouse-pointer mr-1"></i>点击色块可按活动下钻</span>
+                            </h3>
+                            <p class="text-xs text-slate-400 mt-0.5">纵观各促销案的整体生命力与流失占比</p>
+                        </div>
+                        <button id="toggleTypesBtn" class="hidden text-xs bg-slate-50 text-slate-600 hover:bg-slate-100 py-1.5 px-3 border border-slate-200 rounded-lg transition-colors">
+                            <i class="fas fa-expand-arrows-alt mr-1"></i>显示全部种类
+                        </button>
+                    </div>
+                    <!-- Highly elastic responsive canvas wrapper for dynamic expand heights -->
+                    <div id="typeChartContainer" class="relative h-72 transition-all duration-300">
+                        <canvas id="typeChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- ==================== 图表联动穿透流水明细表格 ==================== -->
+                <div id="drillDownSection" class="hidden bg-white p-6 rounded-xl shadow-md border-2 border-blue-100 space-y-4 animate-fade-in" data-html2canvas-ignore="true">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-3 border-b border-slate-100 gap-3">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-800 flex flex-wrap items-center gap-2">
+                                <i class="fas fa-search-dollar text-blue-600"></i>
+                                <span>🎯 图表联动穿透流水明细</span>
+                                <span id="activeFilterBadge" class="text-xs bg-blue-600 text-white px-2.5 py-1 rounded-full font-bold"></span>
+                            </h3>
+                            <p class="text-xs text-slate-400 mt-1">根据您在图表中点击的维度（柱体/色块），实时过滤生成对应的底层客户返利流水账单</p>
+                        </div>
+                        <div class="flex items-center gap-2 self-stretch sm:self-auto justify-end">
+                            <button id="downloadFilteredCsvBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-1.5 px-3.5 rounded-lg shadow-sm transition-colors text-xs flex items-center gap-1.5">
+                                <i class="fas fa-file-excel"></i> 导出筛选结果 (CSV)
+                            </button>
+                            <button id="clearFilterBtn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-1.5 px-3 rounded-lg border border-slate-200 transition-colors text-xs">
+                                清除筛选
+                            </button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto max-h-[350px] overflow-y-auto rounded-lg border border-slate-100 shadow-inner">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="sticky top-0 bg-slate-100/95 backdrop-blur text-slate-600 text-xs uppercase tracking-wider border-b border-slate-200 z-10">
+                                <tr>
+                                    <th class="py-3 px-4 font-bold">序号</th>
+                                    <th class="py-3 px-4 font-bold">客户代码</th>
+                                    <th class="py-3 px-4 font-bold">客户名称</th>
+                                    <th class="py-3 px-4 font-bold">返利券说明</th>
+                                    <th class="py-3 px-4 font-bold">开始/结束日期</th>
+                                    <th class="py-3 px-4 font-bold">实际使用日期</th>
+                                    <th class="py-3 px-4 font-bold text-right">总额 (元)</th>
+                                    <th class="py-3 px-4 font-bold text-right">余额 (元)</th>
+                                    <th class="py-3 px-4 font-bold text-right">已核销金额 (元)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="drillDownTableBody" class="text-sm text-slate-700 divide-y divide-slate-100">
+                                <!-- Filtered dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Dual Table Tabs (Warning list & Active list) -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+                    <!-- Tab Headers -->
+                    <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center border-b border-slate-100 bg-slate-50/50 p-4 gap-4">
+                        <!-- Navigation Tabs -->
+                        <div class="flex bg-slate-200/60 p-1 rounded-lg self-start">
+                            <button id="tabWarningBtn" class="px-4 py-2 text-sm font-bold rounded-md bg-white text-slate-800 shadow-sm transition-all flex items-center gap-2">
+                                <i class="fas fa-exclamation-triangle text-rose-500"></i>⚠️ 预警：客户到期受损榜
+                            </button>
+                            <button id="tabActiveBtn" class="px-4 py-2 text-sm font-medium rounded-md text-slate-600 hover:text-slate-800 transition-all flex items-center gap-2">
+                                <i class="fas fa-star text-emerald-500"></i>🎉 活跃：客户核销活跃榜
+                            </button>
+                        </div>
+
+                        <!-- Action Button depending on Active Tab -->
+                        <div>
+                            <button id="downloadWarningCsvBtn" class="inline-flex bg-rose-600 hover:bg-rose-700 text-white font-medium py-1.5 px-3.5 rounded-lg shadow-sm transition-colors items-center text-xs gap-1.5">
+                                <i class="fas fa-download"></i>一键导出过期受损名单(CSV)
+                            </button>
+                            <button id="downloadActiveCsvBtn" class="hidden bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-1.5 px-3.5 rounded-lg shadow-sm transition-colors items-center text-xs gap-1.5">
+                                <i class="fas fa-download"></i>一键导出完整核销名单(CSV)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tab 1 Container: Warning Top 10 (Expired) -->
+                    <div id="tabWarningContent" class="block overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-600 text-xs border-b border-slate-200 uppercase tracking-wider">
+                                    <th class="py-3.5 px-6 font-semibold">排名</th>
+                                    <th class="py-3.5 px-6 font-semibold">客户代码</th>
+                                    <th class="py-3.5 px-6 font-semibold">客户名称</th>
+                                    <th class="py-3.5 px-6 font-semibold">受损明细（含券说明及对应年份）</th>
+                                    <th class="py-3.5 px-6 font-semibold text-right">已过期作废金额 (元)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="topDamagedCustomersTable" class="text-sm text-slate-700 divide-y divide-slate-100">
+                                <!-- Warning rows -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Tab 2 Container: Active Top 10 (Used) -->
+                    <div id="tabActiveContent" class="hidden overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-600 text-xs border-b border-slate-200 uppercase tracking-wider">
+                                    <th class="py-3.5 px-6 font-semibold">排名</th>
+                                    <th class="py-3.5 px-6 font-semibold">客户代码</th>
+                                    <th class="py-3.5 px-6 font-semibold">客户名称</th>
+                                    <th class="py-3.5 px-6 font-semibold">核销月份及跨年大额券种明细</th>
+                                    <th class="py-3.5 px-6 font-semibold text-right">已核销使用金额 (元)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="topActiveCustomersTable" class="text-sm text-slate-700 divide-y divide-slate-100">
+                                <!-- Active rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Message notification element -->
+    <div id="toast" class="fixed bottom-6 right-6 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-950 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-2 text-sm z-50">
+        <span id="toastIcon"><i class="fas fa-info-circle text-blue-400"></i></span>
+        <span id="toastMsg">提示信息</span>
+    </div>
+
+    <script>
+        const reportToday = new Date(); // Active live clock sync (e.g. June 2026)
+
+        // State variables
+        let rawParsedData = [];
+        let filteredDataset = []; // Storage for search/mile filters
+        let detectedYears = []; 
+        let statusChartInstance = null;
+        let doubleTrendChartInstance = null;
+        let typeChartInstance = null;
+        
+        let globalTypeStats = {};
+        let showAllTypes = false;
+        let activeTab = 'warning'; 
+        let isMileFiltered = false; // "蜜乐" toggle state
+
+        // Export and Drill-down arrays
+        let globalDamagedCustomers = [];
+        let globalActiveCustomers = [];
+        let filteredDetailData = []; // Deep drilldown filter outputs
+
+        // DOM elements
+        const uploadScreen = document.getElementById('uploadScreen');
+        const loading = document.getElementById('loading');
+        const dashboardContent = document.getElementById('dashboardContent');
+        const dropZone = document.getElementById('dropZone');
+        const csvFileInput = document.getElementById('csvFileInput');
+        const loadDemoDataBtn = document.getElementById('loadDemoDataBtn');
+        const backToUploadBtn = document.getElementById('backToUploadBtn');
+
+        // Filter and Search elements
+        const filterMileBtn = document.getElementById('filterMileBtn');
+        const clearGlobalFilterBtn = document.getElementById('clearGlobalFilterBtn');
+        const globalSearchInput = document.getElementById('globalSearchInput');
+
+        // Drilldown elements
+        const drillDownSection = document.getElementById('drillDownSection');
+        const drillDownTableBody = document.getElementById('drillDownTableBody');
+        const activeFilterBadge = document.getElementById('activeFilterBadge');
+        const clearFilterBtn = document.getElementById('clearFilterBtn');
+        const downloadFilteredCsvBtn = document.getElementById('downloadFilteredCsvBtn');
+
+        // Synced clock renderer
+        window.addEventListener('DOMContentLoaded', () => {
+            const formattedDate = formatLocalDate(reportToday);
+            document.getElementById('reportDate').innerText = formattedDate;
+        });
+
+        function formatLocalDate(dateObj) {
+            const yyyy = dateObj.getFullYear();
+            const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const dd = String(dateObj.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+
+        // Robust parsing of nested date segments (supporting 25.12.31 / 2026/05/18 formats etc.)
+        function robustParseDate(dateStr) {
+            if (!dateStr) return null;
+            dateStr = String(dateStr).trim();
+            if (!dateStr || dateStr === "null" || dateStr === "undefined") return null;
+
+            let clean = dateStr.replace(/[\.\-]/g, '/').replace(/年/g, '/').replace(/月/g, '/').replace(/日/g, '').trim();
+            
+            let parts = clean.split('/');
+            if (parts.length >= 3) {
+                let yrPart = parts[0].trim();
+                let monthPart = parts[1].trim();
+                let dayPart = parts[2].trim();
+
+                let year = parseInt(yrPart, 10);
+                let month = parseInt(monthPart, 10) - 1; 
+                let day = parseInt(dayPart, 10);
+
+                if (yrPart.length === 2 && !isNaN(year)) {
+                    year = (year < 50 ? 2000 : 1900) + year;
+                }
+
+                if (!isNaN(year) && !isNaN(month) && !isNaN(day) && month >= 0 && month <= 11 && day >= 1 && day <= 31) {
+                    let d = new Date(year, month, day);
+                    if (!isNaN(d.getTime())) {
+                        return d;
+                    }
+                }
+            }
+            
+            let d = new Date(clean);
+            if (!isNaN(d.getTime())) {
+                let y = d.getFullYear();
+                if (y < 100) {
+                    d.setFullYear((y < 50 ? 2000 : 1900) + y);
+                }
+                return d;
+            }
+
+            return null;
+        }
+
+        // Notification helpers
+        function showToast(msg, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const toastIcon = document.getElementById('toastIcon');
+            
+            toastMsg.innerText = msg;
+            if (type === 'success') {
+                toastIcon.innerHTML = '<i class="fas fa-check-circle text-emerald-400"></i>';
+            } else if (type === 'error') {
+                toastIcon.innerHTML = '<i class="fas fa-exclamation-circle text-rose-400"></i>';
+            } else {
+                toastIcon.innerHTML = '<i class="fas fa-info-circle text-blue-400"></i>';
+            }
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // Currency parser
+        function formatCurrency(num) {
+            return new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' }).format(num);
+        }
+
+        // Drag and drop setup triggers
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropZone.classList.add('drag-over');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('drag-over');
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length) {
+                csvFileInput.files = files;
+                handleFileSelect(files[0]);
+            }
+        });
+
+        csvFileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) {
+                handleFileSelect(e.target.files[0]);
+            }
+        });
+
+        function handleFileSelect(file) {
+            if (!file.name.endsWith('.csv')) {
+                showToast("请确保上传的是有效的 CSV 格式文件！", "error");
+                return;
+            }
+
+            uploadScreen.classList.add('hidden');
+            loading.classList.remove('hidden');
+
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                dynamicTyping: true,
+                complete: function(results) {
+                    setTimeout(() => {
+                        rawParsedData = results.data;
+                        isMileFiltered = false;
+                        globalSearchInput.value = '';
+                        applyGlobalFilters();
+                        loading.classList.add('hidden');
+                        dashboardContent.classList.remove('hidden');
+                        showToast("数据导入成功！", "success");
+                    }, 600);
+                },
+                error: function(err) {
+                    showToast("解析 CSV 文件时发生故障: " + err.message, "error");
+                    loading.classList.add('hidden');
+                    uploadScreen.classList.remove('hidden');
+                }
+            });
+        }
+
+        // Local cross-year simulator seed
+        loadDemoDataBtn.addEventListener('click', () => {
+            uploadScreen.classList.add('hidden');
+            loading.classList.remove('hidden');
+
+            setTimeout(() => {
+                rawParsedData = generateDemoData();
+                isMileFiltered = false;
+                globalSearchInput.value = '';
+                applyGlobalFilters();
+                loading.classList.add('hidden');
+                dashboardContent.classList.remove('hidden');
+                showToast("模拟合并大账单载入成功！", "success");
+            }, 600);
+        });
+
+        backToUploadBtn.addEventListener('click', () => {
+            dashboardContent.classList.add('hidden');
+            uploadScreen.classList.remove('hidden');
+            drillDownSection.classList.add('hidden'); 
+            csvFileInput.value = ''; 
+        });
+
+        // Toggle pre-alert warning list vs active lists
+        tabWarningBtn.addEventListener('click', () => {
+            activeTab = 'warning';
+            tabWarningBtn.className = "px-4 py-2 text-sm font-bold rounded-md bg-white text-slate-800 shadow-sm transition-all flex items-center gap-2";
+            tabActiveBtn.className = "px-4 py-2 text-sm font-medium rounded-md text-slate-600 hover:text-slate-800 transition-all flex items-center gap-2";
+            tabWarningContent.classList.remove('hidden');
+            tabActiveContent.classList.add('hidden');
+            downloadWarningCsvBtn.classList.remove('hidden');
+            downloadActiveCsvBtn.classList.add('hidden');
+        });
+
+        tabActiveBtn.addEventListener('click', () => {
+            activeTab = 'active';
+            tabActiveBtn.className = "px-4 py-2 text-sm font-bold rounded-md bg-white text-slate-800 shadow-sm transition-all flex items-center gap-2";
+            tabWarningBtn.className = "px-4 py-2 text-sm font-medium rounded-md text-slate-600 hover:text-slate-800 transition-all flex items-center gap-2";
+            tabActiveContent.classList.remove('hidden');
+            tabWarningContent.classList.add('hidden');
+            downloadActiveCsvBtn.classList.remove('hidden');
+            downloadWarningCsvBtn.classList.add('hidden');
+        });
+
+        // Simulated cross-year data factory (including "蜜乐" entries explicitly)
+        function generateDemoData() {
+            const customers = [
+                { code: 'C20844', name: '上海蜜乐商贸有限公司' },
+                { code: 'C20231', name: '北京物美商业集团蜜乐采购分部' },
+                { code: 'C21455', name: '广州百佳超级市场有限公司' },
+                { code: 'C20982', name: '深圳岁宝百货连锁控股' },
+                { code: 'C21102', name: '成都红旗连锁股份有限公司' },
+                { code: 'C20443', name: '蜜乐苏果超市商贸总店' },
+                { code: 'C21908', name: '武汉中百仓储超市有限公司' },
+                { code: 'C20556', name: '杭州银泰百货商业总社' },
+                { code: 'C22814', name: '重庆百货大楼股份有限公司' },
+                { code: 'C20334', name: '西安人人乐超市采购服务公司' }
+            ];
+
+            const types = [
+                '开门红回馈返利券',
+                '蜜乐专项返利补贴券',
+                '大客户销售达成奖励券',
+                '季度累计吨位达成补贴券',
+                '新品首发铺市联销推广券',
+                '核心店装潢蜜乐专项补贴'
+            ];
+
+            const mockRows = [];
+            
+            // 2025 Historic Dot Dates (all expired relative to June 2026 clock)
+            for (let i = 0; i < 150; i++) {
+                const cust = customers[Math.floor(Math.random() * customers.length)];
+                const type = "2025年" + types[Math.floor(Math.random() * types.length)];
+                const total = Math.floor(Math.random() * 30) * 1000 + 5000;
+                
+                const isLeftover = Math.random() > 0.88;
+                const balance = isLeftover ? Math.floor(total * (Math.random() * 0.3 + 0.1)) : 0;
+                const used = total - balance;
+
+                const startMonth = Math.floor(Math.random() * 3) + 1; 
+                const startDateStr = `25.${startMonth}.10`; 
+                const endDateStr = `25.12.31`; 
+
+                let useDateStr = null;
+                if (used > 0) {
+                    const useMonth = Math.floor(Math.random() * 10) + 2; 
+                    useDateStr = `25.${useMonth}.15`;
+                }
+
+                mockRows.push({
+                    '客户代码': cust.code,
+                    '客户名称': cust.name,
+                    '券说明': type,
+                    '返利券总额': total,
+                    '返利券余额': balance,
+                    '开始日期': startDateStr,
+                    '结束日期': endDateStr,
+                    '使用日期': useDateStr,
+                    '核销金额': used
+                });
+            }
+
+            // 2026 Future and current active Dot Dates
+            for (let i = 0; i < 150; i++) {
+                const cust = customers[Math.floor(Math.random() * customers.length)];
+                const type = "2026年" + types[Math.floor(Math.random() * types.length)];
+                const total = Math.floor(Math.random() * 40) * 1000 + 8000;
+                
+                const useRatio = Math.random();
+                const balance = useRatio > 0.7 ? total : (useRatio < 0.2 ? 0 : Math.floor(total * useRatio));
+                const used = total - balance;
+
+                const startMonth = Math.floor(Math.random() * 3) + 1; 
+                const startDateStr = `26.${startMonth}.05`; 
+                
+                let endDateStr;
+                // Expirations before and after June 2026
+                if (Math.random() > 0.5) {
+                    endDateStr = `26.03.31`; // Already Expired
+                } else {
+                    const endMonth = Math.floor(Math.random() * 5) + 8; // Aug - Dec 2026 (Valid)
+                    endDateStr = `26.${endMonth}.30`; 
+                }
+
+                let useDateStr = null;
+                if (used > 0) {
+                    const useMonth = Math.floor(Math.random() * 5) + 1; 
+                    useDateStr = `26.0${useMonth}.18`;
+                }
+
+                mockRows.push({
+                    '客户代码': cust.code,
+                    '客户名称': cust.name,
+                    '券说明': type,
+                    '返利券总额': total,
+                    '返利券余额': balance,
+                    '开始日期': startDateStr,
+                    '结束日期': endDateStr,
+                    '使用日期': useDateStr,
+                    '核销金额': used
+                });
+            }
+
+            return mockRows;
+        }
+
+        // Global query filter coordinator
+        function applyGlobalFilters() {
+            let data = [...rawParsedData];
+
+            // 1. Evaluate "蜜乐" toggle state
+            if (isMileFiltered) {
+                data = data.filter(row => {
+                    let nameStr = String(row['客户名称'] || '');
+                    let codeStr = String(row['客户代码'] || '');
+                    let descStr = String(row['券说明'] || row['类型'] || '');
+                    return nameStr.includes('蜜乐') || codeStr.includes('蜜乐') || descStr.includes('蜜乐');
+                });
+                // Highlight filter button states
+                filterMileBtn.className = "bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-4 rounded-md transition-all text-xs flex items-center gap-1.5";
+                clearGlobalFilterBtn.classList.remove('hidden');
+            } else {
+                filterMileBtn.className = "bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold py-1.5 px-4 rounded-md transition-all text-xs flex items-center gap-1.5";
+            }
+
+            // 2. Evaluate general search query input
+            const searchVal = globalSearchInput.value.trim().toLowerCase();
+            if (searchVal) {
+                data = data.filter(row => {
+                    let nameStr = String(row['客户名称'] || '').toLowerCase();
+                    let codeStr = String(row['客户代码'] || '').toLowerCase();
+                    let descStr = String(row['券说明'] || row['类型'] || '').toLowerCase();
+                    return nameStr.includes(searchVal) || codeStr.includes(searchVal) || descStr.includes(searchVal);
+                });
+                clearGlobalFilterBtn.classList.remove('hidden');
+            }
+
+            // Clean visible states
+            if (!isMileFiltered && !searchVal) {
+                clearGlobalFilterBtn.classList.add('hidden');
+            }
+
+            filteredDataset = data;
+            
+            // Sync overall view
+            processData(filteredDataset);
+        }
+
+        // Filter trigger listeners
+        filterMileBtn.addEventListener('click', () => {
+            isMileFiltered = !isMileFiltered;
+            applyGlobalFilters();
+            showToast(isMileFiltered ? "已应用「蜜乐」专属数据过滤" : "已停用「蜜乐」专项过滤", "info");
+        });
+
+        clearGlobalFilterBtn.addEventListener('click', () => {
+            isMileFiltered = false;
+            globalSearchInput.value = '';
+            applyGlobalFilters();
+            showToast("已重置所有全局检索条件", "success");
+        });
+
+        globalSearchInput.addEventListener('input', () => {
+            applyGlobalFilters();
+        });
+
+        // Main Data processing pipelines
+        function processData(data) {
+            let totalIssuedAll = 0;
+            let totalBalanceAll = 0;
+            let totalExpiredAll = 0;
+            let totalValidAll = 0;
+            let totalCountAll = 0;
+
+            let yearlyMetrics = {}; 
+
+            let typeStats = {};
+            let customerStats = {}; 
+            let activeCustomerStats = {}; 
+
+            let monthlyUsedStats = {}; 
+            let monthlyExpiryStats = {}; 
+
+            data.forEach(row => {
+                totalCountAll++;
+
+                let total = parseFloat(row['返利券总额']) || 0;
+                let balance = parseFloat(row['返利券余额']) || 0;
+                let used = parseFloat(row['核销金额']) || (total - balance);
+                if (used < 0) used = 0;
+
+                let startDateStr = row['开始日期'];
+                let endDateStr = row['结束日期'];
+                let useDateStr = row['使用日期'] || row['核销日期'] || row['使用时间'] || row['核销时间'] || row['交易日期'] || null;
+
+                let startDateObj = robustParseDate(startDateStr);
+                let endDateObj = robustParseDate(endDateStr);
+                let useDateObj = robustParseDate(useDateStr);
+
+                let issueYear = "其他";
+                if (startDateObj) {
+                    issueYear = startDateObj.getFullYear().toString();
+                }
+
+                let isExpired = false;
+                if (endDateObj) {
+                    isExpired = endDateObj < reportToday; // Evaluation aligned directly to live Clock
+                }
+
+                totalIssuedAll += total;
+                totalBalanceAll += balance;
+                if (isExpired) {
+                    totalExpiredAll += balance;
+                } else {
+                    totalValidAll += balance;
+                }
+
+                if (!yearlyMetrics[issueYear]) {
+                    yearlyMetrics[issueYear] = { issued: 0, balance: 0, expired: 0, valid: 0, count: 0 };
+                }
+                yearlyMetrics[issueYear].count++;
+                yearlyMetrics[issueYear].issued += total;
+                yearlyMetrics[issueYear].balance += balance;
+                if (isExpired) {
+                    yearlyMetrics[issueYear].expired += balance;
+                } else {
+                    yearlyMetrics[issueYear].valid += balance;
+                }
+
+                if (used > 0) {
+                    let useMonthKey = "未记录日期";
+                    if (useDateObj) {
+                        useMonthKey = `${useDateObj.getFullYear()}-${String(useDateObj.getMonth() + 1).padStart(2, '0')}`;
+                    } else if (startDateObj) {
+                        useMonthKey = `${startDateObj.getFullYear()}-${String(startDateObj.getMonth() + 1).padStart(2, '0')}`;
+                    }
+                    monthlyUsedStats[useMonthKey] = (monthlyUsedStats[useMonthKey] || 0) + used;
+                }
+
+                if (balance > 0 && endDateObj) {
+                    let expiryMonthKey = `${endDateObj.getFullYear()}-${String(endDateObj.getMonth() + 1).padStart(2, '0')}`;
+                    monthlyExpiryStats[expiryMonthKey] = (monthlyExpiryStats[expiryMonthKey] || 0) + balance;
+                }
+
+                let typeDesc = row['券说明'] || row['类型'] || '其他通用券';
+                if (!typeStats[typeDesc]) {
+                    typeStats[typeDesc] = { total: 0, balance: 0, used: 0, expiredBalance: 0 };
+                }
+                typeStats[typeDesc].total += total;
+                typeStats[typeDesc].balance += balance;
+                typeStats[typeDesc].used += used;
+                if (isExpired) {
+                    typeStats[typeDesc].expiredBalance += balance;
+                }
+
+                let customerCode = row['客户代码'];
+                let customerName = row['客户名称'] || '未知经销商';
+                if (customerCode && isExpired && balance > 0) {
+                    if (!customerStats[customerCode]) {
+                        customerStats[customerCode] = { name: customerName, expiredBalance: 0, breakdown: {} };
+                    }
+                    customerStats[customerCode].expiredBalance += balance;
+                    
+                    let indexedTypeDesc = `[${issueYear}年] ${typeDesc}`;
+                    if (!customerStats[customerCode].breakdown[indexedTypeDesc]) {
+                        customerStats[customerCode].breakdown[indexedTypeDesc] = 0;
+                    }
+                    customerStats[customerCode].breakdown[indexedTypeDesc] += balance;
+                }
+
+                if (customerCode && used > 0) {
+                    if (!activeCustomerStats[customerCode]) {
+                        activeCustomerStats[customerCode] = { name: customerName, totalUsed: 0, breakdown: {}, monthlyBreakdown: {} };
+                    }
+                    activeCustomerStats[customerCode].totalUsed += used;
+
+                    let indexedTypeDesc = `[${issueYear}年] ${typeDesc}`;
+                    if (!activeCustomerStats[customerCode].breakdown[indexedTypeDesc]) {
+                        activeCustomerStats[customerCode].breakdown[indexedTypeDesc] = 0;
+                    }
+                    activeCustomerStats[customerCode].breakdown[indexedTypeDesc] += used;
+
+                    let useMonthText = "未知";
+                    if (useDateObj) {
+                        useMonthText = `${useDateObj.getFullYear().toString().substring(2)}年${useDateObj.getMonth() + 1}月`;
+                    } else if (startDateObj) {
+                        useMonthText = `${startDateObj.getFullYear().toString().substring(2)}年${startDateObj.getMonth() + 1}月`;
+                    }
+                    activeCustomerStats[customerCode].monthlyBreakdown[useMonthText] = (activeCustomerStats[customerCode].monthlyBreakdown[useMonthText] || 0) + used;
+                }
+            });
+
+            // Extract detect system years
+            detectedYears = Object.keys(yearlyMetrics).filter(y => y !== "其他" && !isNaN(y)).sort();
+            if (detectedYears.length === 0) {
+                detectedYears = [reportToday.getFullYear().toString()];
+            }
+
+            // Create dynamically shortened title (e.g. "25-26年度")
+            let reportTitle = "";
+            if (detectedYears.length > 1) {
+                let minYear = detectedYears[0];
+                let maxYear = detectedYears[detectedYears.length - 1];
+                let shortMin = minYear.length === 4 ? minYear.substring(2) : minYear;
+                let shortMax = maxYear.length === 4 ? maxYear.substring(2) : maxYear;
+                reportTitle = `${shortMin}-${shortMax}年度`;
+            } else if (detectedYears.length === 1) {
+                reportTitle = `${detectedYears[0]}年度`;
+            } else {
+                reportTitle = "多年度";
+            }
+
+            document.getElementById('headerYearTitle').innerText = reportTitle + " ";
+            document.getElementById('pageTitle').innerText = `${reportTitle} 返利券数据统计分析看板`;
+
+            // Draw Dynamic KPI grid rows
+            renderDynamicKpiRows(yearlyMetrics, totalIssuedAll, totalBalanceAll, totalExpiredAll, totalValidAll, totalCountAll);
+
+            // Calculate metrics breakdown levels
+            let totalUsedAll = totalIssuedAll - totalBalanceAll;
+            let pUsed = totalIssuedAll > 0 ? ((totalUsedAll / totalIssuedAll) * 100).toFixed(0) : 0;
+            let pValid = totalIssuedAll > 0 ? ((totalValidAll / totalIssuedAll) * 100).toFixed(0) : 0;
+            let pExpired = totalIssuedAll > 0 ? ((totalExpiredAll / totalIssuedAll) * 100).toFixed(0) : 0;
+            
+            document.getElementById('summaryUsedPercent').innerText = pUsed + '%';
+            document.getElementById('summaryValidPercent').innerText = pValid + '%';
+            document.getElementById('summaryExpiredPercent').innerText = pExpired + '%';
+
+            globalTypeStats = typeStats;
+
+            // Expand type display buttons
+            const typesCount = Object.keys(typeStats).length;
+            const toggleBtn = document.getElementById('toggleTypesBtn');
+            if (typesCount > 8) {
+                toggleBtn.classList.remove('hidden');
+                toggleBtn.innerHTML = showAllTypes ? 
+                    '<i class="fas fa-compress-arrows-alt mr-1"></i>收起 (仅看前 8 项)' : 
+                    '<i class="fas fa-expand-arrows-alt mr-1"></i>显示全部种类';
+            } else {
+                toggleBtn.classList.add('hidden');
+            }
+
+            // Draw charts & build lists
+            renderCharts(totalUsedAll, totalValidAll, totalExpiredAll, monthlyUsedStats, monthlyExpiryStats);
+            renderTables(customerStats, activeCustomerStats);
+        }
+
+        // Renders rows of KPIs (completely brightness calibrated light themes)
+        function renderDynamicKpiRows(yearlyMetrics, totalIssuedAll, totalBalanceAll, totalExpiredAll, totalValidAll, totalCountAll) {
+            const container = document.getElementById('kpiRowsContainer');
+            container.innerHTML = '';
+
+            const years = Object.keys(yearlyMetrics).sort();
+
+            // Consolidated Row 1: Bright gradients, completely clear text contrasts
+            if (years.length > 1) {
+                let consolidatedUsed = totalIssuedAll - totalBalanceAll;
+                let usageRate = totalIssuedAll > 0 ? ((consolidatedUsed / totalIssuedAll) * 100).toFixed(1) : 0;
+                
+                let consolidatedRowHtml = `
+                <div class="bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-slate-100/70 rounded-2xl shadow-sm p-6 border border-blue-100/40 animate-fade-in border-l-8 border-l-blue-600">
+                    <div class="flex items-center justify-between border-b border-slate-200/50 pb-3 mb-4">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold bg-blue-600 text-white px-3 py-1 rounded-full"><i class="fas fa-globe mr-1"></i>全部年度合并汇总</span>
+                            <span class="text-xs text-slate-500 font-semibold">合并了 ${years.join(' & ')} 的账务数据</span>
+                        </div>
+                        <span class="text-xs text-slate-400 font-bold">总发券条数: ${totalCountAll} 条</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                            <p class="text-xs text-slate-500 font-semibold mb-1">总发放金额 (全年度)</p>
+                            <h4 class="text-xl font-extrabold tracking-tight text-slate-800">${formatCurrency(totalIssuedAll)}</h4>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                            <p class="text-xs text-slate-500 font-semibold mb-1">已核销使用金额</p>
+                            <h4 class="text-xl font-extrabold tracking-tight text-emerald-600">${formatCurrency(consolidatedUsed)}</h4>
+                            <p class="text-[10px] text-emerald-700 font-semibold mt-1 bg-emerald-50 inline-block px-2 py-0.5 rounded">总核销进度: ${usageRate}%</p>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                            <p class="text-xs text-slate-500 font-semibold mb-1">未用余额总计</p>
+                            <h4 class="text-xl font-extrabold tracking-tight text-amber-600">${formatCurrency(totalBalanceAll)}</h4>
+                            <p class="text-[10px] text-slate-500 mt-1">其中有效余额: ${formatCurrency(totalValidAll)}</p>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                            <p class="text-xs text-slate-500 font-semibold mb-1">已到期作废金额</p>
+                            <h4 class="text-xl font-extrabold tracking-tight text-rose-600">${formatCurrency(totalExpiredAll)}</h4>
+                            <p class="text-[10px] text-rose-600 font-semibold mt-1 bg-rose-50 inline-block px-2 py-0.5 rounded">⚠️ 历史流失比例: ${((totalExpiredAll / totalIssuedAll) * 100).toFixed(1)}%</p>
+                        </div>
+                    </div>
+                </div>`;
+                
+                container.insertAdjacentHTML('beforeend', consolidatedRowHtml);
+            }
+
+            years.forEach(year => {
+                let metrics = yearlyMetrics[year];
+                let used = metrics.issued - metrics.balance;
+                let rate = metrics.issued > 0 ? ((used / metrics.issued) * 100).toFixed(1) : 0;
+
+                let is2026 = year === "2026" || year === "26";
+                let badgeColor = is2026 ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-purple-50 text-purple-700 border-purple-200";
+                let borderHighlight = is2026 ? "border-l-blue-600" : "border-l-purple-600";
+
+                let rowHtml = `
+                <div class="bg-white rounded-2xl shadow-sm p-6 border-l-8 ${borderHighlight} border border-slate-100">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-bold border px-3 py-1 rounded-full ${badgeColor}">
+                                <i class="fas fa-calendar-alt mr-1"></i>${year} 年度数据统计 (已清洗校验)
+                            </span>
+                            <span class="text-xs text-slate-400">独立子统计区间</span>
+                        </div>
+                        <span class="text-xs text-slate-400 font-medium">发放数量: ${metrics.count} 笔</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="p-4 bg-slate-50 rounded-xl">
+                            <p class="text-[11px] text-slate-500 font-semibold uppercase tracking-wider mb-1">年度返利券发放额</p>
+                            <h3 class="text-xl font-bold text-slate-800">${formatCurrency(metrics.issued)}</h3>
+                        </div>
+                        <div class="p-4 bg-slate-50 rounded-xl">
+                            <p class="text-[11px] text-slate-500 font-semibold uppercase tracking-wider mb-1">已核销使用金额</p>
+                            <h3 class="text-xl font-bold text-emerald-600">${formatCurrency(used)}</h3>
+                            <p class="text-[10px] text-emerald-700 font-bold mt-1.5 bg-emerald-50 inline-block px-2 py-0.5 rounded-full">核销率: ${rate}%</p>
+                        </div>
+                        <div class="p-4 bg-slate-50 rounded-xl">
+                            <p class="text-[11px] text-slate-500 font-semibold uppercase tracking-wider mb-1">期末未用余额</p>
+                            <h3 class="text-xl font-bold text-slate-800">${formatCurrency(metrics.balance)}</h3>
+                            <p class="text-[10px] text-slate-500 mt-1.5">仍可用余额: ${formatCurrency(metrics.valid)}</p>
+                        </div>
+                        <div class="p-4 bg-slate-50 rounded-xl">
+                            <p class="text-[11px] text-slate-500 font-semibold uppercase tracking-wider mb-1">已到期过期作废额</p>
+                            <h3 class="text-xl font-bold text-rose-600">${formatCurrency(metrics.expired)}</h3>
+                            <p class="text-[10px] text-rose-600 mt-1.5 bg-rose-50 inline-block px-2 py-0.5 rounded-full">已过期流失率: ${((metrics.expired / metrics.issued) * 100).toFixed(1)}%</p>
+                        </div>
+                    </div>
+                </div>`;
+                
+                container.insertAdjacentHTML('beforeend', rowHtml);
+            });
+        }
+
+        // Renders charts supporting continuous timeline intervals and chart-click handlers
+        function renderCharts(used, valid, expired, monthlyUsedStats, monthlyExpiryStats) {
+            Chart.defaults.font.family = "'Segoe UI', Roboto, 'PingFang SC', sans-serif";
+            
+            // -------------------- 1. Overall Pie (Doughnut) --------------------
+            const ctxStatus = document.getElementById('statusChart').getContext('2d');
+            if (statusChartInstance) statusChartInstance.destroy();
+            
+            statusChartInstance = new Chart(ctxStatus, {
+                type: 'doughnut',
+                data: {
+                    labels: ['总已核销使用', '总未用（仍在有效期）', '总未用（已过期作废）'],
+                    datasets: [{
+                        data: [used, valid, expired],
+                        backgroundColor: [
+                            'rgba(16, 185, 129, 0.85)', 
+                            'rgba(245, 158, 11, 0.85)', 
+                            'rgba(239, 68, 68, 0.85)'   
+                        ],
+                        hoverOffset: 8,
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    cutout: '70%',
+                    onHover: (event, activeElements) => {
+                        event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default';
+                    },
+                    onClick: function(evt, element) {
+                        if (element.length > 0) {
+                            const activeEl = element[0];
+                            const datasetIndex = activeEl.datasetIndex;
+                            const index = activeEl.index;
+                            const clickedLabel = this.data.labels[index];
+                            const clickedDatasetLabel = this.data.datasets[datasetIndex].label || '总分配状态';
+                            triggerDrillDown('statusChart', clickedLabel, clickedDatasetLabel, index, datasetIndex);
+                        }
+                    }
+                }
+            });
+
+            // -------------------- 2. Continuous Multi-Year Double Timeline Trend --------------------
+            const allMonths = Array.from(new Set([
+                ...Object.keys(monthlyUsedStats),
+                ...Object.keys(monthlyExpiryStats)
+            ])).filter(m => m !== '未记录日期' && m !== '未知月' && m.includes('-')).sort();
+
+            const usedValues = allMonths.map(m => monthlyUsedStats[m] || 0);
+            
+            const systemMonthStr = `${reportToday.getFullYear()}-${String(reportToday.getMonth() + 1).padStart(2, '0')}`;
+
+            const expiredValues = allMonths.map(m => {
+                const isPast = m < systemMonthStr;
+                return isPast ? (monthlyExpiryStats[m] || 0) : 0;
+            });
+            const futureValues = allMonths.map(m => {
+                const isFuture = m >= systemMonthStr;
+                return isFuture ? (monthlyExpiryStats[m] || 0) : 0;
+            });
+
+            const ctxDouble = document.getElementById('doubleTrendChart').getContext('2d');
+            if (doubleTrendChartInstance) doubleTrendChartInstance.destroy();
+
+            doubleTrendChartInstance = new Chart(ctxDouble, {
+                type: 'bar',
+                data: {
+                    labels: allMonths,
+                    datasets: [
+                        {
+                            label: '已核销使用',
+                            data: usedValues,
+                            backgroundColor: 'rgba(16, 185, 129, 0.85)',
+                            borderRadius: 4
+                        },
+                        {
+                            label: '已到期作废',
+                            data: expiredValues,
+                            backgroundColor: 'rgba(239, 68, 68, 0.85)',
+                            borderRadius: 4
+                        },
+                        {
+                            label: '未来将到期',
+                            data: futureValues,
+                            backgroundColor: 'rgba(245, 158, 11, 0.85)',
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    scales: {
+                        x: { 
+                            grid: { display: false },
+                            ticks: { font: { size: 10 } }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(val) { return '￥' + (val >= 10000 ? (val/10000).toFixed(0) + '万' : val); },
+                                font: { size: 10 }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    onHover: (event, activeElements) => {
+                        event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default';
+                    },
+                    onClick: function(evt) {
+                        const points = this.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+                        if (points.length > 0) {
+                            const activeEl = points[0];
+                            const datasetIndex = activeEl.datasetIndex;
+                            const index = activeEl.index;
+                            const clickedLabel = this.data.labels[index];
+                            const clickedDatasetLabel = this.data.datasets[datasetIndex].label;
+                            triggerDrillDown('doubleTrendChart', clickedLabel, clickedDatasetLabel, index, datasetIndex);
+                        }
+                    }
+                }
+            });
+
+            // -------------------- 3. Type Breakdown Bar Chart --------------------
+            renderTypeChart();
+        }
+
+        function renderTypeChart() {
+            let sortedTypes = Object.keys(globalTypeStats)
+                .map(key => ({ label: key, ...globalTypeStats[key] }))
+                .sort((a, b) => b.total - a.total);
+
+            const displayCount = (!showAllTypes && sortedTypes.length > 8) ? 8 : sortedTypes.length;
+            const sliceTypes = sortedTypes.slice(0, displayCount);
+
+            // Dynamic layout expansion formula (approx 38px height per bar row)
+            const calculatedHeight = showAllTypes ? Math.max(288, sliceTypes.length * 38) : 288;
+            document.getElementById('typeChartContainer').style.height = `${calculatedHeight}px`;
+
+            const labels = sliceTypes.map(t => t.label);
+            const usedData = sliceTypes.map(t => t.used);
+            const activeData = sliceTypes.map(t => t.balance - t.expiredBalance);
+            const expiredData = sliceTypes.map(t => t.expiredBalance);
+
+            const ctxType = document.getElementById('typeChart').getContext('2d');
+            if (typeChartInstance) typeChartInstance.destroy();
+
+            typeChartInstance = new Chart(ctxType, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '已核销金额',
+                            data: usedData,
+                            backgroundColor: 'rgba(16, 185, 129, 0.85)',
+                        },
+                        {
+                            label: '待核销有效余额',
+                            data: activeData,
+                            backgroundColor: 'rgba(245, 158, 11, 0.85)',
+                        },
+                        {
+                            label: '已过期作废金额',
+                            data: expiredData,
+                            backgroundColor: 'rgba(239, 68, 68, 0.85)',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    scales: {
+                        x: { 
+                            stacked: true, 
+                            beginAtZero: true,
+                            ticks: { font: { size: 10 } }
+                        },
+                        y: { 
+                            stacked: true,
+                            ticks: {
+                                font: { size: 10 },
+                                callback: function(val) {
+                                    const fullLabel = labels[val] || '';
+                                    return fullLabel.length > 15 ? fullLabel.substring(0, 15) + '...' : fullLabel;
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+                    },
+                    onHover: (event, activeElements) => {
+                        event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default';
+                    },
+                    onClick: function(evt) {
+                        const points = this.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+                        if (points.length > 0) {
+                            const activeEl = points[0];
+                            const datasetIndex = activeEl.datasetIndex;
+                            const index = activeEl.index;
+                            const clickedLabel = this.data.labels[index];
+                            const clickedDatasetLabel = this.data.datasets[datasetIndex].label;
+                            triggerDrillDown('typeChart', clickedLabel, clickedDatasetLabel, index, datasetIndex);
+                        }
+                    }
+                }
+            });
+        }
+
+        // Expanded/Compressed Type bar layout handler
+        document.getElementById('toggleTypesBtn').addEventListener('click', function() {
+            showAllTypes = !showAllTypes;
+            this.innerHTML = showAllTypes ? 
+                '<i class="fas fa-compress-arrows-alt mr-1"></i>收起 (仅看前 8 项)' : 
+                '<i class="fas fa-expand-arrows-alt mr-1"></i>显示全部种类';
+            renderTypeChart();
+        });
+
+        // Executes drill-down queries and updates tabular detail streams
+        function triggerDrillDown(chartId, clickedLabel, clickedDatasetLabel, labelIndex, datasetIndex) {
+            const systemMonthStr = `${reportToday.getFullYear()}-${String(reportToday.getMonth() + 1).padStart(2, '0')}`;
+
+            filteredDetailData = filteredDataset.filter(row => {
+                let total = parseFloat(row['返利券总额']) || 0;
+                let balance = parseFloat(row['返利券余额']) || 0;
+                let used = parseFloat(row['核销金额']) || (total - balance);
+                if (used < 0) used = 0;
+
+                let startDateStr = row['开始日期'];
+                let endDateStr = row['结束日期'];
+                let useDateStr = row['使用日期'] || row['核销日期'] || row['使用时间'] || row['核销时间'] || row['交易日期'] || null;
+
+                let startDateObj = robustParseDate(startDateStr);
+                let endDateObj = robustParseDate(endDateStr);
+                let useDateObj = robustParseDate(useDateStr);
+
+                let isExpired = false;
+                if (endDateObj) {
+                    isExpired = endDateObj < reportToday;
+                }
+
+                if (chartId === 'statusChart') {
+                    if (labelIndex === 0) return used > 0;
+                    if (labelIndex === 1) return balance > 0 && !isExpired;
+                    if (labelIndex === 2) return balance > 0 && isExpired;
+                }
+
+                if (chartId === 'doubleTrendChart') {
+                    let rowMonth = "";
+                    if (datasetIndex === 0) { 
+                        if (useDateObj) {
+                            rowMonth = `${useDateObj.getFullYear()}-${String(useDateObj.getMonth() + 1).padStart(2, '0')}`;
+                        } else if (startDateObj) {
+                            rowMonth = `${startDateObj.getFullYear()}-${String(startDateObj.getMonth() + 1).padStart(2, '0')}`;
+                        }
+                        return (used > 0) && (rowMonth === clickedLabel);
+                    }
+                    if (datasetIndex === 1) { 
+                        if (endDateObj) {
+                            rowMonth = `${endDateObj.getFullYear()}-${String(endDateObj.getMonth() + 1).padStart(2, '0')}`;
+                        }
+                        return (balance > 0 && isExpired) && (rowMonth === clickedLabel);
+                    }
+                    if (datasetIndex === 2) { 
+                        if (endDateObj) {
+                            rowMonth = `${endDateObj.getFullYear()}-${String(endDateObj.getMonth() + 1).padStart(2, '0')}`;
+                        }
+                        return (balance > 0 && !isExpired) && (rowMonth === clickedLabel);
+                    }
+                }
+
+                if (chartId === 'typeChart') {
+                    let rowType = row['券说明'] || row['类型'] || '其他通用券';
+                    if (rowType !== clickedLabel) return false;
+
+                    if (datasetIndex === 0) return used > 0; 
+                    if (datasetIndex === 1) return balance > 0 && !isExpired; 
+                    if (datasetIndex === 2) return balance > 0 && isExpired; 
+                }
+
+                return false;
+            });
+
+            renderDrillDownTable(clickedLabel, clickedDatasetLabel);
+        }
+
+        function renderDrillDownTable(label, datasetLabel) {
+            drillDownTableBody.innerHTML = '';
+            activeFilterBadge.innerText = `已选维度: ${label} ➔ 【${datasetLabel}】`;
+
+            if (filteredDetailData.length === 0) {
+                drillDownTableBody.innerHTML = `<tr><td colspan="9" class="py-8 text-center text-slate-400">未找到匹配该筛选条件的底层流水账单</td></tr>`;
+            } else {
+                filteredDetailData.forEach((row, index) => {
+                    let total = parseFloat(row['返利券总额']) || 0;
+                    let balance = parseFloat(row['返利券余额']) || 0;
+                    let used = parseFloat(row['核销金额']) || (total - balance);
+                    if (used < 0) used = 0;
+
+                    let isUsed = used > 0;
+                    let useBadgeClass = isUsed ? "text-emerald-700 bg-emerald-50" : "text-slate-400 bg-slate-50";
+
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-blue-50/40 transition-colors";
+                    tr.innerHTML = `
+                        <td class="py-3 px-4 font-semibold text-slate-900">${index + 1}</td>
+                        <td class="py-3 px-4 font-mono text-slate-500">${row['客户代码'] || '-'}</td>
+                        <td class="py-3 px-4 font-medium text-slate-800">${row['客户名称'] || '未知经销商'}</td>
+                        <td class="py-3 px-4 text-xs font-semibold text-slate-600">${row['券说明'] || '其他'}</td>
+                        <td class="py-3 px-4 text-xs font-mono text-slate-500">${row['开始日期'] || '-'} 至 ${row['结束日期'] || '-'}</td>
+                        <td class="py-3 px-4">
+                            <span class="inline-block px-2 py-0.5 rounded-full font-mono text-xs ${useBadgeClass}">
+                                ${row['使用日期'] || (isUsed ? '已核销' : '未核销')}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 text-right font-semibold text-slate-800">${formatCurrency(total)}</td>
+                        <td class="py-3 px-4 text-right font-bold text-amber-600">${formatCurrency(balance)}</td>
+                        <td class="py-3 px-4 text-right font-bold text-emerald-600">${formatCurrency(used)}</td>
+                    `;
+                    drillDownTableBody.appendChild(tr);
+                });
+            }
+
+            drillDownSection.classList.remove('hidden');
+            drillDownSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        clearFilterBtn.addEventListener('click', () => {
+            drillDownSection.classList.add('hidden');
+            filteredDetailData = [];
+            showToast("筛选已清除", "info");
+        });
+
+        function simulateChartClick(chartId, labelIndex) {
+            let chartInstance = chartId === 'statusChart' ? statusChartInstance : null;
+            if (chartInstance) {
+                const label = chartInstance.data.labels[labelIndex];
+                const datasetLabel = chartInstance.data.datasets[0].label || '总分配状态';
+                triggerDrillDown(chartId, label, datasetLabel, labelIndex, 0);
+            }
+        }
+
+        // Dual list tab grids compiler
+        function renderTables(customerStats, activeCustomerStats) {
+            // Render Tab 1: Damaged/Expired
+            const warningBody = document.getElementById('topDamagedCustomersTable');
+            warningBody.innerHTML = '';
+            
+            globalDamagedCustomers = Object.keys(customerStats)
+                .map(code => ({ code: code, ...customerStats[code] }))
+                .sort((a, b) => b.expiredBalance - a.expiredBalance);
+
+            if (globalDamagedCustomers.length === 0) {
+                warningBody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-slate-400 font-medium">太棒了！所选层级下没有客户产生到期作废损失。</td></tr>';
+            } else {
+                globalDamagedCustomers.slice(0, 10).forEach((cust, index) => {
+                    let badge = index === 0 ? '<span class="bg-rose-100 text-rose-800 text-[10px] font-semibold px-2 py-0.5 rounded ml-2">累计损失最大</span>' : '';
+                    
+                    let detailsHtml = Object.entries(cust.breakdown)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([type, amt]) => `
+                            <div class="text-xs text-slate-500 mb-0.5">
+                                <span class="text-slate-700">${type}</span>: ${formatCurrency(amt)}
+                            </div>`)
+                        .join('');
+
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-50 transition-colors";
+                    tr.innerHTML = `
+                        <td class="py-3 px-6 font-semibold text-slate-900">${index + 1}</td>
+                        <td class="py-3 px-6 font-mono text-slate-500">${cust.code}</td>
+                        <td class="py-3 px-6 font-semibold text-slate-800">${cust.name} ${badge}</td>
+                        <td class="py-3 px-6">${detailsHtml}</td>
+                        <td class="py-3 px-6 text-right font-bold text-rose-600">${formatCurrency(cust.expiredBalance)}</td>
+                    `;
+                    warningBody.appendChild(tr);
+                });
+            }
+
+            // Render Tab 2: Active/Used
+            const activeBody = document.getElementById('topActiveCustomersTable');
+            activeBody.innerHTML = '';
+
+            globalActiveCustomers = Object.keys(activeCustomerStats)
+                .map(code => ({ code: code, ...activeCustomerStats[code] }))
+                .sort((a, b) => b.totalUsed - a.totalUsed);
+
+            if (globalActiveCustomers.length === 0) {
+                activeBody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-slate-400 font-medium">暂无返利券使用记录。请检查筛选状态下是否包含已核销数据。</td></tr>';
+            } else {
+                globalActiveCustomers.slice(0, 10).forEach((cust, index) => {
+                    let badge = index === 0 ? '<span class="bg-emerald-100 text-emerald-800 text-[10px] font-semibold px-2 py-0.5 rounded ml-2">总核销冠军</span>' : '';
+
+                    let monthBadges = Object.entries(cust.monthlyBreakdown)
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 3) 
+                        .map(([month, amt]) => `<span class="inline-block bg-emerald-50 text-emerald-700 text-xs px-2 py-0.5 rounded mr-1.5 mb-1 font-semibold">${month}: ${formatCurrency(amt)}</span>`)
+                        .join('');
+
+                    let typeDetails = Object.entries(cust.breakdown)
+                        .slice(0, 2) 
+                        .map(([type, amt]) => `<div class="text-xs text-slate-400"><span class="text-slate-600 font-medium">${type}</span> (${formatCurrency(amt)})</div>`)
+                        .join('');
+
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-50 transition-colors";
+                    tr.innerHTML = `
+                        <td class="py-3 px-6 font-semibold text-slate-900">${index + 1}</td>
+                        <td class="py-3 px-6 font-mono text-slate-500">${cust.code}</td>
+                        <td class="py-3 px-6 font-semibold text-slate-800">${cust.name} ${badge}</td>
+                        <td class="py-3 px-6">
+                            <div class="mb-1.5">${monthBadges}</div>
+                            ${typeDetails}
+                        </td>
+                        <td class="py-3 px-6 text-right font-bold text-emerald-600">${formatCurrency(cust.totalUsed)}</td>
+                    `;
+                    activeBody.appendChild(tr);
+                });
+            }
+        }
+
+        // Unified Download Driver strictly resolving Double-BOM conflicts
+        function downloadCsvFile(content, baseName) {
+            let cleanContent = content;
+            
+            // 1. Remove string-based BOM representation to bypass double-BOM corruptions!
+            if (cleanContent.startsWith('\uFEFF')) {
+                cleanContent = cleanContent.substring(1);
+            }
+            
+            // 2. Inject standard Microsoft-compatible binary UTF-8 BOM byte marker
+            const bomBytes = new Uint8Array([0xEF, 0xBB, 0xBF]);
+            const blob = new Blob([bomBytes, cleanContent], { type: 'text/csv;charset=utf-8;' });
+            
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            
+            const dateStr = new Date().toISOString().slice(0, 10);
+            link.setAttribute("download", `${baseName}_${dateStr}.csv`);
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast("名单导出成功！已应用 Excel 无乱码兼容格式", "success");
+        }
+
+        // CSV Triggers compiled cleanly
+        downloadWarningCsvBtn.addEventListener('click', function() {
+            if (globalDamagedCustomers.length === 0) {
+                showToast("无受损客户数据，无需导出", "info");
+                return;
+            }
+
+            let csvContent = "过期排名,客户代码,客户名称,具体过期返利券明细(含年度),总计过期作废额(元)\n";
+
+            globalDamagedCustomers.forEach((cust, index) => {
+                let name = `"${(cust.name || '').replace(/"/g, '""')}"`;
+                let balance = cust.expiredBalance.toFixed(2);
+                
+                let detailsText = Object.entries(cust.breakdown)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([type, amount]) => `${type}(${amount.toFixed(2)}元)`)
+                    .join('；');
+                detailsText = `"${detailsText.replace(/"/g, '""')}"`;
+
+                csvContent += `${index + 1},${cust.code},${name},${detailsText},${balance}\n`;
+            });
+
+            downloadCsvFile(csvContent, `返利券过期受损客户排行榜`);
+        });
+
+        downloadActiveCsvBtn.addEventListener('click', function() {
+            if (globalActiveCustomers.length === 0) {
+                showToast("无核销活跃数据，无需导出", "info");
+                return;
+            }
+
+            let csvContent = "活跃排名,客户代码,客户名称,核销时间分布,已核销返利券类别明细(含年度),总计已使用金额(元)\n";
+
+            globalActiveCustomers.forEach((cust, index) => {
+                let name = `"${(cust.name || '').replace(/"/g, '""')}"`;
+                let totalUsedVal = cust.totalUsed.toFixed(2);
+
+                let monthsText = Object.entries(cust.monthlyBreakdown)
+                    .map(([month, amt]) => `${month}(核销${amt.toFixed(2)}元)`)
+                    .join(' | ');
+                monthsText = `"${monthsText.replace(/"/g, '""')}"`;
+
+                let detailsText = Object.entries(cust.breakdown)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([type, amount]) => `${type}(${amount.toFixed(2)}元)`)
+                    .join('；');
+                detailsText = `"${detailsText.replace(/"/g, '""')}"`;
+
+                csvContent += `${index + 1},${cust.code},${name},${monthsText},${detailsText},${totalUsedVal}\n`;
+            });
+
+            downloadCsvFile(csvContent, `返利券客户核销活跃贡献排行榜`);
+        });
+
+        downloadFilteredCsvBtn.addEventListener('click', function() {
+            if (filteredDetailData.length === 0) {
+                showToast("无联动筛选流水，请先在图表中点击色块！", "info");
+                return;
+            }
+
+            let csvContent = "明细序号,客户代码,客户名称,券说明,开始日期,结束日期,使用日期,返利券总额,返利券余额,核销使用金额\n";
+
+            filteredDetailData.forEach((row, index) => {
+                let name = `"${(row['客户名称'] || '').replace(/"/g, '""')}"`;
+                let desc = `"${(row['券说明'] || '').replace(/"/g, '""')}"`;
+                let useDate = row['使用日期'] || '';
+                csvContent += `${index + 1},${row['客户代码']},${name},${desc},${row['开始日期']},${row['结束日期']},${useDate},${row['返利券总额']},${row['返利券余额']},${row['核销金额']}\n`;
+            });
+
+            downloadCsvFile(csvContent, `图表联动穿透筛选流水明细`);
+        });
+
+        // Dashboard full image download layout
+        document.getElementById('downloadImgBtn').addEventListener('click', function() {
+            const btn = this;
+            const originalText = btn.innerHTML;
+            
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>正在渲染并打包长图...';
+            btn.classList.add('opacity-75', 'cursor-not-allowed');
+            btn.disabled = true;
+
+            const captureArea = document.getElementById('captureArea');
+
+            html2canvas(captureArea, {
+                scale: 2, 
+                useCORS: true,
+                backgroundColor: '#f8fafc',
+            }).then(canvas => {
+                const imgData = canvas.toDataURL('image/png');
+                
+                const link = document.createElement('a');
+                link.href = imgData;
+                const dateStr = new Date().toISOString().slice(0, 10);
+                link.download = `返利券智能穿透分析大屏_${dateStr}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                btn.innerHTML = originalText;
+                btn.classList.remove('opacity-75', 'cursor-not-allowed');
+                btn.disabled = false;
+                showToast("高清长图已下载，最适合PPT汇报！", "success");
+            }).catch(err => {
+                console.error("html2canvas error:", err);
+                showToast("图片渲染失败，请检查浏览器权限。", "error");
+                btn.innerHTML = originalText;
+                btn.classList.remove('opacity-75', 'cursor-not-allowed');
+                btn.disabled = false;
+            });
+        });
+    </script>
+</body>
+</html>
