@@ -49,10 +49,28 @@
             </p>
         </div>
 
-        <!-- 卡片网格布局 - 升级版 5 列自适应响应式布局 -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 w-full max-w-7xl px-4">
+        <!-- 卡片网格布局 - 升级版 6 列自适应响应式布局 -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 w-full max-w-[90rem] px-4">
             
-            <!-- 卡片 1: 应收账款 -->
+            <!-- 卡片 1: 销售分析系统（全新加入·战略排头兵） -->
+            <div class="bg-white/95 backdrop-blur-sm rounded-[1.6rem] p-7 shadow-[0_4px_25px_rgba(0,0,0,0.02)] border border-slate-100 hover:border-cyan-200 hover:shadow-[0_20px_40px_rgba(6,182,212,0.08)] hover:-translate-y-1.5 flex flex-col group relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-cyan-500 to-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div class="w-14 h-14 bg-cyan-50/80 rounded-2xl flex items-center justify-center mb-6 text-cyan-600 group-hover:bg-cyan-600 group-hover:text-white transition-all duration-300 shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+                    </svg>
+                </div>
+                <h3 class="text-[1.3rem] font-bold mb-3 text-slate-800 tracking-wide">销售分析系统</h3>
+                <p class="text-slate-500/90 text-[0.92rem] leading-[1.65] mb-8 flex-grow">深度解析当期业绩表现、各品类动销轨迹及高价值客户画像，同比看板助推精准战略决策。</p>
+                <a href="./sales.html" class="block mt-auto">
+                    <div class="inline-flex items-center justify-between w-full px-4 py-3 rounded-xl bg-slate-50 text-slate-700 font-bold text-[0.92rem] transition-all duration-300 group-hover:bg-cyan-600 group-hover:text-white group-hover:shadow-[0_8px_20px_rgba(6,182,212,0.2)]">
+                        <span>进入销售分析</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="transform transition-transform duration-300 group-hover:translate-x-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                    </div>
+                </a>
+            </div>
+
+            <!-- 卡片 2: 应收账款（安全回款风控） -->
             <div class="bg-white/95 backdrop-blur-sm rounded-[1.6rem] p-7 shadow-[0_4px_25px_rgba(0,0,0,0.02)] border border-slate-100 hover:border-blue-200 hover:shadow-[0_20px_40px_rgba(37,99,235,0.08)] hover:-translate-y-1.5 flex flex-col group relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-blue-500 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div class="w-14 h-14 bg-blue-50/80 rounded-2xl flex items-center justify-center mb-6 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300 shadow-sm">
@@ -70,7 +88,7 @@
                 </a>
             </div>
 
-            <!-- 卡片 2: 库存规划 -->
+            <!-- 卡片 3: 库存规划（动销供应链） -->
             <div class="bg-white/95 backdrop-blur-sm rounded-[1.6rem] p-7 shadow-[0_4px_25px_rgba(0,0,0,0.02)] border border-slate-100 hover:border-emerald-200 hover:shadow-[0_20px_40px_rgba(16,185,129,0.08)] hover:-translate-y-1.5 flex flex-col group relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-emerald-500 to-teal-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div class="w-14 h-14 bg-emerald-50/80 rounded-2xl flex items-center justify-center mb-6 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300 shadow-sm">
@@ -88,7 +106,7 @@
                 </a>
             </div>
 
-            <!-- 卡片 3: 蜜乐涂料 -->
+            <!-- 卡片 4: 蜜乐涂料补货（细分品类海运闭环） -->
             <div class="bg-white/95 backdrop-blur-sm rounded-[1.6rem] p-7 shadow-[0_4px_25px_rgba(0,0,0,0.02)] border border-slate-100 hover:border-rose-200 hover:shadow-[0_20px_40px_rgba(244,63,94,0.08)] hover:-translate-y-1.5 flex flex-col group relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-rose-500 to-orange-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div class="w-14 h-14 bg-rose-50/80 rounded-2xl flex items-center justify-center mb-6 text-rose-600 group-hover:bg-rose-600 group-hover:text-white transition-all duration-300 shadow-sm">
@@ -107,7 +125,26 @@
                 </a>
             </div>
 
-            <!-- 卡片 4: 海报排版智能设计系统 -->
+            <!-- 卡片 5: 集团E券分析（营销效能监控） -->
+            <div class="bg-white/95 backdrop-blur-sm rounded-[1.6rem] p-7 shadow-[0_4px_25px_rgba(0,0,0,0.02)] border border-slate-100 hover:border-amber-200 hover:shadow-[0_20px_40px_rgba(245,158,11,0.08)] hover:-translate-y-1.5 flex flex-col group relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-amber-500 to-orange-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div class="w-14 h-14 bg-amber-50/80 rounded-2xl flex items-center justify-center mb-6 text-amber-600 group-hover:bg-amber-600 group-hover:text-white transition-all duration-300 shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/>
+                        <path d="M13 5v14"/>
+                    </svg>
+                </div>
+                <h3 class="text-[1.3rem] font-bold mb-3 text-slate-800 tracking-wide">集团E券分析</h3>
+                <p class="text-slate-500/90 text-[0.92rem] leading-[1.65] mb-8 flex-grow">全渠道E券发放、核销与转化率全生命周期监控，深度赋能精准营销与精益对账。</p>
+                <a href="./ecoupon.html" class="block mt-auto">
+                    <div class="inline-flex items-center justify-between w-full px-4 py-3 rounded-xl bg-slate-50 text-slate-700 font-bold text-[0.92rem] transition-all duration-300 group-hover:bg-amber-600 group-hover:text-white group-hover:shadow-[0_8px_20px_rgba(245,158,11,0.2)]">
+                        <span>进入E券分析</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="transform transition-transform duration-300 group-hover:translate-x-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                    </div>
+                </a>
+            </div>
+
+            <!-- 卡片 6: 海报排版智能设计系统（业务设计提效） -->
             <div class="bg-white/95 backdrop-blur-sm rounded-[1.6rem] p-7 shadow-[0_4px_25px_rgba(0,0,0,0.02)] border border-slate-100 hover:border-violet-200 hover:shadow-[0_20px_40px_rgba(139,92,246,0.08)] hover:-translate-y-1.5 flex flex-col group relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-violet-500 to-fuchsia-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div class="w-14 h-14 bg-violet-50/80 rounded-2xl flex items-center justify-center mb-6 text-violet-600 group-hover:bg-violet-600 group-hover:text-white transition-all duration-300 shadow-sm">
@@ -122,31 +159,6 @@
                 <a href="./poster.html" class="block mt-auto">
                     <div class="inline-flex items-center justify-between w-full px-4 py-3 rounded-xl bg-slate-50 text-slate-700 font-bold text-[0.92rem] transition-all duration-300 group-hover:bg-violet-600 group-hover:text-white group-hover:shadow-[0_8px_20px_rgba(139,92,246,0.2)]">
                         <span>进入海报排版</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="transform transition-transform duration-300 group-hover:translate-x-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-                    </div>
-                </a>
-            </div>
-
-            <!-- 卡片 5: 集团E券分析 -->
-            <div class="bg-white/95 backdrop-blur-sm rounded-[1.6rem] p-7 shadow-[0_4px_25px_rgba(0,0,0,0.02)] border border-slate-100 hover:border-amber-200 hover:shadow-[0_20px_40px_rgba(245,158,11,0.08)] hover:-translate-y-1.5 flex flex-col group relative overflow-hidden">
-                <!-- 顶部琥珀色流光装饰 -->
-                <div class="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-amber-500 to-orange-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                
-                <!-- 图标容器 -->
-                <div class="w-14 h-14 bg-amber-50/80 rounded-2xl flex items-center justify-center mb-6 text-amber-600 group-hover:bg-amber-600 group-hover:text-white transition-all duration-300 shadow-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/>
-                        <path d="M13 5v14"/>
-                    </svg>
-                </div>
-                
-                <h3 class="text-[1.3rem] font-bold mb-3 text-slate-800 tracking-wide">集团E券分析</h3>
-                <p class="text-slate-500/90 text-[0.92rem] leading-[1.65] mb-8 flex-grow">全渠道E券发放、核销与转化率全生命周期监控，深度赋能精准营销与精益对账。</p>
-                
-                <!-- 升级版动效按钮 -->
-                <a href="./ecoupon.html" class="block mt-auto">
-                    <div class="inline-flex items-center justify-between w-full px-4 py-3 rounded-xl bg-slate-50 text-slate-700 font-bold text-[0.92rem] transition-all duration-300 group-hover:bg-amber-600 group-hover:text-white group-hover:shadow-[0_8px_20px_rgba(245,158,11,0.2)]">
-                        <span>进入E券分析</span>
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="transform transition-transform duration-300 group-hover:translate-x-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
                     </div>
                 </a>
@@ -167,13 +179,13 @@
             const hour = new Date().getHours();
             let greeting = '系统就绪 · 欢迎使用智能中枢';
             if (hour >= 5 && hour < 12) {
-                greeting = '早上好！美好的一天从高效协同工作开始';
+                greeting = '早上好！战略领航，美好的一天从高效协同工作开始';
             } else if (hour >= 12 && hour < 14) {
                 greeting = '中午好！适度休息，保持饱满精力';
             } else if (hour >= 14 && hour < 18) {
-                greeting = '下午好！继续保持专注与卓越';
+                greeting = '下午好！深入销售洞察，保持专注与卓越';
             } else {
-                greeting = '晚上好！今天辛苦了，智能中枢持续守候中';
+                greeting = '晚上好！今天辛苦了，中枢持续守候并沉淀本日数据';
             }
             textElement.textContent = greeting;
         });
