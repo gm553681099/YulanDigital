@@ -6,11 +6,11 @@
     <title>蜜乐涂料 (Miller Paint) - 智能库存补货系统</title>
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 React 核心库 -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- 引入 Babel -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- 【优化】引入 React 核心库 - 更换为高可用 CDN 并锁定稳定版本 18.3.1 -->
+    <script crossorigin src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+    <script crossorigin src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+    <!-- 【优化】引入 Babel - 更换为高可用 CDN 并锁定版本，消除首屏重定向延迟 -->
+    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
 </head>
 <body class="bg-slate-50 overflow-hidden">
     <div id="root"></div>
@@ -46,59 +46,44 @@
 
         const App = () => {
           const initialSettings = {
-            // 美国涂料海运周期较长
             leadTime: 45, 
             safetyDays: 15,
-            
-            // 箱规与货柜配置
-            skuMultiplier: 4,      // 单型号订货必须为4的倍数
-            containerSize: 2520,   // 整柜起定量，总补货量将凑满整柜
-            
-            // 差异化补货频率
-            orderDaysA: 60,        // A类高周转，备2个月即可
-            orderDaysB: 120,       // B类低周转，备4个月降低发单频次
-            orderDaysC: 180,       // C类极低频长尾，一次性备货半年
-
+            skuMultiplier: 4,      
+            containerSize: 2520,   
+            orderDaysA: 60,        
+            orderDaysB: 120,       
+            orderDaysC: 180,       
             demandCalcMethod: 'simple', 
             weight30d: 40,
             weight90d: 30,
             weightOlder: 30,
-            
             minOrderFreq: 5, 
-
-            coreMetric: 'qty', // 统一控制看板分析视角与 ABC 分类基准
-
-            abcThresholdA: 70, // A类商品贡献70%占比
-            abcThresholdB: 95, // B类商品贡献25%占比，C类5%
-
+            coreMetric: 'qty', 
+            abcThresholdA: 70, 
+            abcThresholdB: 95, 
             basePeriod: 180,       
             endDate: new Date().toISOString().split('T')[0],
-
-            overstockWarningDays: 270, // 半年预警
-            deadStockDays: 720         // 一年死库
+            overstockWarningDays: 270, 
+            deadStockDays: 720         
           };
           
           const [draftSettings, setDraftSettings] = useState(initialSettings);
           const [appliedSettings, setAppliedSettings] = useState(initialSettings);
-
           const [rawData, setRawData] = useState([]);
           const [searchTerm, setSearchTerm] = useState('');
           const [isSidebarOpen, setIsSidebarOpen] = useState(true);
           const [uploadError, setUploadError] = useState(''); 
-          
-          const [sortConfig, setSortConfig] = useState({ key: 'd', direction: 'desc' }); // 默认排序改为日均销量
-          
-          const [showUserGuide, setShowUserGuide] = useState(false); // 新增新手指南状态
+          const [sortConfig, setSortConfig] = useState({ key: 'd', direction: 'desc' }); 
+          const [showUserGuide, setShowUserGuide] = useState(false); 
           const [showGuide, setShowGuide] = useState(false); 
           const [showAbcGuide, setShowAbcGuide] = useState(false);
           const [showAlgoSettings, setShowAlgoSettings] = useState(true); 
-
           const [parsedHeadersInfo, setParsedHeadersInfo] = useState(null);
           const [viewMode, setViewMode] = useState('table');
-          const [clearanceView, setClearanceView] = useState('spec'); // 新增：积压视图状态
+          const [clearanceView, setClearanceView] = useState('spec'); 
           const fileInputRef = useRef(null);
           const priceFileInputRef = useRef(null);
-          const onOrderFileInputRef = useRef(null); // 新增在途数据引用
+          const onOrderFileInputRef = useRef(null); 
 
           const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
           const showToastMessage = (message, type = 'success') => {
@@ -194,24 +179,19 @@
             const headers = splitCSVRow(lines[0]).map(h => h.replace(/["\r]/g, ''));
             const usedCols = new Set();
             
-            // 强化主表物料号的精准与模糊匹配
             const colItemCode = getColumnIndex(headers, ['涂料编号', '涂料编码', '产品编号', '产品编码', '型号', '编号', '代码', 'SKU', '物料号', '商品编码'], ['编号', '编码', '型号', '代码', 'sku', '品号', '条码'], usedCols);
             const colItemName = getColumnIndex(headers, ['涂料名称', '产品名称', '品名', '名称'], ['名称', '品名'], usedCols);
             const colSpec = getColumnIndex(headers, ['规格', '容量', '包装'], ['规格', '容量', '包装'], usedCols);
-
             const colStock = getColumnIndex(headers, ['公司库存', '总库存', '库存', '当前库存', '结存'], ['库存', '结存', '实物'], usedCols);
             const colOnOrder = getColumnIndex(headers, ['采购在途', '在途库存', '在途', '已订购'], ['在途', '未交', '未到', '待收', '待入库', '已订'], usedCols);
-
             const colSales = getColumnIndex(headers, ['销量', '销售量', '总销量', '出库数量', '数量'], ['销量', '出库', '销售数'], usedCols);
             const colSales30d = getColumnIndex(headers, ['近30天销量', '30天销量', '月销量'], ['30天', '月销'], usedCols);
             const colSales90d = getColumnIndex(headers, ['近90天销量', '90天销量', '季销量'], ['90天', '季销'], usedCols);
             const colRevenue = getColumnIndex(headers, ['金额', '销售额', '销售金额', '营业额'], ['金额', '销售额'], usedCols);
-            
             const colLaunchDate = getColumnIndex(headers, ['上市时间', '建档日期', '创建时间'], ['上市', '建档', '创建'], usedCols);
             const colOrderFreq = getColumnIndex(headers, ['订货频次', '订单数', '频次', '笔数'], ['频次', '笔数', '单数'], usedCols);
 
             const headersFound = colItemCode !== -1 || colItemName !== -1 || colSales !== -1 || colStock !== -1;
-
             if (!headersFound) return { data: [], headersFound: false, matchedColumns: null };
 
             const parsedData = [];
@@ -220,14 +200,11 @@
               if (values.length > 0) {
                 const stockVal = colStock !== -1 ? cleanNumber(values[colStock]) : 0;
                 const onOrderVal = colOnOrder !== -1 ? cleanNumber(values[colOnOrder]) : 0;
-
                 const sales = colSales !== -1 ? cleanNumber(values[colSales]) : 0;
                 const sales30 = colSales30d !== -1 && values[colSales30d] ? cleanNumber(values[colSales30d]) : null;
                 const sales90 = colSales90d !== -1 && values[colSales90d] ? cleanNumber(values[colSales90d]) : null;
-
                 const revenue = colRevenue !== -1 ? cleanNumber(values[colRevenue]) : 0;
                 const orderFreqVal = colOrderFreq !== -1 && values[colOrderFreq] ? cleanNumber(values[colOrderFreq]) : null;
-
                 const rawCode = colItemCode !== -1 && values[colItemCode] ? String(values[colItemCode]).replace(/"/g, '') : '';
                 const rawName = colItemName !== -1 && values[colItemName] ? String(values[colItemName]).replace(/"/g, '') : '';
                 
@@ -237,7 +214,6 @@
                   itemCode: rawCode || '-',
                   itemName: rawName || `未命名产品-${i}`,
                   spec: (colSpec !== -1 && values[colSpec]) ? String(values[colSpec]).replace(/"/g, '') : '-',
-                  
                   sales: sales,
                   sales30d: sales30,
                   hasSales30d: sales30 !== null,
@@ -245,11 +221,9 @@
                   hasSales90d: sales90 !== null,
                   revenue: revenue,
                   launchDate: (colLaunchDate !== -1 && values[colLaunchDate]) ? String(values[colLaunchDate]).replace(/"/g, '') : '-',
-                  
                   currentStock: stockVal,
                   onOrderStock: onOrderVal,
                   availableStock: stockVal + onOrderVal,
-
                   orderFreqConfig: orderFreqVal,
                   hasOrderFreq: colOrderFreq !== -1 && orderFreqVal !== null
                 });
@@ -262,7 +236,6 @@
                 sales: colSales !== -1 ? headers[colSales] : null,
                 sales30d: colSales30d !== -1 ? headers[colSales30d] : null,
             };
-
             return { data: parsedData, headersFound: true, matchedColumns };
           };
 
@@ -312,7 +285,6 @@
                 setRawData(result.data);
                 setParsedHeadersInfo(result.matchedColumns);
                 setViewMode('table');
-                
                 showToastMessage('数据载入成功，引擎已根据您的配置完成初次运算！', 'success');
                 setSortConfig({ key: 'd', direction: 'desc' });
               }
@@ -331,7 +303,6 @@
                 let text = new TextDecoder('utf-8').decode(buffer);
                 if (text.charCodeAt(0) === 0xFEFF) text = text.substring(1);
 
-                // 快速解析表头
                 const getHeaders = (txt) => {
                     const lines = txt.split(/\r\n|\n|\r/).filter(line => line.trim() !== '');
                     if(lines.length === 0) return [];
@@ -352,14 +323,11 @@
                 let headers = getHeaders(text);
                 const clean = s => String(s).replace(/[\s\-_\(\)（）\uFEFF]/g, '').toLowerCase();
                 
-                // 升级防干扰的精准+模糊分层匹配引擎
                 const findCol = (hdrs, exactArr, includeArr) => {
-                    // 第一层：优先找字面意思完全一样的（防止被"供应商代码"等无关列抢占）
                     for (let match of exactArr) {
                         const idx = hdrs.findIndex(h => clean(h) === clean(match));
                         if (idx !== -1) return idx;
                     }
-                    // 第二层：如果没有精准词，再找包含指定关键字的
                     for (let match of includeArr) {
                         const idx = hdrs.findIndex(h => clean(h).includes(clean(match)));
                         if (idx !== -1) return idx;
@@ -369,17 +337,14 @@
 
                 const codeExact = ['涂料编号', '涂料编码', '产品编号', '产品编码', '型号', '编号', '代码', 'SKU', '物料号', '商品编码'];
                 const codeInclude = ['编号', '编码', '型号', '代码', 'sku', '品号', '条码'];
-                
                 const priceExact = ['单价', '经销价', '销售价', '标准价', '结算价', '含税单价', '无税单价', '成本价'];
                 const priceInclude = ['单价', '价格', '售价', '成本', '金额'];
-                
                 const onOrderExact = ['采购在途', '在途库存', '在途数量', '在途', '已订购数量', '未交数量'];
                 const onOrderInclude = ['在途', '未交', '未到', '待收', '待入库', '已订'];
 
                 let codeIdx = findCol(headers, codeExact, codeInclude);
                 let targetIdx = type === 'price' ? findCol(headers, priceExact, priceInclude) : findCol(headers, onOrderExact, onOrderInclude);
 
-                // 如果 UTF-8 没找到表头，自动回退 GBK 解码（防中文乱码）
                 if (codeIdx === -1 || targetIdx === -1) {
                     try {
                         text = new TextDecoder('gbk').decode(buffer);
@@ -423,10 +388,7 @@
                         const rawCode = row[codeIdx].replace(/["\r]/g, '').trim();
                         const code = cleanCodeStr(rawCode);
                         const valStr = row[targetIdx].replace(/["\r,]/g, '').trim();
-                        
-                        // 【核心修复】：将空白值或横杠强制解析为 0，防止跳过这些有效型号
                         const val = (valStr === '' || valStr === '-') ? 0 : parseFloat(valStr);
-                        
                         if (code && !isNaN(val)) {
                             dataMap[code] = val;
                         }
@@ -471,7 +433,6 @@
             if (rawData.length === 0) return { data: [], totalContainers: 0, targetTotalPurchase: 0, containerFilledQty: 0, allowPadding: false, paddingReason: '无数据' };
             const end = new Date(appliedSettings.endDate);
 
-            // 第一阶段：基础统计与 ABC 评级
             let mappedData = rawData.map(item => {
                 let effectiveDays = appliedSettings.basePeriod;
                 if (item.launchDate && item.launchDate !== '-') {
@@ -486,7 +447,6 @@
                 }
                 
                 let unitPrice = item.uploadedPrice !== undefined ? item.uploadedPrice : (item.sales > 0 ? (item.revenue / item.sales) : 0);
-
                 let rawD = 0;
                 if (appliedSettings.demandCalcMethod === 'weighted') {
                     if (item.hasSales30d && item.hasSales90d) {
@@ -524,8 +484,6 @@
                 
                 let d = rawD * freqPenalty;
                 const pureD = effectiveDays > 0 ? (item.sales / effectiveDays) : 0;
-                
-                // 双轴周转天数独立计算
                 const physicalCoverDays = pureD > 0 ? (item.currentStock / pureD) : (item.currentStock > 0 ? Infinity : 0);
                 const totalCoverDays = pureD > 0 ? (item.availableStock / pureD) : (item.availableStock > 0 ? Infinity : 0);
                 
@@ -533,32 +491,26 @@
                 if (appliedSettings.demandCalcMethod === 'weighted') {
                     calcSales = d * effectiveDays;
                 }
-                // 核算金额：优先使用导入的单价 * 算法修正销量
                 let calcRevenue = unitPrice > 0 ? (calcSales * unitPrice) : item.revenue;
                 
-                // 统一核心基准：联动看板和 ABC 评级
                 let sortValue = calcSales; 
                 if (appliedSettings.coreMetric === 'revenue') {
                     sortValue = calcRevenue; 
                 }
 
-                // --- 夸托/QT装拦截逻辑 ---
                 const isQtStr = (str) => {
                     if(!str) return false;
                     const upper = String(str).toUpperCase();
-                    // 兼容多种写法：QT、夸托、夸脱
                     return upper.includes('QT') || upper.includes('夸托') || upper.includes('夸脱');
                 };
                 const isColorantStr = (str) => {
                     if(!str) return false;
                     return String(str).includes('色浆');
                 };
-                // 如果是QT或夸托，并且不是色浆，则标记为排除采购
                 const isExcludedQt = (isQtStr(item.spec) || isQtStr(item.itemName)) && !(isColorantStr(item.spec) || isColorantStr(item.itemName));
 
                 let promoAction = '-', promoLevel = 0;
                 if (item.currentStock === 0) { promoAction = '健康 (零库存)'; promoLevel = 0; } 
-                // 库龄和清仓依然以“实物库存”为准 (因为飘在海上的不占物理库房也没变老)
                 else if (physicalCoverDays === Infinity) { promoAction = '无动销死库'; promoLevel = 2; } 
                 else if (physicalCoverDays > appliedSettings.deadStockDays) { promoAction = '重度积压'; promoLevel = 2; } 
                 else if (physicalCoverDays > appliedSettings.overstockWarningDays) { promoAction = '滞销预警'; promoLevel = 1; } 
@@ -568,72 +520,55 @@
                   ...item, unitPrice, effectiveDays, d, pureD, freqPenalty,
                   calcSales, calcRevenue, sortValue,
                   physicalCoverDays, totalCoverDays, promoAction, promoLevel, isExcludedQt,
-                  // 初始化变量
                   rop: 0, targetStock: 0, basePurchase: 0, actualPurchase: 0, padQty: 0, initialCapital: 0, 
                   needsRestock: false, isCritical: false, immediateRisk: false
                 };
             });
 
-            // 排序并进行 ABC 评级
             mappedData.sort((a, b) => b.sortValue - a.sortValue);
-            const totalSortValue = mappedData.reduce((sum, item) => sum + item.sortValue, 0);
+            let totalSortValue = mappedData.reduce((sum, item) => sum + item.sortValue, 0);
             let runningVal = 0;
 
             const step1Data = mappedData.map(item => {
                 runningVal += item.sortValue;
                 const cumPct = totalSortValue > 0 ? runningVal / totalSortValue : 0;
-                
                 let abcClass = 'C', classLabel = 'C类 (极低频长尾)';
                 const thresholdA = appliedSettings.abcThresholdA / 100;
                 const thresholdB = appliedSettings.abcThresholdB / 100;
 
-                // 现在所有商品均会参与采购计划，只作层级标识区分策略
                 if (cumPct <= thresholdA) { abcClass = 'A'; classLabel = 'A类 (高频畅销)'; } 
                 else if (cumPct <= thresholdB) { abcClass = 'B'; classLabel = 'B类 (低频常规)'; } 
-                
                 return { ...item, abcClass, classLabel };
             });
 
-            // 第二阶段：目标水位填补模型 (Target Inventory Level) 采购量计算
             let totalBasePurchase = 0;
             step1Data.forEach(item => {
                 let sL = appliedSettings.leadTime;
                 let sSS = appliedSettings.safetyDays;
-                
-                // 【差异化策略】：根据不同ABC分类使用不同的期望备货期
                 let oqDays = item.abcClass === 'A' ? appliedSettings.orderDaysA : 
                             (item.abcClass === 'B' ? appliedSettings.orderDaysB : appliedSettings.orderDaysC);
 
                 let rop = Math.ceil(item.d * (sL + sSS)); 
                 let oq = Math.ceil(item.d * oqDays); 
-                let targetInitialStock = rop + oq; // 目标理想备货水位
+                let targetInitialStock = rop + oq; 
                 
                 item.rop = item.isExcludedQt ? 0 : rop;
                 item.targetStock = item.isExcludedQt ? 0 : targetInitialStock;
-                
-                // 【双轴告急预警】：仅作看板状态及凑单强度的依据，不作为补货的前置拦截
-                // 1. 发单红线告急：(包含在途) 决定是否需要强制开船凑柜
                 item.isCritical = !item.isExcludedQt && item.availableStock <= rop && item.d > 0; 
-                // 2. 实物断货风险：单看现有仓库货量是不是快断了（如果在途还没到，就面临即时缺货）
                 item.immediateRisk = !item.isExcludedQt && item.currentStock <= rop && item.d > 0; 
 
-                // 【核心算法升级】：直接补足到目标水位 (Top-up)，移除跌破 ROP 的前置条件限制
                 if (!item.isExcludedQt && item.d > 0) {
                     let rawPurchase = targetInitialStock - item.availableStock;
-                    
                     if (rawPurchase > 0) {
-                        // 只要没满，就向上取整至 skuMultiplier 的倍数生成刚需订单
                         let base = Math.ceil(rawPurchase / appliedSettings.skuMultiplier) * appliedSettings.skuMultiplier;
-                        
                         item.basePurchase = base;
                         item.actualPurchase = base;
-                        item.needsRestock = true; // 只要有不满水位的刚需就标记为需补货
+                        item.needsRestock = true; 
                         totalBasePurchase += base;
                     }
                 }
             });
 
-            // 第三阶段：全局整柜智能凑单算法 (Container Optimization) 带有凑柜拦截逻辑
             let totalContainers = 0;
             let targetTotalPurchase = 0;
             let containerFilledQty = totalBasePurchase;
@@ -641,7 +576,6 @@
             let paddingReason = '当前无任何备货需求';
 
             if (totalBasePurchase > 0) {
-                // 判断是否触发强制满柜 (判定条件基于 isCritical 而非普通的 needsRestock)
                 const abCriticalCount = step1Data.filter(i => (i.abcClass === 'A' || i.abcClass === 'B') && i.isCritical).length;
                 const cItems = step1Data.filter(i => i.abcClass === 'C' && !i.isExcludedQt);
                 const cCriticalCount = cItems.filter(i => i.isCritical).length;
@@ -667,51 +601,41 @@
                     if (candidates.length === 0) candidates = step1Data.filter(i => i.pureD > 0 && !i.isExcludedQt);
 
                     if (candidates.length > 0) {
-                        let maxLoops = 10000; // 防止无限循环的保险
+                        let maxLoops = 10000; 
                         
-                        // 【新增逻辑】：凑柜第一阶段 - 优先把不足 32 桶的款式补足到 32 桶（不考虑ABC）
                         while (gap > 0 && maxLoops-- > 0) {
                             let under32Candidates = candidates.filter(i => i.actualPurchase < 32);
-                            if (under32Candidates.length === 0) break; // 所有候选项都已达到或超过32桶，结束第一阶段
+                            if (under32Candidates.length === 0) break; 
                             
                             let bestItem = under32Candidates[0];
                             let minCoverDays = Infinity;
 
                             for (let i = 0; i < under32Candidates.length; i++) {
                                 let it = under32Candidates[i];
-                                // 不考虑 ABC，只看谁的可用天数最短，优先拉它一把
                                 let futureCover = (it.availableStock + it.actualPurchase) / it.pureD;
-                                
                                 if (futureCover < minCoverDays) {
                                     minCoverDays = futureCover;
                                     bestItem = it;
                                 }
                             }
-
-                            // 每次分配一个箱规(如4件)
                             bestItem.actualPurchase += appliedSettings.skuMultiplier;
                             bestItem.padQty += appliedSettings.skuMultiplier;
                             gap -= appliedSettings.skuMultiplier;
                         }
 
-                        // 【原逻辑】：凑柜第二阶段 - 按ABC优先级继续填补剩余的货柜空间
                         while (gap > 0 && maxLoops-- > 0) {
                             let bestItem = candidates[0];
                             let minCoverDays = Infinity;
 
                             for (let i = 0; i < candidates.length; i++) {
                                 let it = candidates[i];
-                                // 凑柜优先级策略：A类最高 (系数1.0)，B类次之 (1.5)，C类最低 (2.0)
                                 let classMultiplier = it.abcClass === 'A' ? 1.0 : (it.abcClass === 'B' ? 1.5 : 2.0); 
                                 let futureCover = ((it.availableStock + it.actualPurchase) / it.pureD) * classMultiplier;
-                                
                                 if (futureCover < minCoverDays) {
                                     minCoverDays = futureCover;
                                     bestItem = it;
                                 }
                             }
-
-                            // 每次分配一个箱规(如4件)
                             bestItem.actualPurchase += appliedSettings.skuMultiplier;
                             bestItem.padQty += appliedSettings.skuMultiplier;
                             gap -= appliedSettings.skuMultiplier;
@@ -719,14 +643,12 @@
                     }
                     containerFilledQty = targetTotalPurchase;
                 } else {
-                    // 如果取消强行凑柜，真实反映零散数量
                     totalContainers = (totalBasePurchase / appliedSettings.containerSize).toFixed(2);
                     targetTotalPurchase = totalBasePurchase;
                     containerFilledQty = totalBasePurchase;
                 }
             }
 
-            // 计算全部款式的采购资金
             step1Data.forEach(item => {
                 item.initialCapital = item.actualPurchase * item.unitPrice;
             });
@@ -872,12 +794,10 @@
                      if (isDead) { breakdown[cat][key].deadQty += qty; breakdown[cat][key].deadFund += fund; }
                  };
 
-                 // 按规格
                  if (specUpper.includes('加仑') || specUpper.includes('GL') || nameUpper.includes('加仑')) { addData('spec', '加仑'); }
                  else if (specUpper.includes('夸脱') || specUpper.includes('夸托') || specUpper.includes('QT') || nameUpper.includes('夸脱')) { addData('spec', '夸脱'); }
                  else { addData('spec', '其它'); }
 
-                 // 按系列
                  if (nameUpper.includes('百年')) { addData('series', '百年'); }
                  else if (nameUpper.includes('极净')) { addData('series', '极净'); }
                  else if (nameUpper.includes('至臻')) { addData('series', '至臻'); }
@@ -885,7 +805,6 @@
                  else if (nameUpper.includes('色浆') || specUpper.includes('色浆')) { addData('series', '色浆'); }
                  else { addData('series', '其它'); }
 
-                 // 按基漆
                  if (nameUpper.includes('超深基') || nameUpper.includes('UD') || nameUpper.includes('ULTRA')) { addData('baseType', '超深基'); }
                  else if (nameUpper.includes('深基') || nameUpper.includes('DP') || nameUpper.includes('DEEP')) { addData('baseType', '深基'); }
                  else if (nameUpper.includes('浅基') || nameUpper.includes('白基') || nameUpper.includes('PASTEL') || nameUpper.includes('LIGHT')) { addData('baseType', '浅基(白基)'); }
@@ -945,7 +864,6 @@
               ...dataToExport.map(item => {
                 const physicalCoverStr = item.physicalCoverDays === Infinity ? '无动销死库' : (item.physicalCoverDays > 0 ? Math.round(item.physicalCoverDays).toString() : '0');
                 const totalCoverStr = item.totalCoverDays === Infinity ? '无动销' : (item.totalCoverDays > 0 ? Math.round(item.totalCoverDays).toString() : '0');
-                
                 const escapeCSV = (str) => `"${String(str).replace(/"/g, '""')}"`;
                 return [
                   escapeCSV(item.itemCode), escapeCSV(item.itemName), escapeCSV(item.spec),
@@ -978,7 +896,6 @@
           const renderDashboard = () => {
               const { funds, totalFunds, totalQty, radar, age, restockList, clearanceBreakdown } = dashboardData;
               const isQtyMode = appliedSettings.coreMetric === 'qty';
-              
               const totalHealthMetric = isQtyMode ? totalQty : totalFunds;
               const maxAgeMetric = Math.max(...age.map(a => isQtyMode ? a.qty : a.fund), 1);
 
@@ -1049,7 +966,6 @@
                               <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
                                  <IconBarChart3 size={20} className="text-indigo-500"/> {isQtyMode ? '库龄分布状态图 (按件数)' : '库龄分布状态图 (按占用资金)'}
                               </h3>
-                              
                               <div className="flex-1 relative mt-2 flex flex-col justify-end min-h-[220px]">
                                   <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-8">
                                       <div className="border-t border-dashed border-slate-200 w-full h-0"></div>
@@ -1057,7 +973,6 @@
                                       <div className="border-t border-dashed border-slate-200 w-full h-0"></div>
                                       <div className="border-t border-slate-300 w-full h-0"></div>
                                   </div>
-
                                   <div className="flex items-end justify-around gap-2 absolute inset-0 pb-8 z-10">
                                       {age.map((a, i) => {
                                           const currentMetric = isQtyMode ? a.qty : a.fund;
@@ -1071,11 +986,9 @@
                                                   <div className="flex justify-between w-full gap-4 mt-1"><span className="text-slate-400">预估资金:</span> <span className="font-bold text-amber-300">{a.fund > 0 ? `¥${a.fund.toLocaleString(undefined, {maximumFractionDigits:0})}` : '未知'}</span></div>
                                                   <div className="absolute top-full w-0 h-0 border-4 border-transparent border-t-slate-800"></div>
                                               </div>
-                                              
                                               <div className="text-[10px] font-bold text-slate-500 mb-1.5 opacity-0 group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-300">
                                                   {a.count}款
                                               </div>
-                                              
                                               <div 
                                                   className="w-full max-w-[42px] rounded-t-md transition-all duration-700 ease-out shadow-sm relative overflow-hidden" 
                                                   style={{height: `max(4px, ${heightPct}%)`, backgroundColor: a.color, opacity: 0.85}}
@@ -1085,7 +998,6 @@
                                           </div>
                                       )})}
                                   </div>
-
                                   <div className="flex justify-around pt-2 z-10 relative">
                                       {age.map((a, i) => (
                                           <div key={i} className="flex flex-col items-center w-full">
@@ -1150,12 +1062,10 @@
                                           if(viewData.length === 0) return <p className="text-sm text-slate-400 text-center py-10">🎉 当前无积压款式</p>;
                                           
                                           const maxVal = Math.max(...viewData.map(x => isQtyMode ? x.totalQty : x.totalFund));
-                                          
                                           return viewData.map((item, i) => {
                                               const totalVal = isQtyMode ? item.totalQty : item.totalFund;
                                               const warningVal = isQtyMode ? item.warningQty : item.warningFund;
                                               const deadVal = isQtyMode ? item.deadQty : item.deadFund;
-                                              
                                               const pctWarning = totalVal > 0 ? (warningVal / totalVal) * 100 : 0;
                                               const pctDead = totalVal > 0 ? (deadVal / totalVal) * 100 : 0;
                                               const pctTotal = maxVal > 0 ? (totalVal / maxVal) * 100 : 0;
@@ -1169,14 +1079,12 @@
                                                               {isQtyMode && <span className="text-[10px] text-slate-500 ml-0.5">件</span>}
                                                           </div>
                                                       </div>
-                                                      
                                                       <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden flex">
                                                           <div className="h-full flex transition-all duration-500" style={{width: `${pctTotal}%`}}>
                                                               {pctWarning > 0 && <div className="bg-amber-400 h-full" style={{width: `${pctWarning}%`}}></div>}
                                                               {pctDead > 0 && <div className="bg-rose-500 h-full" style={{width: `${pctDead}%`}}></div>}
                                                           </div>
                                                       </div>
-
                                                       <div className="flex justify-between text-[9px] text-slate-400 mt-0.5">
                                                           <div className="flex gap-2">
                                                               {warningVal > 0 && <span className="text-amber-600 font-medium">轻度: {isQtyMode ? warningVal.toLocaleString() : `¥${warningVal.toFixed(0)}`}</span>}
@@ -1198,8 +1106,6 @@
 
           return (
             <div className="h-screen w-screen bg-slate-50 flex font-sans text-slate-800 overflow-hidden relative">
-              
-              {/* --- 全局 Toast 提示 --- */}
               {toast.show && (
                   <div className={`fixed top-4 right-4 z-50 flex items-center gap-2.5 px-5 py-3.5 rounded-xl shadow-lg border animate-slide-in-right ${
                       toast.type === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-800' :
@@ -1211,7 +1117,6 @@
                   </div>
               )}
 
-              {/* --- 左侧设置边栏 --- */}
               <div className={`bg-white border-r border-slate-200 transition-all duration-300 flex flex-col shadow-sm z-10 shrink-0 overflow-hidden ${isSidebarOpen ? 'w-[320px]' : 'w-0'}`}>
                 <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0 bg-blue-50/50">
                   <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
@@ -1221,8 +1126,6 @@
                 </div>
                 
                 <div className="px-4 py-4 overflow-y-auto flex-1 space-y-4 custom-scrollbar">
-                  
-                  {/* --- 新手指南说明面板 --- */}
                   <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-md overflow-hidden mb-2 text-white">
                       <button onClick={() => setShowUserGuide(!showUserGuide)} className="w-full px-3 py-2.5 flex items-center justify-between hover:bg-white/10 transition-colors">
                           <div className="flex items-center gap-2">
@@ -1238,7 +1141,6 @@
                               <p><strong className="text-amber-300">③ 补全在途：</strong>通过右上角【补在途表】，自动减去在途重算风险。</p>
                               <p><strong className="text-amber-300">④ 参数生效：</strong>每次修改下方策略后，需点击底部【保存参数并重算】。</p>
                               <p><strong className="text-amber-300">⑤ 智能凑柜：</strong>计算完刚需后，系统先将不足32桶的优先补齐，最后再将整柜空余塞给A/B类。</p>
-                              
                               <div className="mt-3 pt-3 border-t border-white/20 border-dashed">
                                   <p className="font-bold text-blue-100 mb-1.5 flex items-center gap-1"><IconCalculator size={12}/> 【核心补货推演原理】</p>
                                   <ul className="list-disc pl-4 space-y-1.5 text-white/80">
@@ -1252,7 +1154,6 @@
                       )}
                   </div>
 
-                  {/* --- ABC 类别说明面板 --- */}
                   <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
                       <button onClick={() => setShowAbcGuide(!showAbcGuide)} className="w-full bg-slate-100 px-3 py-2.5 flex items-center justify-between hover:bg-slate-200 transition-colors">
                           <div className="flex items-center gap-2">
@@ -1264,7 +1165,7 @@
                       {showAbcGuide && (
                           <div className="p-3 space-y-3 border-t border-slate-200 bg-white">
                               <div>
-                                  <label className="block text-[11px] font-bold text-slate-700 mb-1" title="切换后将同时改变看板呈现数据与ABC等级划分规则">核心分析视角 (全局联动)</label>
+                                  <label className="block text-[11px] font-bold text-slate-700 mb-1">核心分析视角 (全局联动)</label>
                                   <select name="coreMetric" value={draftSettings.coreMetric} onChange={handleSettingChange} className="w-full border border-blue-200 rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none bg-blue-50 text-blue-800 font-medium">
                                       <option value="qty">以【库存件数/销量】为主 (默认)</option>
                                       <option value="revenue">以【占用资金/销售额】为主</option>
@@ -1287,7 +1188,6 @@
                       )}
                   </div>
 
-                  {/* --- 全局供应链参数 (装箱与货柜) --- */}
                   <div className="bg-white border border-blue-100 rounded-xl shadow-sm overflow-hidden">
                     <div className="bg-blue-50/50 px-3 py-2.5 border-b border-blue-50 flex items-center gap-2">
                       <IconPackage size={16} className="text-blue-600" />
@@ -1295,22 +1195,21 @@
                     </div>
                     <div className="p-3 grid grid-cols-2 gap-3 bg-white">
                       <div>
-                        <label className="block text-[11px] font-bold text-purple-700 mb-0.5 truncate" title="单个型号下单必须是此数字的倍数">单品装箱数(倍数)</label>
+                        <label className="block text-[11px] font-bold text-purple-700 mb-0.5 truncate">单品装箱数(倍数)</label>
                         <input type="number" name="skuMultiplier" value={draftSettings.skuMultiplier} onChange={handleSettingChange} className="w-full border border-purple-300 rounded px-2 py-1.5 text-sm bg-purple-50 focus:ring-2 focus:ring-purple-500 outline-none font-bold" />
                       </div>
                       <div>
-                        <label className="block text-[11px] font-bold text-purple-700 mb-0.5 truncate" title="系统会自动补足加项直到填满货柜">整柜容量(桶/加仑)</label>
+                        <label className="block text-[11px] font-bold text-purple-700 mb-0.5 truncate">整柜容量(桶/加仑)</label>
                         <input type="number" name="containerSize" value={draftSettings.containerSize} onChange={handleSettingChange} className="w-full border border-purple-300 rounded px-2 py-1.5 text-sm bg-purple-50 focus:ring-2 focus:ring-purple-500 outline-none font-bold" />
                       </div>
                       <div>
-                        <label className="block text-[11px] font-medium text-slate-700 mb-0.5 truncate" title="海运+报关+内陆总耗时">海外提前期 L(天)</label>
+                        <label className="block text-[11px] font-medium text-slate-700 mb-0.5 truncate">海外提前期 L(天)</label>
                         <input type="number" name="leadTime" value={draftSettings.leadTime} onChange={handleSettingChange} className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
                       </div>
                       <div>
-                        <label className="block text-[11px] font-medium text-slate-700 mb-0.5 truncate" title="应对船期延误等风险">安全缓冲期 SS(天)</label>
+                        <label className="block text-[11px] font-medium text-slate-700 mb-0.5 truncate">安全缓冲期 SS(天)</label>
                         <input type="number" name="safetyDays" value={draftSettings.safetyDays} onChange={handleSettingChange} className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
                       </div>
-                      
                       <div className="col-span-2 pt-1 border-t border-slate-100">
                         <label className="block text-[11px] font-bold text-slate-700 mb-1.5">各分类期望备货周期 (天)</label>
                         <div className="grid grid-cols-3 gap-2">
@@ -1331,7 +1230,6 @@
                     </div>
                   </div>
 
-                  {/* --- 需求预测算法配置 --- */}
                   <div className="bg-white border border-indigo-100 rounded-xl shadow-sm overflow-hidden mt-4">
                       <button onClick={() => setShowAlgoSettings(!showAlgoSettings)} className="w-full bg-indigo-50/50 px-3 py-2.5 flex items-center justify-between hover:bg-indigo-100/50 transition-colors border-b border-indigo-50">
                           <div className="flex items-center gap-2">
@@ -1349,7 +1247,6 @@
                                       <option value="weighted">多段加权 (近期权重更高)</option>
                                   </select>
                               </div>
-                              
                               {draftSettings.demandCalcMethod === 'weighted' && (
                                   <div className="pt-2 border-t border-slate-100">
                                       <label className="block text-[11px] font-bold text-indigo-700 mb-2">销量阶段权重分配 (%)</label>
@@ -1363,15 +1260,14 @@
                                               <input type="number" name="weight90d" value={draftSettings.weight90d} onChange={handleSettingChange} className="w-full border border-indigo-200 rounded px-1 py-1 text-xs text-center focus:ring-2 focus:ring-indigo-500" />
                                           </div>
                                           <div className="flex-1">
-                                              <p className="text-[9px] text-slate-500 mb-0.5 text-center">>90天</p>
+                                              <p className="text-[9px] text-slate-500 mb-0.5 text-center">&gt;90天</p>
                                               <input type="number" name="weightOlder" value={draftSettings.weightOlder} onChange={handleSettingChange} className="w-full border border-indigo-200 rounded px-1 py-1 text-xs text-center focus:ring-2 focus:ring-indigo-500" />
                                           </div>
                                       </div>
                                   </div>
                               )}
-                              
                               <div className="pt-2 border-t border-slate-100">
-                                  <label className="block text-[11px] font-bold text-indigo-700 mb-1" title="如果某型号频次极低，将被判定为工程偶然单，削减其日均需求防爆仓">工程大单过滤 (最低频次)</label>
+                                  <label className="block text-[11px] font-bold text-indigo-700 mb-1">工程大单过滤 (最低频次)</label>
                                   <div className="flex items-center gap-2">
                                       <input type="number" name="minOrderFreq" value={draftSettings.minOrderFreq} onChange={handleSettingChange} className="w-20 border border-slate-300 rounded px-2 py-1 text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-700" />
                                       <span className="text-[10px] text-slate-500">次 / 周期</span>
@@ -1385,11 +1281,11 @@
                     <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">系统时间基准</h3>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="block text-[11px] font-bold text-indigo-700 mb-0.5 truncate" title="ERP导出【总销量】的对应时间跨度">总销量周期(天)</label>
+                        <label className="block text-[11px] font-bold text-indigo-700 mb-0.5 truncate">总销量周期(天)</label>
                         <input type="number" name="basePeriod" value={draftSettings.basePeriod} onChange={handleSettingChange} className="w-full border border-indigo-300 rounded px-2 py-1 text-sm bg-indigo-50 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-900" />
                       </div>
                       <div>
-                        <label className="block text-[11px] font-medium text-slate-700 mb-0.5 truncate" title="数据导出日期">数据基准日</label>
+                        <label className="block text-[11px] font-medium text-slate-700 mb-0.5 truncate">数据基准日</label>
                         <input type="date" name="endDate" value={draftSettings.endDate} onChange={handleSettingChange} className="w-full border border-slate-300 rounded px-1.5 py-1 text-[11px] focus:ring-2 focus:ring-slate-400 outline-none" />
                       </div>
                     </div>
@@ -1410,7 +1306,6 @@
                       </div>
                     </div>
                   </div>
-
                 </div>
                 
                 <div className="p-3 border-t border-slate-100 bg-slate-50 shrink-0">
@@ -1421,14 +1316,12 @@
                 </div>
               </div>
 
-              {/* --- 右侧主工作区 --- */}
               <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/50">
                 <header className="bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0 z-20 relative">
                   <div className="flex items-center gap-3">
                     <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className={`text-slate-500 hover:text-blue-600 transition-all duration-300 bg-slate-100 p-1.5 rounded-md border border-slate-200 ${!isSidebarOpen ? 'rotate-180' : ''}`} title="收起/展开左侧设置">
                       <IconPanelLeft size={18} />
                     </button>
-                    
                     {rawData.length > 0 && (
                         <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 ml-4 shadow-inner">
                             <button onClick={()=>setViewMode('table')} className={`px-4 py-1.5 text-xs font-bold rounded-md flex items-center gap-1.5 transition-all duration-300 ${viewMode === 'table' ? 'bg-white shadow-sm text-blue-700 border border-slate-200/50' : 'text-slate-500 hover:text-slate-700'}`}>
@@ -1450,10 +1343,10 @@
                           <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 px-3 py-1.5 rounded font-bold transition-colors text-xs border border-slate-200 shadow-sm">
                             <IconUpload size={14} /> 重导主表
                           </button>
-                          <button onClick={() => onOrderFileInputRef.current?.click()} className="flex items-center gap-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-1.5 rounded font-bold transition-colors text-xs border border-blue-100 shadow-sm" title="若主数据无在途，可单独补充导入在途表">
+                          <button onClick={() => onOrderFileInputRef.current?.click()} className="flex items-center gap-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-1.5 rounded font-bold transition-colors text-xs border border-blue-100 shadow-sm">
                             <IconPackage size={14} /> 补在途表
                           </button>
-                          <button onClick={() => priceFileInputRef.current?.click()} className="flex items-center gap-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 px-3 py-1.5 rounded font-bold transition-colors text-xs border border-amber-100 shadow-sm" title="若主数据无销售额，可单独补充导入单价表">
+                          <button onClick={() => priceFileInputRef.current?.click()} className="flex items-center gap-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 px-3 py-1.5 rounded font-bold transition-colors text-xs border border-amber-100 shadow-sm">
                             <IconDollarSign size={14} /> 补单价表
                           </button>
                       </div>
@@ -1500,7 +1393,6 @@
                                         <li><strong className="text-slate-700">销售指标：</strong>销量 (周期内总发货数)</li>
                                     </ul>
                                 </div>
-
                                 <div className="bg-slate-50 p-5 rounded-xl border border-slate-100 shadow-sm">
                                     <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-3">
                                         <span className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs">2</span>
@@ -1519,8 +1411,6 @@
                      renderDashboard()
                   ) : (
                     <div className="flex-1 flex flex-col w-full mx-auto space-y-4 overflow-hidden p-5 animate-fade-in">
-                      
-                      {/* --- 顶部指标卡片 --- */}
                       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 shrink-0">
                         <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-3 rounded-xl border border-blue-800 shadow-md flex items-center gap-3 text-white relative overflow-hidden">
                           <div className="absolute right-0 top-0 w-24 h-24 bg-white/10 rounded-full -mr-8 -mt-8 pointer-events-none"></div>
@@ -1597,24 +1487,17 @@
                                 <SortableHeader label="涂料型号" sortKey="itemCode" />
                                 <SortableHeader label="名称与规格" sortKey="itemName" />
                                 <SortableHeader label="层级" sortKey="classLabel" />
-                                
-                                <SortableHeader label="日均发货" sortKey="d" align="right" title="预测日均销量" />
-                                
-                                <SortableHeader label="公司库存" sortKey="currentStock" align="right" className="bg-slate-100 border-l border-slate-200 text-slate-700" title="仓库实存" />
-                                <SortableHeader label="实物周转" sortKey="physicalCoverDays" align="right" className="bg-slate-100 text-slate-700" title="仅按现有库存计算的可售天数" />
-                                
+                                <SortableHeader label="日均发货" sortKey="d" align="right" />
+                                <SortableHeader label="公司库存" sortKey="currentStock" align="right" className="bg-slate-100 border-l border-slate-200 text-slate-700" />
+                                <SortableHeader label="实物周转" sortKey="physicalCoverDays" align="right" className="bg-slate-100 text-slate-700" />
                                 <SortableHeader label="采购在途" sortKey="onOrderStock" align="right" className="bg-emerald-50 text-emerald-700 border-l border-emerald-100" />
                                 <SortableHeader label="可用总库" sortKey="availableStock" align="right" className="bg-blue-50 text-blue-900 border-l border-blue-100 font-bold" />
-                                <SortableHeader label="总库周转" sortKey="totalCoverDays" align="right" className="bg-blue-50 text-blue-800" title="含在途库存的可售天数" />
-                                
+                                <SortableHeader label="总库周转" sortKey="totalCoverDays" align="right" className="bg-blue-50 text-blue-800" />
                                 <SortableHeader label="系统状态" sortKey="promoLevel" align="center" className="bg-rose-50/50 border-l border-rose-100" />
-                                
-                                <SortableHeader label="红线 / 目标位" sortKey="rop" align="right" className="bg-red-50 text-red-700 font-bold border-l border-red-100" title="防断货红线 / 理想备货总水位" />
-                                
-                                <SortableHeader label="刚需量" sortKey="basePurchase" align="right" className="bg-purple-50 text-purple-800" title="目标水位减去可用总库，并按箱规取整" />
-                                <SortableHeader label="凑柜追加" sortKey="padQty" align="right" className="bg-purple-100/50 text-purple-600" title="为了填满集装箱被自动分配的追加数量" />
-                                <SortableHeader label="最终下单" sortKey="actualPurchase" align="right" className="bg-purple-100 text-purple-900 font-bold border-r border-purple-200" title="实际发送给供应商的订单总量（必定是箱规的倍数）" />
-                                
+                                <SortableHeader label="红线 / 目标位" sortKey="rop" align="right" className="bg-red-50 text-red-700 font-bold border-l border-red-100" />
+                                <SortableHeader label="刚需量" sortKey="basePurchase" align="right" className="bg-purple-50 text-purple-800" />
+                                <SortableHeader label="凑柜追加" sortKey="padQty" align="right" className="bg-purple-100/50 text-purple-600" />
+                                <SortableHeader label="最终下单" sortKey="actualPurchase" align="right" className="bg-purple-100 text-purple-900 font-bold border-r border-purple-200" />
                                 <SortableHeader label="预估资金" sortKey="initialCapital" align="right" className="bg-amber-50/30 text-amber-800" />
                               </tr>
                             </thead>
@@ -1625,7 +1508,6 @@
                                   <td className="py-2.5 px-2 font-bold text-slate-800">
                                       {item.itemName} <span className="text-slate-400 font-normal ml-1">({item.spec})</span>
                                   </td>
-                                  
                                   <td className="py-2.5 px-2">
                                     <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold shadow-sm border
                                         ${item.abcClass === 'A' ? 'bg-blue-50 text-blue-700 border-blue-200' : 
@@ -1634,12 +1516,7 @@
                                         {item.classLabel.split(' ')[0]}
                                     </span>
                                   </td>
-                                  
-                                  <td className="py-2.5 px-2 text-right text-slate-800 font-bold">
-                                      {item.d.toFixed(1)}
-                                  </td>
-                                  
-                                  {/* --- 核心修改：双轴展示 --- */}
+                                  <td className="py-2.5 px-2 text-right text-slate-800 font-bold">{item.d.toFixed(1)}</td>
                                   <td className="py-2.5 px-2 text-right font-medium text-slate-700 border-l border-slate-100 bg-slate-50/30">
                                       {item.currentStock.toLocaleString()}
                                       {item.immediateRisk && <span className="ml-1 text-red-500 font-bold text-[10px]" title="实物库存已破红线，若无在途将断货!">(危)</span>}
@@ -1647,18 +1524,15 @@
                                   <td className={`py-2.5 px-2 text-right font-mono bg-slate-50/30 ${item.immediateRisk ? 'text-red-600 font-bold' : 'text-slate-500'}`}>
                                     {item.physicalCoverDays === Infinity ? '无动销' : Math.round(item.physicalCoverDays)}
                                   </td>
-
                                   <td className="py-2.5 px-2 text-right text-emerald-600 font-bold bg-emerald-50/30 border-l border-emerald-50">
                                       {item.onOrderStock > 0 ? item.onOrderStock.toLocaleString() : <span className="text-emerald-200">-</span>}
                                   </td>
-
                                   <td className={`py-2.5 px-2 text-right font-bold bg-blue-50/50 border-l border-blue-100 shadow-inner ${item.isCritical ? 'text-red-600' : 'text-blue-900'}`}>
                                     {item.availableStock.toLocaleString()}
                                   </td>
                                   <td className={`py-2.5 px-2 text-right font-mono bg-blue-50/30 ${item.isCritical ? 'text-red-600 font-bold' : 'text-blue-800'}`}>
                                     {item.totalCoverDays === Infinity ? '无动销' : Math.round(item.totalCoverDays)}
                                   </td>
-                                  
                                   <td className="py-2.5 px-2 text-center text-[10px] border-l border-rose-50">
                                     {item.promoLevel === 3 ? (
                                       <span className="inline-block px-2 py-0.5 rounded font-bold bg-slate-200 text-slate-700 border border-slate-300">{item.promoAction}</span>
@@ -1670,25 +1544,21 @@
                                       <span className="text-slate-400 font-medium">{item.promoAction}</span>
                                     )}
                                   </td>
-
                                   <td className="py-2.5 px-2 text-right font-bold text-rose-600 bg-rose-50/50 border-l border-rose-100/50 shadow-inner">
                                     {item.d > 0 && !item.isExcludedQt ? (
                                         <div className="flex items-center justify-end gap-1.5">
                                             <span>{item.rop.toLocaleString()}</span>
                                             <span className="text-[11px] text-slate-400 font-normal">/</span>
-                                            <span className="text-slate-600 font-medium" title="该品类目标备货总水位">{item.targetStock.toLocaleString()}</span>
+                                            <span className="text-slate-600 font-medium">{item.targetStock.toLocaleString()}</span>
                                         </div>
                                     ) : '-'}
                                   </td>
-                                  
                                   <td className="py-2.5 px-2 text-right font-medium text-purple-700 bg-purple-50/30 border-l border-purple-50/50">
                                     {item.basePurchase > 0 ? item.basePurchase.toLocaleString() : '-'}
                                   </td>
-
                                   <td className="py-2.5 px-2 text-right font-bold text-purple-500 bg-purple-50/50">
                                     {item.padQty > 0 ? `+${item.padQty.toLocaleString()}` : <span className="text-slate-300 opacity-50">-</span>}
                                   </td>
-
                                   <td className={`py-2.5 px-2 text-right font-bold border-r border-purple-100/80 ${item.isExcludedQt ? 'bg-slate-50 text-slate-400' : (item.needsRestock ? 'bg-purple-100 text-purple-900 shadow-sm' : 'bg-slate-50 text-slate-300')}`}>
                                     {item.isExcludedQt ? (
                                       <span className="text-slate-400 text-[11px] font-normal">停补(建议分装)</span>
@@ -1701,7 +1571,6 @@
                                       ) : '暂无需补'
                                     ) : '-')}
                                   </td>
-                                  
                                   <td className="py-2.5 px-2 text-right font-mono font-medium text-amber-700 bg-amber-50/20">
                                     {item.initialCapital > 0 ? `¥${item.initialCapital.toLocaleString(undefined, {maximumFractionDigits:0})}` : '-'}
                                   </td>
@@ -1733,11 +1602,8 @@
         .custom-scrollbar::-webkit-scrollbar-track { background: #f8fafc; border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        
-        /* 动画 */
         .animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
         .animate-slide-in-right { animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     </style>

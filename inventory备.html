@@ -16,7 +16,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useMemo, useRef } = React;
+        const { useState, useMemo, useRef, useEffect } = React;
 
         // --- 图标组件集合 ---
         const IconSettings = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>;
@@ -45,6 +45,7 @@
         const IconCheckCircle = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>;
         const IconPlus = ({ size = 16, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>;
         const IconTrash = ({ size = 14, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>;
+        const IconLayers = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 12 12 17 22 12"></polyline><polyline points="2 17 12 22 22 17"></polyline></svg>;
 
         const App = () => {
           const initialSettings = {
@@ -70,6 +71,7 @@
 
             abcThresholdA: 50,
             abcThresholdB: 80,
+            abcThresholdC: 95,
 
             basePeriod: 180,       
             endDate: '2026-04-29',
@@ -88,12 +90,16 @@
           const [uploadError, setUploadError] = useState(''); 
           
           const [sortConfig, setSortConfig] = useState({ key: 'calcRevenue', direction: 'desc' }); 
+          const [vSortConfig, setVSortConfig] = useState({ key: 'restockCapitalAB', direction: 'desc' });
           
           const [showGuide, setShowGuide] = useState(false); 
           const [showAbcGuide, setShowAbcGuide] = useState(false);
           const [showAlgoSettings, setShowAlgoSettings] = useState(true); 
           const [showSupplierSettings, setShowSupplierSettings] = useState(false);
           const [newSupplierName, setNewSupplierName] = useState(''); 
+          const [manualOverrides, setManualOverrides] = useState({});
+          
+          const [versionStrategies, setVersionStrategies] = useState({});
 
           const [parsedHeadersInfo, setParsedHeadersInfo] = useState(null);
           const [viewMode, setViewMode] = useState('table');
@@ -150,6 +156,11 @@
               }));
               setNewSupplierName('');
               showToastMessage(`已为您添加专属供应商：${name}`, 'success');
+          };
+
+          const handleClassOverride = (model, newClass) => {
+              setManualOverrides(prev => ({ ...prev, [model]: newClass }));
+              showToastMessage(`已将 [${model}] 手动强制调整为 ${newClass}类`, 'success');
           };
 
           const handleApplySettings = () => {
@@ -367,6 +378,8 @@
               } else {
                 setRawData(result.data);
                 setParsedHeadersInfo(result.matchedColumns);
+                setManualOverrides({});
+                setVersionStrategies({}); 
                 setViewMode('table');
                 
                 showToastMessage('数据载入成功，引擎已根据您的配置完成初次运算！', 'success');
@@ -523,41 +536,37 @@
                 runningRev += item.calcRevenue;
                 const cumPct = totalCalcRevenue > 0 ? runningRev / totalCalcRevenue : 0;
                 
-                let abcClass = 'C', classLabel = 'C类 (先咨询交付时间)', isCat1 = false; 
+                let calcAbcClass = 'D'; 
                 const thresholdA = appliedSettings.abcThresholdA / 100;
                 const thresholdB = appliedSettings.abcThresholdB / 100;
+                const thresholdC = appliedSettings.abcThresholdC / 100;
 
-                if (cumPct <= thresholdA) { abcClass = 'A'; classLabel = 'A类 (备货, 5天内发货)'; isCat1 = true; } 
-                else if (cumPct <= thresholdB) { abcClass = 'B'; classLabel = 'B类 (等生产, 10天内发货)'; isCat1 = false; }
+                if (cumPct <= thresholdA) { calcAbcClass = 'A'; } 
+                else if (cumPct <= thresholdB) { calcAbcClass = 'B'; }
+                else if (cumPct <= thresholdC) { calcAbcClass = 'C'; }
                 
-                return {
-                    ...item, abcClass, classLabel, isCat1,
-                    rop: isCat1 ? item.rop : 0,
-                    oq: isCat1 ? item.oq : 0,
-                    actualPurchase: isCat1 ? item.actualPurchase : 0,
-                    initialCapital: isCat1 ? item.initialCapital : 0,
-                    needsRestock: isCat1 ? item.needsRestock : false
-                };
+                const abcClass = manualOverrides[item.model] || calcAbcClass;
+                let classLabel = '';
+
+                if (abcClass === 'A') { classLabel = 'A类 (公司备货, 5天内交付)'; } 
+                else if (abcClass === 'B') { classLabel = 'B类 (供应商备货, 8天内交付)'; }
+                else if (abcClass === 'C') { classLabel = 'C类 (等订单生产, 15天内交付)'; }
+                else if (abcClass === 'D') { classLabel = 'D类 (沟通交期)'; }
+                
+                return { ...item, abcClass, calcAbcClass, classLabel };
             });
 
             return finalData;
-          }, [rawData, appliedSettings]); 
+          }, [rawData, appliedSettings, manualOverrides]); 
 
           const filteredData = useMemo(() => {
             if (!searchTerm.trim()) return processedData;
-            
             const keywords = searchTerm.toLowerCase().trim().split(/\s+/);
-            
             return processedData.filter(item => {
                 const combinedStr = [
-                    item.model || '',
-                    item.vCode || '',
-                    item.versionName || '',
-                    item.supplier || ''
+                    item.model || '', item.vCode || '', item.versionName || '', item.supplier || ''
                 ].join(' ').toLowerCase();
-                
                 const cleanCombinedStr = combinedStr.replace(/[\s\-_]/g, '');
-
                 return keywords.every(kw => {
                     const cleanKw = kw.replace(/[\s\-_]/g, '');
                     return combinedStr.includes(kw) || cleanCombinedStr.includes(cleanKw);
@@ -572,7 +581,6 @@
                 let valA = a[sortConfig.key]; let valB = b[sortConfig.key];
                 if (valA === undefined) valA = 0;
                 if (valB === undefined) valB = 0;
-
                 if (typeof valA === 'string') valA = valA.toLowerCase();
                 if (typeof valB === 'string') valB = valB.toLowerCase();
                 if (valA === valB) return 0;
@@ -606,24 +614,49 @@
             );
           };
 
+          const requestVSort = (key) => {
+            let direction = 'desc';
+            if (vSortConfig.key === key && vSortConfig.direction === 'desc') direction = 'asc';
+            setVSortConfig({ key, direction });
+          };
+
+          const SortableVHeader = ({ label, sortKey, align = "left", className = "", title = "" }) => {
+            const isActive = vSortConfig.key === sortKey;
+            return (
+                <th className={`py-2.5 px-4 font-bold text-slate-500 border-b cursor-pointer hover:bg-slate-200 transition-colors select-none ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'} ${className}`} onClick={() => requestVSort(sortKey)} title={title}>
+                    <div className={`flex items-center gap-1 ${align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : 'justify-start'}`}>
+                        {label}
+                        <span className="text-slate-400 shrink-0">
+                            {isActive ? (vSortConfig.direction === 'asc' ? <IconChevronUp size={12}/> : <IconChevronDown size={12}/>) : <IconChevronsUpDown size={12} className="opacity-30" />}
+                        </span>
+                    </div>
+                </th>
+            );
+          };
+
           const metrics = useMemo(() => {
-            let totalA = 0, totalB = 0, totalC = 0, totalCapital = 0, totalStock = 0;
+            let totalA = 0, totalB = 0, totalC = 0, totalD = 0, totalCapital = 0, totalStock = 0;
             let totalOverstockItems = 0;
             processedData.forEach(item => {
-              if (item.abcClass === 'A') { totalA++; totalCapital += item.initialCapital; totalStock += item.actualPurchase; }
+              if (item.abcClass === 'A') totalA++;
               if (item.abcClass === 'B') totalB++;
               if (item.abcClass === 'C') totalC++;
+              if (item.abcClass === 'D') totalD++;
               if (item.promoLevel > 0) totalOverstockItems++;
+
+              if (item.needsRestock) {
+                  totalCapital += item.initialCapital;
+                  totalStock += item.actualPurchase;
+              }
             });
-            return { totalA, totalB, totalC, totalCapital, totalStock, totalItems: processedData.length, totalOverstockItems };
+            return { totalA, totalB, totalC, totalD, totalCapital, totalStock, totalItems: processedData.length, totalOverstockItems };
           }, [processedData]);
           
           const dashboardData = useMemo(() => {
              let healthyFunds = 0, warningFunds = 0, deadFunds = 0;
              let healthyQty = 0, warningQty = 0, deadQty = 0;
-             let aSafe = 0, aRestock = 0;
-             let aRestockCapital = 0, aRestockQty = 0;
-             
+             let safe = 0, restock = 0;
+             let restockCapital = 0, restockQty = 0;
              let under10mQty = 0, under10mFund = 0;
              
              let age30 = { count: 0, qty: 0, fund: 0, name: '≤30天(极速)', color: '#10b981' };
@@ -632,6 +665,8 @@
              let age360 = { count: 0, qty: 0, fund: 0, name: '181-360天(轻滞销)', color: '#f59e0b' };
              let ageOver = { count: 0, qty: 0, fund: 0, name: '>360天(重度)', color: '#ef4444' };
              let ageDead = { count: 0, qty: 0, fund: 0, name: '无动销', color: '#94a3b8' };
+
+             const versionStats = {};
 
              processedData.forEach(item => {
                  const fund = item.currentStock * item.unitPrice;
@@ -646,14 +681,12 @@
                  else if (item.promoLevel === 1) { warningFunds += fund; warningQty += qty; }
                  else { deadFunds += fund; deadQty += qty; }
 
-                 if (item.abcClass === 'A') {
-                     if (item.needsRestock) {
-                         aRestock++;
-                         aRestockCapital += item.initialCapital;
-                         aRestockQty += item.actualPurchase;
-                     } else {
-                         aSafe++;
-                     }
+                 if (item.needsRestock) {
+                     restock++;
+                     restockCapital += item.initialCapital;
+                     restockQty += item.actualPurchase;
+                 } else {
+                     safe++;
                  }
 
                  if (item.currentStock > 0) {
@@ -664,10 +697,41 @@
                      else if (item.stockCoverDays > 30) { age90.count++; age90.qty+=qty; age90.fund+=fund; }
                      else { age30.count++; age30.qty+=qty; age30.fund+=fund; }
                  }
+
+                 const vName = item.versionName || '无归属系列';
+                 if (!versionStats[vName]) {
+                     versionStats[vName] = { 
+                         name: vName, count: 0, A: 0, B: 0, C: 0, D: 0, 
+                         restockQty: 0, restockCapital: 0, restockCapitalAB: 0, restockItems: 0,
+                         sales: 0, revenue: 0, stockQty: 0, deadCapital: 0,
+                         suppliers: new Set()
+                     };
+                 }
+                 versionStats[vName].count++;
+                 versionStats[vName].sales += item.sales;
+                 versionStats[vName].revenue += item.revenue;
+                 versionStats[vName].stockQty += item.currentStock;
+                 if (item.supplier && item.supplier !== '-') {
+                     versionStats[vName].suppliers.add(item.supplier);
+                 }
+                 if (item.promoLevel > 0) {
+                     versionStats[vName].deadCapital += (item.currentStock * item.unitPrice);
+                 }
+                 if (['A', 'B', 'C', 'D'].includes(item.abcClass)) {
+                     versionStats[vName][item.abcClass]++;
+                 }
+                 if (item.needsRestock) {
+                     versionStats[vName].restockItems++;
+                     versionStats[vName].restockQty += item.actualPurchase;
+                     versionStats[vName].restockCapital += item.initialCapital;
+                     if (item.abcClass === 'A' || item.abcClass === 'B') {
+                         versionStats[vName].restockCapitalAB += item.initialCapital;
+                     }
+                 }
              });
 
              const restockList = processedData
-                 .filter(i => i.isCat1 && i.needsRestock)
+                 .filter(i => i.needsRestock)
                  .sort((a,b) => b.actualPurchase - a.actualPurchase)
                  .slice(0, 5);
 
@@ -677,6 +741,11 @@
                  .sort((a,b) => b.deadFund - a.deadFund)
                  .slice(0, 5);
 
+             const versionStatsList = Object.values(versionStats).map(v => ({
+                 ...v,
+                 supplierStr: v.suppliers.size > 0 ? Array.from(v.suppliers).join(', ') : '-'
+             }));
+
              return {
                  funds: [
                      { name: `健康流转`, value: healthyFunds, qty: healthyQty, color: '#10b981' },
@@ -684,21 +753,40 @@
                      { name: `重度滞销/死库`, value: deadFunds, qty: deadQty, color: '#f43f5e' }
                  ],
                  totalFunds: healthyFunds + warningFunds + deadFunds,
-                 radar: { safe: aSafe, restock: aRestock, restockCapital: aRestockCapital, restockQty: aRestockQty },
+                 radar: { safe, restock, restockCapital, restockQty },
                  age: [age30, age90, age180, age360, ageOver, ageDead],
                  restockList,
                  clearanceList,
+                 versionStatsList,
                  under10m: { qty: Math.round(under10mQty), fund: Math.round(under10mFund) }
              };
           }, [processedData, appliedSettings]);
 
+          const sortedVersionList = useMemo(() => {
+            if(!dashboardData.versionStatsList) return [];
+            let list = [...dashboardData.versionStatsList];
+            if (vSortConfig !== null) {
+              list.sort((a, b) => {
+                let valA = a[vSortConfig.key] || 0; 
+                let valB = b[vSortConfig.key] || 0;
+                if (typeof valA === 'string') valA = valA.toLowerCase();
+                if (typeof valB === 'string') valB = valB.toLowerCase();
+                if (valA === valB) return 0;
+                if (valA < valB) return vSortConfig.direction === 'asc' ? -1 : 1;
+                if (valA > valB) return vSortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+              });
+            }
+            return list;
+          }, [dashboardData.versionStatsList, vSortConfig]);
+
           const exportToCSV = (exportType = 'all') => {
             let dataToExport = sortedData;
-            let filename = '完整ABC分级计划.csv';
+            let filename = '完整ABCD全盘计划.csv';
 
             if (exportType === 'restock') {
-              dataToExport = sortedData.filter(item => item.needsRestock);
-              filename = 'A类需补货清单.csv';
+              dataToExport = sortedData.filter(item => (item.abcClass === 'A' || item.abcClass === 'B') && item.needsRestock);
+              filename = 'AB类重点补货清单.csv';
             } else if (exportType === 'clearance') {
               dataToExport = sortedData.filter(item => item.promoLevel > 0);
               filename = '滞销清仓建议清单.csv';
@@ -706,11 +794,11 @@
 
             if (dataToExport.length === 0) { alert('当前没有符合条件的导出数据。'); return; }
 
-            const headers = ['版本号', '版本名称', '型号', '供应商', '上市时间', 'ABC分类', '核算销量', '订货频次(次)', '计算算法', '算法日均需求(d)', '核算金额', '物理总库存', '在途库存', '可用总库存', '10米以上', '10米以下', '实际周转(天)', '处理建议', '预估单价', '防断货红线(ROP)', '理论补货量(OQ)', '配置起定量(MOQ)', '实际建议采购量', '实际资金占用'];
+            const headers = ['版本号', '版本名称', '型号', '供应商', '上市时间', 'ABCD分类', '核算销量', '订货频次(次)', '计算算法', '算法日均需求(d)', '核算金额', '物理总库存', '在途库存', '可用总库存', '10米以上', '10米以下', '实际周转(天)', '处理建议', '预估单价', '防断货红线(ROP)', '理论补货量(OQ)', '配置起定量(MOQ)', '实际建议采购量', '实际资金占用'];
             const csvContent = [
               headers.join(','),
               ...dataToExport.map(item => {
-                const coverDaysStr = item.stockCoverDays === Infinity ? '无动销' : (item.stockCoverDays > 0 ? Math.round(item.stockCoverDays).toString() : '0');
+                const coverDaysStr = item.stockCoverDays === Infinity ? '无动销' : (Number(item.stockCoverDays) || 0).toFixed(0);
                 const escapeCSV = (str) => `"${String(str).replace(/"/g, '""')}"`;
                 return [
                   escapeCSV(item.vCode), escapeCSV(item.versionName), escapeCSV(item.model), escapeCSV(item.supplier), escapeCSV(item.launchDate),
@@ -718,8 +806,7 @@
                   Math.round(item.calcSales), item.hasOrderFreq ? item.orderFreqConfig : '-', escapeCSV(item.usedCalcMethod), item.d.toFixed(2), Math.round(item.calcRevenue),
                   item.currentStock, item.onOrderStock, item.availableStock, Math.round(item.stockDetails.over10m || 0), Math.round(item.stockDetails.under10m || 0),
                   coverDaysStr, escapeCSV(item.promoAction), item.unitPrice.toFixed(2), 
-                  item.isCat1 ? item.rop : '-', item.isCat1 ? item.oq : '-',
-                  item.isCat1 ? item.applicableMoq : '-', item.isCat1 ? item.actualPurchase : '-', item.isCat1 ? item.initialCapital : '-'
+                  item.rop, item.oq, item.applicableMoq, item.actualPurchase, item.initialCapital
                 ].join(',');
               })
             ].join('\n');
@@ -733,6 +820,157 @@
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+          };
+
+          const renderVersionBoard = () => {
+              const totalVCount = dashboardData.versionStatsList.length;
+              const totalRestockCapital = dashboardData.radar.restockCapital;
+              
+              let companyCount = 0, supplierCount = 0, orderCount = 0;
+              let companyCapitalAB = 0, supplierCapitalAB = 0, orderCapitalAB = 0;
+
+              sortedVersionList.forEach(v => {
+                  // 核心更新：默认将版本属性定为“供应商备货(8天)”，即 B类策略
+                  const s = versionStrategies[v.name] || '供应商备货(8天)';
+                  if(s === '公司备货(5天)') { companyCount++; companyCapitalAB += v.restockCapitalAB; }
+                  else if(s === '供应商备货(8天)') { supplierCount++; supplierCapitalAB += v.restockCapitalAB; }
+                  else if(s === '订单生产(15天)') { orderCount++; orderCapitalAB += v.restockCapitalAB; }
+              });
+
+              return (
+                  <div className="flex-1 overflow-auto custom-scrollbar bg-slate-50 flex flex-col gap-5 p-5 animate-fade-in">
+                      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 shrink-0">
+                          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
+                              <p className="text-[11px] font-bold text-slate-500 mb-2">解析总版本数</p>
+                              <p className="text-3xl font-bold text-slate-800 leading-none">{totalVCount}</p>
+                          </div>
+                          
+                          <div className="bg-white p-4 rounded-2xl border border-indigo-200 shadow-sm flex flex-col justify-center ring-1 ring-indigo-50 relative overflow-hidden">
+                              <div className="flex justify-between items-center mb-2">
+                                  <p className="text-[11px] font-bold text-indigo-600">🏢 公司备货 (5天)</p>
+                                  <span className="text-lg font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full leading-none">{companyCount}<span className="text-[10px] ml-0.5 font-normal">个</span></span>
+                              </div>
+                              <div className="pt-1 border-t border-indigo-100/50">
+                                  <p className="text-[9px] text-indigo-400 mb-0.5">关联 <span className="font-bold">AB类</span> 资金</p>
+                                  <p className="text-xl font-bold text-indigo-700 leading-none">¥{(companyCapitalAB / 10000).toFixed(2)}<span className="text-xs ml-0.5 font-medium">万</span></p>
+                              </div>
+                          </div>
+
+                          <div className="bg-white p-4 rounded-2xl border border-emerald-200 shadow-sm flex flex-col justify-center relative">
+                              <div className="flex justify-between items-center mb-2">
+                                  <p className="text-[11px] font-bold text-emerald-600">🚚 供应商备货 (8天)</p>
+                                  <span className="text-lg font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full leading-none">{supplierCount}<span className="text-[10px] ml-0.5 font-normal">个</span></span>
+                              </div>
+                              <div className="pt-1 border-t border-emerald-100/50">
+                                  <p className="text-[9px] text-emerald-400 mb-0.5">关联 <span className="font-bold">AB类</span> 资金</p>
+                                  <p className="text-xl font-bold text-emerald-700 leading-none">¥{(supplierCapitalAB / 10000).toFixed(2)}<span className="text-xs ml-0.5 font-medium">万</span></p>
+                              </div>
+                          </div>
+
+                          <div className="bg-white p-4 rounded-2xl border border-amber-200 shadow-sm flex flex-col justify-center relative">
+                              <div className="flex justify-between items-center mb-2">
+                                  <p className="text-[11px] font-bold text-amber-600">⚙️ 订单生产 (15天)</p>
+                                  <span className="text-lg font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full leading-none">{orderCount}<span className="text-[10px] ml-0.5 font-normal">个</span></span>
+                              </div>
+                              <div className="pt-1 border-t border-amber-100/50">
+                                  <p className="text-[9px] text-amber-400 mb-0.5">关联 <span className="font-bold">AB类</span> 资金</p>
+                                  <p className="text-xl font-bold text-amber-700 leading-none">¥{(orderCapitalAB / 10000).toFixed(2)}<span className="text-xs ml-0.5 font-medium">万</span></p>
+                              </div>
+                          </div>
+
+                          <div className="bg-white p-4 rounded-2xl border border-rose-200 shadow-sm flex flex-col justify-center">
+                              <p className="text-[11px] font-bold text-rose-500 mb-2">全盘所有版本采买资金</p>
+                              <div className="pt-1 border-t border-rose-100/50">
+                                  <p className="text-[9px] text-rose-400 mb-0.5">全品类合计</p>
+                                  <p className="text-xl font-bold text-rose-700 leading-none">¥{(totalRestockCapital / 10000).toFixed(2)}<span className="text-xs ml-0.5 font-medium">万</span></p>
+                              </div>
+                          </div>
+                      </div>
+
+                      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col flex-1">
+                          <div className="bg-indigo-50/50 px-5 py-3 border-b border-indigo-100 flex items-center justify-between shrink-0">
+                              <h3 className="text-sm font-bold text-indigo-900 flex items-center gap-2">
+                                  <IconLayers size={18} className="text-indigo-600" />
+                                  📑 版本系列级资产结构与采买分析
+                              </h3>
+                              <span className="text-[10px] font-medium bg-white text-slate-500 px-3 py-1 rounded-md border border-slate-200 shadow-sm">点击表头可对任意列进行多维排序</span>
+                          </div>
+                          <div className="p-0 overflow-auto flex-1 custom-scrollbar">
+                              <table className="w-full text-left border-collapse text-xs whitespace-nowrap">
+                                  <thead className="bg-white sticky top-0 z-10 shadow-sm border-b border-slate-200">
+                                      <tr>
+                                          <th className="py-2.5 px-4 font-bold text-slate-400 border-b">排名</th>
+                                          <SortableVHeader label="版本/系列名称" sortKey="name" className="text-slate-700" />
+                                          <SortableVHeader label="涉及供应商" sortKey="supplierStr" className="text-slate-500 border-r border-slate-100" />
+                                          <th className="py-2.5 px-4 font-bold text-indigo-700 border-b border-r border-slate-100 bg-indigo-50/20" title="可手动设定该版本对经销商宣布的统一交付策略">对公备货属性 (手动设定)</th>
+                                          <SortableVHeader label="总款式数" sortKey="count" align="right" />
+                                          <th className="py-2.5 px-4 font-bold text-slate-500 text-center border-b">ABCD 款式内部占比</th>
+                                          <SortableVHeader label="总销量" sortKey="sales" align="right" />
+                                          <SortableVHeader label="总销售额(¥)" sortKey="revenue" align="right" className="border-r border-slate-100" />
+                                          <SortableVHeader label="物理总库存" sortKey="stockQty" align="right" />
+                                          <SortableVHeader label="滞销积压金(¥)" sortKey="deadCapital" align="right" className="text-rose-700 bg-rose-50/20 border-r border-rose-50" />
+                                          <SortableVHeader label="需补货款数" sortKey="restockItems" align="right" className="text-indigo-700 bg-indigo-50/20" />
+                                          <SortableVHeader label="需采买件数" sortKey="restockQty" align="right" className="text-indigo-700 bg-indigo-50/20" />
+                                          <SortableVHeader label="AB类采买金(¥)" sortKey="restockCapitalAB" align="right" className="text-amber-700 bg-amber-50/50 border-x border-amber-100" title="该版本内属于AB类的必须采买资金" />
+                                          <SortableVHeader label="全盘采买金(¥)" sortKey="restockCapital" align="right" className="text-amber-700 bg-amber-50/20" title="该版本全部款式的总采买资金" />
+                                      </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100">
+                                      {sortedVersionList.map((v, i) => (
+                                          <tr key={i} className="hover:bg-slate-50 transition-colors">
+                                              <td className="py-2.5 px-4 font-bold text-slate-300">#{i + 1}</td>
+                                              <td className="py-2.5 px-4 font-bold text-indigo-800 max-w-[150px] truncate" title={v.name}>{v.name}</td>
+                                              <td className="py-2.5 px-4 text-slate-500 border-r border-slate-50 max-w-[100px] truncate" title={v.supplierStr}>{v.supplierStr}</td>
+                                              
+                                              <td className="py-2.5 px-4 border-r border-slate-50 bg-indigo-50/10">
+                                                  <select
+                                                      value={versionStrategies[v.name] || '供应商备货(8天)'}
+                                                      onChange={(e) => setVersionStrategies(prev => ({...prev, [v.name]: e.target.value}))}
+                                                      className={`appearance-none outline-none cursor-pointer inline-flex items-center px-2 py-1 rounded text-[11px] font-bold shadow-sm border
+                                                          ${(versionStrategies[v.name] || '供应商备货(8天)') === '公司备货(5天)' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 
+                                                            (versionStrategies[v.name] || '供应商备货(8天)') === '供应商备货(8天)' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 
+                                                            (versionStrategies[v.name] || '供应商备货(8天)') === '订单生产(15天)' ? 'bg-amber-50 text-amber-700 border-amber-200' : 
+                                                            'bg-rose-50 text-rose-700 border-rose-200'}`}
+                                                  >
+                                                      <option value="公司备货(5天)">🏢 公司备货 (5天内交付)</option>
+                                                      <option value="供应商备货(8天)">🚚 供应商备货 (8天内交付)</option>
+                                                      <option value="订单生产(15天)">⚙️ 订单生产 (15天内交付)</option>
+                                                      <option value="特殊交期">📞 特殊交期</option>
+                                                  </select>
+                                              </td>
+
+                                              <td className="py-2.5 px-4 font-bold text-slate-600 text-right">{v.count}</td>
+                                              <td className="py-2.5 px-4 text-center">
+                                                  <div className="flex items-center justify-center gap-1">
+                                                      {v.A > 0 && <span className="text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-bold border border-indigo-100" title={`包含 ${v.A} 个 A类款`}>A: {v.A}</span>}
+                                                      {v.B > 0 && <span className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-bold border border-emerald-100" title={`包含 ${v.B} 个 B类款`}>B: {v.B}</span>}
+                                                      {v.C > 0 && <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-bold border border-amber-100" title={`包含 ${v.C} 个 C类款`}>C: {v.C}</span>}
+                                                      {v.D > 0 && <span className="text-[10px] bg-slate-50 text-slate-600 px-1.5 py-0.5 rounded font-bold border border-slate-200" title={`包含 ${v.D} 个 D类款`}>D: {v.D}</span>}
+                                                  </div>
+                                              </td>
+                                              <td className="py-2.5 px-4 text-right font-medium text-slate-600">{Math.round(v.sales).toLocaleString()}</td>
+                                              <td className="py-2.5 px-4 text-right font-bold text-slate-700 border-r border-slate-50">¥{Math.round(v.revenue).toLocaleString()}</td>
+                                              <td className="py-2.5 px-4 text-right font-medium text-slate-600">{v.stockQty.toLocaleString()}</td>
+                                              <td className="py-2.5 px-4 text-right font-bold text-rose-600 bg-rose-50/10 border-r border-rose-50/30">
+                                                  {v.deadCapital > 0 ? `¥${Math.round(v.deadCapital).toLocaleString()}` : <span className="text-slate-300">-</span>}
+                                              </td>
+                                              <td className="py-2.5 px-4 text-right font-bold text-indigo-600 bg-indigo-50/10">{v.restockItems > 0 ? v.restockItems : '-'}</td>
+                                              <td className="py-2.5 px-4 text-right font-bold text-indigo-600 bg-indigo-50/10">{v.restockQty > 0 ? v.restockQty.toLocaleString() : '-'}</td>
+                                              <td className="py-2.5 px-4 text-right font-bold text-amber-700 bg-amber-50/40 border-x border-amber-100 shadow-inner">
+                                                  {v.restockCapitalAB > 0 ? `¥${v.restockCapitalAB.toLocaleString()}` : '-'}
+                                              </td>
+                                              <td className="py-2.5 px-4 text-right font-bold text-amber-700 bg-amber-50/20">{v.restockCapital > 0 ? `¥${v.restockCapital.toLocaleString()}` : '-'}</td>
+                                          </tr>
+                                      ))}
+                                      {sortedVersionList.length === 0 && (
+                                          <tr><td colSpan="14" className="text-center py-10 text-slate-400">导入数据后，此处将自动生成版本系列全景分析</td></tr>
+                                      )}
+                                  </tbody>
+                              </table>
+                          </div>
+                      </div>
+                  </div>
+              );
           };
 
           const renderDashboard = () => {
@@ -793,7 +1031,7 @@
 
                          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col">
                              <h3 className="text-base font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                 <IconAlertTriangle size={20} className="text-rose-500"/> A类核心资产补货预警
+                                 <IconAlertTriangle size={20} className="text-rose-500"/> 全盘防断货预警
                              </h3>
                              <div className="flex items-center gap-6 mb-6 h-[110px]">
                                  <div className="flex-1 flex flex-col justify-center items-center p-4 bg-blue-50/70 rounded-xl border border-blue-100/50">
@@ -874,10 +1112,10 @@
                                   <div className="absolute top-0 left-0 w-1 h-full bg-rose-500"></div>
                                   <div className="bg-rose-50/50 px-5 py-3.5 border-b border-rose-100 flex items-center justify-between">
                                       <h3 className="text-sm font-bold text-rose-800 flex items-center gap-2">🔥 急需补货 TOP 5</h3>
-                                      <span className="text-[10px] font-medium bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full border border-rose-200">A类断货预警</span>
+                                      <span className="text-[10px] font-medium bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full border border-rose-200">全盘断货预警</span>
                                   </div>
                                   <div className="p-4 flex-1 flex flex-col gap-2.5">
-                                      {restockList.length === 0 ? <p className="text-sm text-slate-400 text-center py-10">🎉 当前A类货源充足</p> : restockList.map((item, i) => (
+                                      {restockList.length === 0 ? <p className="text-sm text-slate-400 text-center py-10">🎉 当前货源充足</p> : restockList.map((item, i) => (
                                           <div key={i} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded-xl border border-transparent hover:border-slate-100 transition-all">
                                               <div className="flex items-center gap-3.5 overflow-hidden">
                                                   <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold shadow-sm ${i===0?'bg-rose-500 text-white':i===1?'bg-rose-400 text-white':i===2?'bg-rose-300 text-white':'bg-slate-100 text-slate-500'}`}>{i+1}</span>
@@ -885,7 +1123,7 @@
                                                       <p className="text-[13px] font-bold text-slate-800 truncate mb-0.5" title={`[${item.versionName}] ${item.model}`}>
                                                           <span className="text-indigo-600 mr-1.5 font-medium text-[11px] bg-indigo-50 px-1 py-0.5 rounded">[{item.versionName}]</span>{item.model}
                                                       </p>
-                                                      <p className="text-[11px] font-medium text-slate-500">可用库存: <span className="text-slate-700">{item.availableStock}件</span> / 警戒: <span className="text-rose-600">{item.rop}件</span></p>
+                                                      <p className="text-[11px] font-medium text-slate-500">可用: <span className="text-slate-700">{item.availableStock}件</span> / 警戒: <span className="text-rose-600">{item.rop}件</span></p>
                                                   </div>
                                               </div>
                                               <div className="text-right shrink-0 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100 min-w-[76px]">
@@ -913,7 +1151,7 @@
                                                       <p className="text-[13px] font-bold text-slate-800 truncate mb-0.5" title={`[${item.versionName}] ${item.model}`}>
                                                           <span className="text-slate-500 mr-1.5 font-medium text-[11px] bg-slate-100 px-1 py-0.5 rounded">[{item.versionName}]</span>{item.model}
                                                       </p>
-                                                      <p className="text-[11px] font-medium text-slate-500">周转期：{item.stockCoverDays === Infinity ? '无动销死库' : item.stockCoverDays.toFixed(0)+'天'}</p>
+                                                      <p className="text-[11px] font-medium text-slate-500">周转期：{item.stockCoverDays === Infinity ? '无动销死库' : (Number(item.stockCoverDays) || 0).toFixed(0)+'天'}</p>
                                                   </div>
                                               </div>
                                               <div className="text-right shrink-0 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 min-w-[76px]">
@@ -927,6 +1165,7 @@
                               </div>
                           </div>
                       </div>
+
                   </div>
               );
           };
@@ -958,7 +1197,7 @@
                   
                   {/* --- 新手指南面板 --- */}
                   <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-                      <button onClick={() => setShowGuide(!showGuide)} className="w-full bg-slate-100 px-3 py-2.5 flex items-center justify-between hover:bg-slate-200 transition-colors">
+                      <button type="button" onClick={() => setShowGuide(!showGuide)} className="w-full bg-slate-100 px-3 py-2.5 flex items-center justify-between hover:bg-slate-200 transition-colors">
                           <div className="flex items-center gap-2">
                               <IconHelpCircle size={16} className="text-indigo-600" />
                               <h3 className="text-xs font-bold text-slate-700">新手指南：参数计算原理</h3>
@@ -993,10 +1232,10 @@
 
                   {/* --- ABC 类别说明面板 --- */}
                   <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-                      <button onClick={() => setShowAbcGuide(!showAbcGuide)} className="w-full bg-slate-100 px-3 py-2.5 flex items-center justify-between hover:bg-slate-200 transition-colors">
+                      <button type="button" onClick={() => setShowAbcGuide(!showAbcGuide)} className="w-full bg-slate-100 px-3 py-2.5 flex items-center justify-between hover:bg-slate-200 transition-colors">
                           <div className="flex items-center gap-2">
                               <IconInfo size={16} className="text-slate-600" />
-                              <h3 className="text-xs font-bold text-slate-700">系统模型：ABC动态分级</h3>
+                              <h3 className="text-xs font-bold text-slate-700">系统模型：ABCD动态分级</h3>
                           </div>
                           {showAbcGuide ? <IconChevronUp size={14} className="text-slate-500"/> : <IconChevronDown size={14} className="text-slate-500"/>}
                       </button>
@@ -1007,33 +1246,44 @@
                                       <span>A类</span>
                                       <span className="text-[10px] bg-indigo-100 text-indigo-800 px-1 rounded">前 {draftSettings.abcThresholdA}%</span>
                                   </div>
-                                  <p className="text-[11px] text-slate-600 leading-tight"><strong>核心资产：</strong>系统自动计算防断货与补货指标，强制保交付。</p>
+                                  <p className="text-[11px] text-slate-600 leading-tight"><strong>5天内交付：</strong>公司备货，系统自动计算补货防断货。</p>
                               </div>
                               <div className="flex flex-col gap-1 border-l-2 border-emerald-500 pl-2 pt-1 border-t border-slate-100 mt-1">
                                   <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700">
                                       <span>B类</span>
                                       <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1 rounded">{draftSettings.abcThresholdA}% - {draftSettings.abcThresholdB}%</span>
                                   </div>
-                                  <p className="text-[11px] text-slate-600 leading-tight"><strong>常规流转：</strong>零备货，接单后生产以释放现金流。</p>
+                                  <p className="text-[11px] text-slate-600 leading-tight"><strong>8天内交付：</strong>供应商备货，常规流转，释放资金。</p>
+                              </div>
+                              <div className="flex flex-col gap-1 border-l-2 border-amber-500 pl-2 pt-1 border-t border-slate-100 mt-1">
+                                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-600">
+                                      <span>C类</span>
+                                      <span className="text-[10px] bg-amber-100 text-amber-800 px-1 rounded">{draftSettings.abcThresholdB}% - {draftSettings.abcThresholdC}%</span>
+                                  </div>
+                                  <p className="text-[11px] text-slate-600 leading-tight"><strong>15天内交付：</strong>等订单生产，纯按需流转。</p>
                               </div>
                               <div className="flex flex-col gap-1 border-l-2 border-slate-400 pl-2 pt-1 border-t border-slate-100 mt-1">
                                   <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
-                                      <span>C类</span>
-                                      <span className="text-[10px] bg-slate-100 text-slate-600 px-1 rounded">后 {100 - draftSettings.abcThresholdB}%</span>
+                                      <span>D类</span>
+                                      <span className="text-[10px] bg-slate-100 text-slate-600 px-1 rounded">后 {100 - draftSettings.abcThresholdC}%</span>
                                   </div>
-                                  <p className="text-[11px] text-slate-600 leading-tight"><strong>边缘长尾：</strong>随时可能淘汰，先咨询交付时间后接单。</p>
+                                  <p className="text-[11px] text-slate-600 leading-tight"><strong>沟通交期：</strong>特殊材料/工艺，需单独确定交付时间。</p>
                               </div>
                               
                               <div className="pt-3 mt-2 border-t border-slate-100">
-                                <h3 className="text-[11px] font-bold text-slate-700 mb-2">📊 ABC 累计占比界限调节 (%)</h3>
-                                <div className="grid grid-cols-2 gap-2">
+                                <h3 className="text-[11px] font-bold text-slate-700 mb-2">📊 ABCD 累计占比界限调节 (%)</h3>
+                                <div className="grid grid-cols-3 gap-2">
                                   <div>
-                                    <label className="block text-[10px] font-medium text-slate-500 mb-0.5 truncate">A类界限</label>
-                                    <input type="number" name="abcThresholdA" value={draftSettings.abcThresholdA} onChange={handleSettingChange} className="w-full border border-slate-300 rounded px-2 py-1 text-sm font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                    <label className="block text-[10px] font-medium text-slate-500 mb-0.5 truncate">A类</label>
+                                    <input type="number" name="abcThresholdA" value={draftSettings.abcThresholdA} onChange={handleSettingChange} className="w-full border border-slate-300 rounded px-1.5 py-1 text-sm font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500 outline-none" />
                                   </div>
                                   <div>
-                                    <label className="block text-[10px] font-medium text-slate-500 mb-0.5 truncate">B类界限</label>
-                                    <input type="number" name="abcThresholdB" value={draftSettings.abcThresholdB} onChange={handleSettingChange} className="w-full border border-slate-300 rounded px-2 py-1 text-sm font-bold text-emerald-700 focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                    <label className="block text-[10px] font-medium text-slate-500 mb-0.5 truncate">B类</label>
+                                    <input type="number" name="abcThresholdB" value={draftSettings.abcThresholdB} onChange={handleSettingChange} className="w-full border border-slate-300 rounded px-1.5 py-1 text-sm font-bold text-emerald-700 focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] font-medium text-slate-500 mb-0.5 truncate">C类</label>
+                                    <input type="number" name="abcThresholdC" value={draftSettings.abcThresholdC} onChange={handleSettingChange} className="w-full border border-slate-300 rounded px-1.5 py-1 text-sm font-bold text-amber-600 focus:ring-2 focus:ring-amber-500 outline-none" />
                                   </div>
                                 </div>
                               </div>
@@ -1043,7 +1293,7 @@
 
                   {/* --- 加权需求预测算法配置 --- */}
                   <div className="bg-white border border-indigo-100 rounded-xl shadow-sm overflow-hidden mt-4">
-                      <button onClick={() => setShowAlgoSettings(!showAlgoSettings)} className="w-full bg-indigo-50/50 px-3 py-2.5 flex items-center justify-between hover:bg-indigo-100/50 transition-colors border-b border-indigo-50">
+                      <button type="button" onClick={() => setShowAlgoSettings(!showAlgoSettings)} className="w-full bg-indigo-50/50 px-3 py-2.5 flex items-center justify-between hover:bg-indigo-100/50 transition-colors border-b border-indigo-50">
                           <div className="flex items-center gap-2">
                               <IconTrendingUp size={16} className="text-indigo-600" />
                               <h3 className="text-[12px] font-bold text-indigo-900">📈 需求预测算法配置</h3>
@@ -1094,7 +1344,7 @@
 
                   {/* --- 全局兜底参数配置 --- */}
                   <div className="border-t border-slate-100 pt-3">
-                    <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">⚙️ 供应链全局参数 (A类)</h3>
+                    <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">⚙️ 供应链全局参数 (默认兜底)</h3>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block text-[11px] font-medium text-slate-700 mb-0.5 truncate" title="默认到货周期">提前期 L (天)</label>
@@ -1117,7 +1367,7 @@
 
                   {/* --- 专属供应商参数配置 --- */}
                   <div className="bg-white border border-emerald-100 rounded-xl shadow-sm overflow-hidden mt-2">
-                      <button onClick={() => setShowSupplierSettings(!showSupplierSettings)} className="w-full bg-emerald-50/50 px-3 py-2.5 flex items-center justify-between hover:bg-emerald-100/50 transition-colors border-b border-emerald-50">
+                      <button type="button" onClick={() => setShowSupplierSettings(!showSupplierSettings)} className="w-full bg-emerald-50/50 px-3 py-2.5 flex items-center justify-between hover:bg-emerald-100/50 transition-colors border-b border-emerald-50">
                           <div className="flex items-center gap-2">
                               <IconPackage size={16} className="text-emerald-600" />
                               <h3 className="text-[12px] font-bold text-emerald-900">🚚 专属供应商配置</h3>
@@ -1128,7 +1378,7 @@
                           <div className="p-2 space-y-2 bg-slate-50/50 max-h-[300px] overflow-y-auto custom-scrollbar">
                               <div className="flex items-center gap-1.5 mb-2 px-1">
                                   <input type="text" value={newSupplierName} onChange={e => setNewSupplierName(e.target.value)} placeholder="输入新厂家名称" className="flex-1 border border-emerald-200 rounded px-2 py-1 text-xs focus:ring-2 focus:ring-emerald-500 outline-none" />
-                                  <button onClick={handleAddSupplier} className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded shadow-sm transition-colors" title="添加新供应商">
+                                  <button type="button" onClick={handleAddSupplier} className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded shadow-sm transition-colors" title="添加新供应商">
                                       <IconPlus size={14} />
                                   </button>
                               </div>
@@ -1141,7 +1391,7 @@
                                           <p className="text-[11px] font-bold text-slate-800 flex items-center gap-1">
                                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> {supplier}
                                           </p>
-                                          <button onClick={() => handleRemoveSupplier(supplier)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" title="删除该配置">
+                                          <button type="button" onClick={() => handleRemoveSupplier(supplier)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" title="删除该配置">
                                               <IconTrash size={12} />
                                           </button>
                                       </div>
@@ -1207,7 +1457,7 @@
                 </div>
                 
                 <div className="p-3 border-t border-slate-100 bg-slate-50 shrink-0">
-                  <button onClick={handleApplySettings} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold transition-colors shadow-md flex items-center justify-center gap-2">
+                  <button type="button" onClick={handleApplySettings} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold transition-colors shadow-md flex items-center justify-center gap-2">
                     <IconCalculator size={18} />
                     保存参数并重算
                   </button>
@@ -1216,38 +1466,42 @@
 
               {/* --- 右侧主工作区 --- */}
               <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/50">
-                <header className="bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0 z-20 relative">
+                {/* 核心更新：提高层级至 z-[100]，加上 pointer-events-auto 以防沙盒拦截点击 */}
+                <header className="bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0 z-[100] relative pointer-events-auto">
                   <div className="flex items-center gap-3">
-                    <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className={`text-slate-500 hover:text-indigo-600 transition-all duration-300 bg-slate-100 p-1.5 rounded-md border border-slate-200 ${!isSidebarOpen ? 'rotate-180' : ''}`} title="收起/展开左侧设置">
+                    <button type="button" onClick={() => setIsSidebarOpen(!isSidebarOpen)} className={`text-slate-500 hover:text-indigo-600 transition-all duration-300 bg-slate-100 p-1.5 rounded-md border border-slate-200 cursor-pointer ${!isSidebarOpen ? 'rotate-180' : ''}`} title="收起/展开左侧设置">
                       <IconPanelLeft size={18} />
                     </button>
                     
                     {rawData.length > 0 && (
-                        <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 ml-4 shadow-inner">
-                            <button onClick={()=>setViewMode('table')} className={`px-4 py-1.5 text-xs font-bold rounded-md flex items-center gap-1.5 transition-all duration-300 ${viewMode === 'table' ? 'bg-white shadow-sm text-indigo-700 border border-slate-200/50' : 'text-slate-500 hover:text-slate-700'}`}>
+                        <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 ml-4 shadow-inner relative z-[100]">
+                            <button type="button" onClick={()=>setViewMode('table')} className={`cursor-pointer px-4 py-1.5 text-xs font-bold rounded-md flex items-center gap-1.5 transition-all duration-300 ${viewMode === 'table' ? 'bg-white shadow-sm text-indigo-700 border border-slate-200/50' : 'text-slate-500 hover:text-slate-700'}`}>
                                 <IconTable size={14} /> 数据明细表
                             </button>
-                            <button onClick={()=>setViewMode('dashboard')} className={`px-4 py-1.5 text-xs font-bold rounded-md flex items-center gap-1.5 transition-all duration-300 ${viewMode === 'dashboard' ? 'bg-white shadow-sm text-indigo-700 border border-slate-200/50' : 'text-slate-500 hover:text-slate-700'}`}>
+                            <button type="button" onClick={()=>setViewMode('versionBoard')} className={`cursor-pointer px-4 py-1.5 text-xs font-bold rounded-md flex items-center gap-1.5 transition-all duration-300 ${viewMode === 'versionBoard' ? 'bg-white shadow-sm text-indigo-700 border border-slate-200/50' : 'text-slate-500 hover:text-slate-700'}`}>
+                                <IconLayers size={14} /> 版本采买看板
+                            </button>
+                            <button type="button" onClick={()=>setViewMode('dashboard')} className={`cursor-pointer px-4 py-1.5 text-xs font-bold rounded-md flex items-center gap-1.5 transition-all duration-300 ${viewMode === 'dashboard' ? 'bg-white shadow-sm text-indigo-700 border border-slate-200/50' : 'text-slate-500 hover:text-slate-700'}`}>
                                 <IconLayoutDashboard size={14} /> 图形化看板
                             </button>
                         </div>
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 relative z-[100]">
                     <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
                     {rawData.length > 0 && (
-                      <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1.5 rounded font-bold transition-colors text-xs border border-indigo-100 shadow-sm">
+                      <button type="button" onClick={() => fileInputRef.current?.click()} className="cursor-pointer flex items-center gap-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1.5 rounded font-bold transition-colors text-xs border border-indigo-100 shadow-sm">
                         <IconUpload size={14} /> 重新导入
                       </button>
                     )}
-                    <button onClick={() => exportToCSV('all')} disabled={processedData.length === 0} className="flex items-center gap-1.5 bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50 px-3 py-1.5 rounded font-bold transition-colors text-xs shadow-sm">
+                    <button type="button" onClick={() => exportToCSV('all')} disabled={processedData.length === 0} className="cursor-pointer flex items-center gap-1.5 bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50 px-3 py-1.5 rounded font-bold transition-colors text-xs shadow-sm">
                       <IconDownload size={14} /> 导出完整计划
                     </button>
-                    <button onClick={() => exportToCSV('restock')} disabled={processedData.length === 0} className="flex items-center gap-1.5 bg-amber-100 text-amber-800 hover:bg-amber-200 disabled:opacity-50 px-3 py-1.5 rounded font-bold transition-colors text-xs border border-amber-200 shadow-sm">
-                      <IconDownload size={14} /> 仅导出A类补货
+                    <button type="button" onClick={() => exportToCSV('restock')} disabled={processedData.length === 0} className="cursor-pointer flex items-center gap-1.5 bg-amber-100 text-amber-800 hover:bg-amber-200 disabled:opacity-50 px-3 py-1.5 rounded font-bold transition-colors text-xs border border-amber-200 shadow-sm">
+                      <IconDownload size={14} /> 仅导出AB类补货
                     </button>
-                    <button onClick={() => exportToCSV('clearance')} disabled={processedData.length === 0} className="flex items-center gap-1.5 bg-rose-100 text-rose-800 hover:bg-rose-200 disabled:opacity-50 px-3 py-1.5 rounded font-bold transition-colors text-xs border border-rose-200 shadow-sm">
+                    <button type="button" onClick={() => exportToCSV('clearance')} disabled={processedData.length === 0} className="cursor-pointer flex items-center gap-1.5 bg-rose-100 text-rose-800 hover:bg-rose-200 disabled:opacity-50 px-3 py-1.5 rounded font-bold transition-colors text-xs border border-rose-200 shadow-sm">
                       <IconDownload size={14} /> 导出清仓款
                     </button>
                   </div>
@@ -1263,7 +1517,7 @@
                                 </div>
                                 <h2 className="text-2xl font-bold text-slate-800 mb-3 tracking-wide">系统待命，等待数据载入</h2>
                                 <p className="text-slate-500 text-sm mb-6">请严格按照以下数据规范准备您的 CSV 表格，以获取最精准的库存补货与清仓建议。</p>
-                                <button onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-2 bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5">
+                                <button type="button" onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-2 bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5">
                                     <IconUpload size={18} /> 选择并导入 CSV 数据文件
                                 </button>
                                 {uploadError && (
@@ -1311,6 +1565,8 @@
                             </div>
                         </div>
                     </div>
+                  ) : viewMode === 'versionBoard' ? (
+                     renderVersionBoard()
                   ) : viewMode === 'dashboard' ? (
                      renderDashboard()
                   ) : (
@@ -1332,11 +1588,12 @@
                             <IconPackage className="text-indigo-600" size={18} />
                           </div>
                           <div className="w-full pr-1 truncate">
-                            <p className="text-[10px] font-bold text-slate-500 mb-0.5">ABC 款式分布</p>
+                            <p className="text-[10px] font-bold text-slate-500 mb-0.5">ABCD 款式分布</p>
                             <div className="flex items-end gap-1.5 leading-none">
                               <span className="text-[11px] font-bold text-indigo-700" title="A类">A:{metrics.totalA}</span>
                               <span className="text-[11px] font-bold text-emerald-700" title="B类">B:{metrics.totalB}</span>
-                              <span className="text-[11px] font-bold text-slate-500" title="C类">C:{metrics.totalC}</span>
+                              <span className="text-[11px] font-bold text-amber-600" title="C类">C:{metrics.totalC}</span>
+                              <span className="text-[11px] font-bold text-slate-500" title="D类">D:{metrics.totalD}</span>
                             </div>
                           </div>
                         </div>
@@ -1346,7 +1603,7 @@
                             <IconPackage className="text-emerald-600" size={18} />
                           </div>
                           <div className="truncate">
-                            <p className="text-[10px] font-bold text-slate-500 mb-0.5">A类需采总件数</p>
+                            <p className="text-[10px] font-bold text-slate-500 mb-0.5">全盘需采总件数</p>
                             <p className="text-lg font-bold text-emerald-700 leading-none">{metrics.totalStock.toLocaleString()} <span className="text-[10px] font-normal text-slate-400">件</span></p>
                           </div>
                         </div>
@@ -1355,7 +1612,7 @@
                             <IconDollarSign className="text-amber-600" size={18} />
                           </div>
                           <div className="truncate">
-                            <p className="text-[10px] font-bold text-slate-500 mb-0.5">A类采购资金预估</p>
+                            <p className="text-[10px] font-bold text-slate-500 mb-0.5">全盘采购资金预估</p>
                             <p className="text-lg font-bold text-amber-700 leading-none truncate" title={`¥${metrics.totalCapital.toFixed(2)}`}>¥{(metrics.totalCapital / 10000).toFixed(2)} <span className="text-[10px] font-normal text-slate-400">万</span></p>
                           </div>
                         </div>
@@ -1392,11 +1649,12 @@
                                 <SortableHeader label="版本名称" sortKey="versionName" />
                                 <SortableHeader label="型号" sortKey="model" />
                                 <SortableHeader label="供应商" sortKey="supplier" />
-                                <SortableHeader label="ABC" sortKey="classLabel" />
+                                <SortableHeader label="ABCD等级" sortKey="abcClass" title="基于核算金额占比计算，点击下方下拉框可进行手动强制调整" />
                                 
                                 <SortableHeader label="核算销量" sortKey="calcSales" align="right" title="基于所选算法计算出的等效总销量" />
                                 <SortableHeader label="频次" sortKey="orderFreqConfig" align="right" className="bg-indigo-50/50 text-indigo-700" title="该款式的历史订货次数" />
-                                <SortableHeader label="日均(d)" sortKey="d" align="right" title="受算法降权影响后的日均，仅用于计算采购" />
+                                <SortableHeader label="算法日均(d)" sortKey="d" align="right" title="受算法降权影响后的日均，仅用于计算采购" />
+                                <SortableHeader label="计算标记" sortKey="usedCalcMethod" align="center" className="text-slate-400 text-[10px]" />
                                 
                                 <SortableHeader label="核算金额" sortKey="calcRevenue" align="right" title="基于所选算法计算出的等效总金额 (影响ABC与默认排序)" />
                                 
@@ -1411,9 +1669,9 @@
                                 <SortableHeader label="周转(天)" sortKey="stockCoverDays" align="right" className="bg-rose-50/50 text-rose-800" title="实际可销售天数 = 物理基准库存 ÷ 真实历史日均 (不受预测算法降权影响)" />
                                 <SortableHeader label="清仓建议" sortKey="promoLevel" align="center" className="bg-rose-50/50" />
                                 <SortableHeader label="🚨红线ROP" sortKey="rop" align="right" className="bg-red-50 text-red-700 font-bold border-x border-red-100" title="可用总库存跌破此红线必须立即下单补货" />
-                                <SortableHeader label="理论OQ" sortKey="oq" align="right" className="bg-slate-100 text-slate-600" title="期望补货量 (仅A类计算)" />
+                                <SortableHeader label="理论OQ" sortKey="oq" align="right" className="bg-slate-100 text-slate-600" title="期望补货量" />
                                 <SortableHeader label="实际需采" sortKey="actualPurchase" align="right" className="bg-purple-100/50 text-purple-900 font-bold" title="(ROP+OQ) - 可用库存，且受MOQ托底" />
-                                <SortableHeader label="资金占用" sortKey="initialCapital" align="right" className="bg-amber-50/30 text-amber-800" />
+                                <SortableHeader label="资金占用(¥)" sortKey="initialCapital" align="right" className="bg-amber-50/30 text-amber-800" />
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -1427,12 +1685,21 @@
                                       {item.usedSupplierConfig && <span className="ml-0.5 text-emerald-500 cursor-help" title="已套用专属快反参数"><i className="fa-solid fa-bolt text-[10px]"></i></span>}
                                   </td>
                                   <td className="py-1.5 px-1.5">
-                                    <span className={`inline-flex items-center px-1 py-0.5 rounded text-[10px] font-bold shadow-sm border
-                                        ${item.abcClass === 'A' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 
-                                          item.abcClass === 'B' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 
-                                          'bg-slate-50 text-slate-600 border-slate-200'}`}>
-                                        {item.classLabel.split(' ')[0]}
-                                    </span>
+                                    <select
+                                        value={item.abcClass}
+                                        onChange={(e) => handleClassOverride(item.model, e.target.value)}
+                                        className={`appearance-none outline-none cursor-pointer inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold shadow-sm border
+                                            ${item.abcClass === 'A' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 
+                                              item.abcClass === 'B' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 
+                                              item.abcClass === 'C' ? 'bg-amber-50 text-amber-700 border-amber-200' : 
+                                              'bg-slate-50 text-slate-600 border-slate-200'}`}
+                                        title={`系统核算建议：${item.calcAbcClass}类。\n当前状态：${item.classLabel}\n\n* 点击可进行手动强制调整分类，将直接覆写算法推荐！`}
+                                    >
+                                        <option value="A" className="text-indigo-700 font-bold">A类</option>
+                                        <option value="B" className="text-emerald-700 font-bold">B类</option>
+                                        <option value="C" className="text-amber-700 font-bold">C类</option>
+                                        <option value="D" className="text-slate-600 font-bold">D类</option>
+                                    </select>
                                   </td>
                                   
                                   <td className="py-1.5 px-1.5 text-right font-medium text-slate-800">{Math.round(item.calcSales).toLocaleString()}</td>
@@ -1442,9 +1709,12 @@
                                   <td className="py-1.5 px-1.5 text-right text-slate-800 font-bold">
                                       {item.d.toFixed(1)}
                                       {item.freqPenalty < 1 && (
-                                          <span className="text-amber-500 ml-1 cursor-help" title={`频次过低(${item.orderFreqConfig}次)，原物理日均需求 ${item.pureD.toFixed(1)} 已被降权。`}><IconArrowDown size={12} className="inline"/></span>
+                                          <span className="text-amber-500 ml-1 cursor-help" title={`频次过低(${item.orderFreqConfig}次)，原物理日均需求 ${item.pureD.toFixed(1)} 已被算法打折降权，防止突发大单引发过度补货。`}>
+                                              <IconArrowDown size={12} className="inline"/>
+                                          </span>
                                       )}
                                   </td>
+                                  <td className="py-1.5 px-1.5 text-center text-[9px] text-slate-400">{item.usedCalcMethod}</td>
                                   
                                   <td className="py-1.5 px-1.5 text-right font-bold text-indigo-700">¥{Math.round(item.calcRevenue).toLocaleString()}</td>
                                   
@@ -1469,7 +1739,7 @@
                                   </td>
                                   
                                   <td className={`py-1.5 px-1.5 text-right font-mono ${item.promoLevel === 2 ? 'text-rose-700 font-bold' : item.promoLevel === 1 ? 'text-amber-600 font-bold' : 'text-slate-500 font-medium'}`}>
-                                    {item.stockCoverDays === Infinity ? '无动销' : Math.round(item.stockCoverDays)}
+                                    {item.stockCoverDays === Infinity ? '无动销' : (Number(item.stockCoverDays) || 0).toFixed(0)}
                                   </td>
                                   <td className="py-1.5 px-1.5 text-center text-[10px]">
                                     {item.promoLevel === 2 ? (
@@ -1482,23 +1752,21 @@
                                   </td>
                                   
                                   <td className="py-1.5 px-1.5 text-right font-bold text-rose-600 bg-rose-50/50 border-x border-rose-100/50 shadow-inner">
-                                    {item.isCat1 ? item.rop.toLocaleString() : '-'}
+                                    {item.rop.toLocaleString()}
                                   </td>
                                   <td className="py-1.5 px-1.5 text-right font-bold text-slate-500 bg-slate-50">
-                                    {item.isCat1 ? item.oq.toLocaleString() : '-'}
+                                    {item.oq.toLocaleString()}
                                   </td>
                                   <td className={`py-1.5 px-1.5 text-right font-bold ${item.needsRestock ? 'bg-red-50 text-red-700 border border-red-100' : 'bg-slate-50 text-slate-400 border border-slate-100'}`}>
-                                    {item.isCat1 ? (
-                                      item.actualPurchase > 0 ? (
+                                    {item.actualPurchase > 0 ? (
                                         <div className="flex items-center justify-end gap-1">
                                           {item.needsRestock && <IconAlertCircle size={12} className="text-red-500 animate-pulse" title="可用库存已降至警戒线以下" />}
                                           {item.actualPurchase.toLocaleString()}
                                         </div>
-                                      ) : '充足'
-                                    ) : '-'}
+                                      ) : '充足'}
                                   </td>
                                   <td className="py-1.5 px-1.5 text-right font-mono font-medium text-amber-700 bg-amber-50/20">
-                                    {item.isCat1 && item.initialCapital > 0 ? `¥${Math.round(item.initialCapital).toLocaleString()}` : '-'}
+                                    {item.initialCapital > 0 ? `¥${Math.round(item.initialCapital).toLocaleString()}` : '-'}
                                   </td>
                                 </tr>
                               ))}
