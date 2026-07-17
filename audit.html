@@ -1,0 +1,2453 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>外勤拜访 & 住宿时空轨迹智能审计大盘</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .leaflet-div-icon { background: transparent; border: none; }
+        .marker-pin {
+            display: flex; align-items: center; justify-content: center;
+            width: 24px; height: 24px; border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg); margin: -12px 0 0 -12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+        }
+        .marker-pin:hover { z-index: 9999 !important; transform: rotate(-45deg) scale(1.15); box-shadow: 0 4px 8px rgba(0,0,0,0.5); }
+        .marker-pin span { transform: rotate(45deg); color: white; font-size: 11px; font-weight: bold; }
+        
+        /* 规则富文本专用高亮样式 */
+        .anomaly-text b { font-weight: 800; margin-right: 4px; letter-spacing: 0.5px; }
+        .anomaly-text i { opacity: 0.9; font-style: normal; text-decoration: underline; text-underline-offset: 2px; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <header class="bg-slate-900 text-white shadow-lg px-6 py-4">
+        <div class="max-w-[98%] w-full mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 p-2 rounded-lg text-white flex-shrink-0">
+                    <i data-lucide="shield-check" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight">外勤拜访 & 住宿时空轨迹智能审计大盘</h1>
+                    <p class="text-xs text-slate-400 mt-0.5">客观时空事实交叉核验 • 细粒度业务与合规度量</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                <button onclick="openSystemConfigModal()" class="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2.5 rounded-xl text-sm font-bold transition shadow-sm border border-slate-700">
+                    <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+                    审计规则与常驻地配置
+                </button>
+                <label class="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold cursor-pointer transition shadow-sm ring-1 ring-blue-400">
+                    <i data-lucide="folder-up" class="w-4 h-4"></i>
+                    <span id="importBtnText">批量导入文件 (可多选三类报表)</span>
+                    <input type="file" id="multiFileInput" accept=".csv" multiple class="hidden" onchange="handleMultiFileUpload(event)">
+                </label>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-[98%] w-full mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        
+        <section class="lg:col-span-3 flex flex-col gap-4 h-full">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex-shrink-0">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                        <i data-lucide="calendar" class="w-4 h-4 text-blue-600"></i>
+                        数据月份切换 (可多选)
+                    </h3>
+                    <span class="text-xs text-slate-400 font-semibold" id="dataRangeLabel">未载入数据</span>
+                </div>
+                <div class="flex flex-wrap gap-2" id="monthSelectorContainer">
+                    <div class="text-xs text-slate-400 py-1" id="noMonthPlaceholder">请导入报表激活数据...</div>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex-shrink-0 flex flex-col overflow-hidden max-h-[650px]">
+                <div class="flex items-center justify-between mb-2 border-b border-slate-100 pb-2">
+                    <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                        <i data-lucide="git-merge" class="w-4 h-4 text-indigo-600"></i>
+                        级联树形组织选择器
+                    </h3>
+                    <button onclick="clearTreeFilter()" class="text-[11px] text-blue-600 hover:underline font-medium">查看全公司</button>
+                </div>
+                
+                <div class="overflow-y-auto space-y-2 text-xs pr-1" id="orgTreeContainer">
+                    <div class="border border-slate-100 rounded-lg overflow-hidden">
+                        <div id="dept-btn-1" class="dept-node px-2.5 py-2 font-bold text-slate-700 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition" onclick="selectDeptFilter(1, ['刘媛媛','董琥','苑傲华','袁海亮','王亚钊','黄祥明','曾耸俊'])">
+                            <span class="flex items-center gap-1"><i data-lucide="folder" class="w-3.5 h-3.5 text-slate-400"></i>营销一部</span>
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-[10px] bg-slate-100 text-slate-500 px-1 rounded">刘文平</span>
+                                <button onclick="exportDeptImage(event, '营销一部', ['刘媛媛','董琥','苑傲华','袁海亮','王亚钊','黄祥明','曾耸俊'])" class="text-blue-500 hover:text-blue-700 bg-blue-50 p-1 rounded transition border border-blue-100" title="导出高清长图报告"><i data-lucide="image-down" class="w-3.5 h-3.5"></i></button>
+                            </div>
+                        </div>
+                        <div class="p-1.5 grid grid-cols-2 gap-1 bg-white border-t border-slate-50">
+                            <button onclick="selectUserFilter('刘媛媛')" class="user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate">北京办事处: 刘媛媛</button>
+                            <button onclick="selectUserFilter('董琥')" class="user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate">长春办事处: 董琥</button>
+                            <button onclick="selectUserFilter('苑傲华')" class="user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate">济南办事处: 苑傲华</button>
+                            <button onclick="selectUserFilter('袁海亮')" class="user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate">武汉办事处: 袁海亮</button>
+                            <button onclick="selectUserFilter('王亚钊')" class="user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate">石家庄办: 王亚钊</button>
+                            <button onclick="selectUserFilter('黄祥明')" class="user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate">南京办事处: 黄祥明</button>
+                            <button onclick="selectUserFilter('曾耸俊')" class="user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate">杭州办事处: 曾耸俊</button>
+                        </div>
+                    </div>
+                    <div class="border border-slate-100 rounded-lg overflow-hidden">
+                        <div id="dept-btn-2" class="dept-node px-2.5 py-2 font-bold text-slate-700 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition" onclick="selectDeptFilter(2, ['李曾灵','冯广科','高承栋','蓝俊','王甜','黄勇志','伍海波','谢健'])">
+                            <span class="flex items-center gap-1"><i data-lucide="folder" class="w-3.5 h-3.5 text-slate-400"></i>营销二部</span>
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-[10px] bg-slate-100 text-slate-500 px-1 rounded">刘伟</span>
+                                <button onclick="exportDeptImage(event, '营销二部', ['李曾灵','冯广科','高承栋','蓝俊','王甜','黄勇志','伍海波','谢健'])" class="text-blue-500 hover:text-blue-700 bg-blue-50 p-1 rounded transition border border-blue-100" title="导出高清长图报告"><i data-lucide="image-down" class="w-3.5 h-3.5"></i></button>
+                            </div>
+                        </div>
+                        <div class="p-1.5 grid grid-cols-2 gap-1 bg-white border-t border-slate-50">
+                            <button onclick="selectUserFilter('李曾灵')" class="user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate">西安办事处: 李曾灵</button>
+                            <button onclick="selectUserFilter('冯广科')" class="user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate">陕北办事处: 冯广科</button>
+                            <button onclick="selectUserFilter('高承栋')" class="user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate">兰州办事处: 高承栋</button>
+                            <button onclick="selectUserFilter('蓝俊')" class="user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate">云贵办事处: 蓝俊</button>
+                            <button onclick="selectUserFilter('王甜')" class="user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate">成都办事处: 王甜</button>
+                            <button onclick="selectUserFilter('黄勇志')" class="user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate">广州办事处: 黄勇志</button>
+                            <button onclick="selectUserFilter('伍海波')" class="user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate">深圳办事处: 伍海波</button>
+                            <button onclick="selectUserFilter('谢健')" class="user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate">东莞办事处: 谢健</button>
+                        </div>
+                    </div>
+                    <div class="border border-slate-100 rounded-lg overflow-hidden">
+                        <div id="dept-btn-3" class="dept-node px-2.5 py-2 font-bold text-slate-700 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition" onclick="selectDeptFilter(3, ['韩洋洋','肖帆','张娟','陈明芳','周鹏','徐俊飞','谢镇旺','蔡志强'])">
+                            <span class="flex items-center gap-1"><i data-lucide="folder" class="w-3.5 h-3.5 text-slate-400"></i>营销三部</span>
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-[10px] bg-slate-100 text-slate-500 px-1 rounded">韩洋洋</span>
+                                <button onclick="exportDeptImage(event, '营销三部', ['韩洋洋','肖帆','张娟','陈明芳','周鹏','徐俊飞','谢镇旺','蔡志强'])" class="text-blue-500 hover:text-blue-700 bg-blue-50 p-1 rounded transition border border-blue-100" title="导出高清长图报告"><i data-lucide="image-down" class="w-3.5 h-3.5"></i></button>
+                            </div>
+                        </div>
+                        <div class="p-1.5 grid grid-cols-2 gap-1 bg-white border-t border-slate-50">
+                            <button onclick="selectUserFilter('韩洋洋')" class="user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate">华北大区: 韩洋洋</button>
+                            <button onclick="selectUserFilter('肖帆')" class="user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate">华中大区: 肖帆</button>
+                            <button onclick="selectUserFilter('张娟')" class="user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate">西北大区: 张娟</button>
+                            <button onclick="selectUserFilter('陈明芳')" class="user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate">西南大区: 陈明芳</button>
+                            <button onclick="selectUserFilter('周鹏')" class="user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate">华东一区: 周鹏</button>
+                            <button onclick="selectUserFilter('徐俊飞')" class="user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate">华东二区: 徐俊飞</button>
+                            <button onclick="selectUserFilter('谢镇旺')" class="user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate">华南大区: 谢镇旺</button>
+                            <button onclick="selectUserFilter('蔡志强')" class="user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate">碧桂园: 蔡志强</button>
+                        </div>
+                    </div>
+                    <div class="border border-slate-100 rounded-lg overflow-hidden">
+                        <div id="dept-btn-4" class="dept-node px-2.5 py-2 font-bold text-slate-700 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition" onclick="selectDeptFilter(4, ['戴继锋','王毅','郑云峰','胡松'])">
+                            <span class="flex items-center gap-1"><i data-lucide="folder" class="w-3.5 h-3.5 text-blue-500"></i>营销四部</span>
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-[10px] bg-blue-100 text-blue-700 px-1 rounded">蜜乐涂料</span>
+                                <button onclick="exportDeptImage(event, '营销四部', ['戴继锋','王毅','郑云峰','胡松'])" class="text-blue-500 hover:text-blue-700 bg-blue-50 p-1 rounded transition border border-blue-100" title="导出高清长图报告"><i data-lucide="image-down" class="w-3.5 h-3.5"></i></button>
+                            </div>
+                        </div>
+                        <div class="p-1.5 grid grid-cols-2 gap-1 bg-white border-t border-slate-50">
+                            <button onclick="selectUserFilter('戴继锋')" class="user-node text-left p-1 rounded border border-transparent truncate text-blue-600 font-medium">北部大区: 戴继锋</button>
+                            <button onclick="selectUserFilter('王毅')" class="user-node text-left p-1 rounded border border-transparent truncate text-amber-600 font-medium">西部大区: 王毅</button>
+                            <button onclick="selectUserFilter('郑云峰')" class="user-node text-left p-1 rounded border border-transparent truncate text-rose-600 font-medium">东部大区: 郑云峰</button>
+                            <button onclick="selectUserFilter('胡松')" class="user-node text-left p-1 rounded border border-transparent truncate text-emerald-600 font-medium">南部大区: 胡松</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex-grow flex flex-col overflow-hidden h-0 shadow-sm">
+                <div class="flex items-center justify-between mb-3 border-b border-slate-100 pb-2 flex-shrink-0">
+                    <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                        <i data-lucide="shield-alert" class="w-4 h-4 text-rose-500"></i>
+                        范围异常概览
+                    </h3>
+                    <span class="text-xs text-slate-400 font-semibold bg-slate-50 px-2 py-0.5 rounded-full" id="majorAnomalyBadge">无数据</span>
+                </div>
+                <div class="space-y-2.5 flex-grow overflow-y-auto pr-1 flex flex-col justify-start" id="auditSummaryContainer">
+                    <div class="my-auto py-12 text-center text-slate-400">⏳ 请导入报表进行比对...</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 flex-shrink-0">
+                <div class="bg-white p-3.5 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-center">
+                    <span class="text-xs text-slate-400 font-medium leading-none">实际开展业务打卡</span>
+                    <div class="text-lg font-bold text-slate-800 mt-1.5 flex items-baseline">
+                        <span id="statTotalVisits" class="text-emerald-600 mr-1">0</span> <span class="text-[11px] text-slate-500 mr-3">次拜访 (核定依据)</span>
+                    </div>
+                </div>
+                <div class="bg-white p-3.5 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-center">
+                    <span class="text-xs text-slate-400 font-medium leading-none">早晚定位确认 (不作核定)</span>
+                    <div class="text-lg font-bold text-cyan-600 mt-1.5 flex items-baseline">
+                        <span id="statTotalAttendances">0</span> <span class="text-[11px] text-slate-500 ml-1">次考勤定位</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="lg:col-span-9 flex flex-col gap-6 h-full">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col relative" style="height: 720px;">
+                <div class="px-5 py-2 bg-slate-900 text-white flex flex-col xl:flex-row justify-between items-start xl:items-center gap-2 z-[600] flex-shrink-0 relative">
+                    <div class="flex flex-col">
+                        <h3 class="font-bold text-sm flex items-center gap-2">
+                            <i data-lucide="map" class="w-4 h-4 text-blue-400"></i>
+                            物理位置交叉地图 (🏨住宿驻地 vs 📍签到打卡 vs 🕒早晚考勤)
+                        </h3>
+                        <div class="text-[10px] text-slate-400 mt-0.5 flex flex-wrap gap-3">
+                            <span class="flex items-center gap-1 text-emerald-400">🟢 实线: 业务拜访轨迹</span>
+                            <span class="flex items-center gap-1 text-cyan-400">🔵 虚线: 纯考勤物理定位</span>
+                            <span class="flex items-center gap-1 text-amber-400">🟠 虚线: 店房闭合状态</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-wrap items-center gap-3">
+                        <div class="flex gap-2 text-xs font-medium bg-slate-800 p-1.5 rounded-lg border border-slate-700 shadow-inner">
+                            <label class="flex items-center gap-1.5 cursor-pointer px-2 py-1 rounded transition text-emerald-400 hover:bg-slate-700 has-[:checked]:bg-slate-700 has-[:checked]:text-emerald-300">
+                                <input type="checkbox" id="chk_map_visit" checked onchange="updateFilter('visit', this.checked)" class="accent-emerald-500 w-3.5 h-3.5"> 📍 拜访记录
+                            </label>
+                            <label class="flex items-center gap-1.5 cursor-pointer px-2 py-1 rounded transition text-cyan-400 hover:bg-slate-700 has-[:checked]:bg-slate-700 has-[:checked]:text-cyan-300">
+                                <input type="checkbox" id="chk_map_attendance" checked onchange="updateFilter('attendance', this.checked)" class="accent-cyan-500 w-3.5 h-3.5"> 🕒 考勤驻点
+                            </label>
+                            <label class="flex items-center gap-1.5 cursor-pointer px-2 py-1 rounded transition text-amber-400 hover:bg-slate-700 has-[:checked]:bg-slate-700 has-[:checked]:text-amber-300">
+                                <input type="checkbox" id="chk_map_hotel" checked onchange="updateFilter('hotel', this.checked)" class="accent-amber-500 w-3.5 h-3.5"> 🏨 酒店驻地
+                            </label>
+                        </div>
+                        <div class="flex flex-wrap gap-2 text-xs font-medium" id="mapLegend"></div>
+                    </div>
+                </div>
+                <div id="map" class="w-full flex-grow z-0"></div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col justify-center">
+                <h3 class="font-bold text-slate-800 flex items-center gap-2 mb-3">
+                    <i data-lucide="file-text" class="w-5 h-5 text-indigo-600"></i>
+                    所选组织市场提炼看板 (客观过滤非业务考勤数据)
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="issueInsightContainer">
+                    <div class="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                        <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">💡 区域典型痛点反馈</h4>
+                        <ul class="text-xs text-slate-500 space-y-2 list-disc pl-4" id="insightIssuesList">
+                            <li class="italic list-none">等待选择组织...</li>
+                        </ul>
+                    </div>
+                    <div class="p-4 bg-indigo-50/20 rounded-xl border border-indigo-100/30">
+                        <h4 class="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-2">🛠️ 建议应对对策汇总</h4>
+                        <ul class="text-xs text-indigo-950/60 space-y-2 list-disc pl-4" id="insightSolutionsList">
+                            <li class="italic list-none">等待选择组织...</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 图1 效能大盘 -->
+        <section class="lg:col-span-12 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col mt-2">
+            <div class="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                <div>
+                    <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                        <i data-lucide="contact-2" class="w-5 h-5 text-blue-600"></i>
+                        责任人出差效能与合规深度透视看板 
+                        <span id="scopeLabel" class="text-xs font-bold bg-blue-600 text-white px-2 py-0.5 rounded ml-2">全公司大盘</span>
+                    </h3>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse" id="managerAnalysisTable">
+                    <thead>
+                        <tr class="bg-slate-100 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider sticky top-0 z-10 whitespace-nowrap">
+                            <th class="py-3 px-5">责任人</th>
+                            <th class="py-3 px-5">外勤天数与住宿报核</th>
+                            <th class="py-3 px-5">业务覆盖城市</th>
+                            <th class="py-3 px-5">实际业务拜访</th>
+                            <th class="py-3 px-5">辅助考勤定位</th>
+                            <th class="py-3 px-5">独立客群规模</th>
+                            <th class="py-3 px-5">月度综合效能判定</th>
+                            <th class="py-3 px-5">合规异常率</th>
+                            <th class="py-3 px-5 w-[36%]">深度价值诊断与效能画像（陈述客观事实）</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 text-sm text-slate-600" id="managerAnalysisTbody">
+                        <tr><td colspan="9" class="py-8 text-center text-slate-400 italic">⏳ 暂无数据，请载入相关报表。</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 图3 细表/日历网格 区域 -->
+        <section class="lg:col-span-12 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col mt-2 mb-8">
+            <div class="px-5 py-4 border-b border-slate-100 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3">
+                <div>
+                    <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                        <i data-lucide="list-filter" class="w-4 h-4 text-slate-500"></i>
+                        拜访轨迹与时空合理性混合穿透细表
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5">多日行程以倒序展示（单日内按早到晚正序）。自动基于地理位置及时间匹配行程闭环。</p>
+                </div>
+                
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner">
+                        <button onclick="switchDetailView('table')" id="btnViewTable" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-white shadow-sm text-slate-800 transition">细表聚合模式</button>
+                        <button onclick="switchDetailView('timeline')" id="btnViewTimeline" class="px-3 py-1.5 text-xs font-bold rounded-lg text-slate-500 hover:text-slate-800 transition">日历排布模式</button>
+                    </div>
+                    
+                    <div class="h-5 w-px bg-slate-200 hidden lg:block"></div>
+
+                    <div class="flex gap-4 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200 shadow-sm">
+                        <label class="flex items-center gap-1.5 text-xs font-bold cursor-pointer text-slate-700 hover:text-emerald-600 transition-all">
+                            <input type="checkbox" id="chk_tbl_visit" checked onchange="updateFilter('visit', this.checked)" class="accent-emerald-500 w-4 h-4 cursor-pointer"> 📍 拜访记录
+                        </label>
+                        <label class="flex items-center gap-1.5 text-xs font-bold cursor-pointer text-slate-700 hover:text-cyan-600 transition-all">
+                            <input type="checkbox" id="chk_tbl_attendance" checked onchange="updateFilter('attendance', this.checked)" class="accent-cyan-500 w-4 h-4 cursor-pointer"> 🕒 考勤记录
+                        </label>
+                        <label class="flex items-center gap-1.5 text-xs font-bold cursor-pointer text-slate-700 hover:text-amber-600 transition-all">
+                            <input type="checkbox" id="chk_tbl_hotel" checked onchange="updateFilter('hotel', this.checked)" class="accent-amber-500 w-4 h-4 cursor-pointer"> 🏨 住宿凭证
+                        </label>
+                    </div>
+
+                    <div class="h-5 w-px bg-slate-200 hidden lg:block"></div>
+
+                    <div class="flex gap-2">
+                        <button onclick="updateFilter('anomalyOnly', false)" id="btnFilterAll" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-950 text-white transition-all duration-200">
+                            显示全部
+                        </button>
+                        <button onclick="updateFilter('anomalyOnly', true)" id="btnFilterAnomaly" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-rose-50 hover:text-rose-700 flex items-center gap-1 transition-all duration-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>只看异常
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 细表视图 -->
+            <div id="tableViewContainer" class="overflow-x-auto w-full">
+                <!-- 使用 table-fixed 固定列宽算法 -->
+                <table class="w-full text-left border-collapse table-fixed" id="auditDetailTable">
+                    <thead>
+                        <tr class="bg-slate-50 border-b border-slate-100 text-[11px] font-bold text-slate-500 uppercase tracking-wider sticky top-0 z-10">
+                            <th class="py-2.5 px-3 w-[7%]">人员</th>
+                            <th class="py-2.5 px-3 w-[9%]">日期</th>
+                            <th class="py-2.5 px-3 w-[15%]">考勤打卡 (定位参考)</th>
+                            <th class="py-2.5 px-3 w-[23%]">业务活动 (拜访事实)</th>
+                            <th class="py-2.5 px-3 w-[16%]">对应酒店入住记录</th>
+                            <th class="py-2.5 px-3 w-[30%]">时空合规判定与异常详述</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 text-sm text-slate-600" id="auditDetailTbody">
+                        <tr><td colspan="6" class="py-8 text-center text-slate-400">请自上方导入数据报表。</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 标准日历卡片视图 -->
+            <div id="timelineViewContainer" class="hidden bg-slate-50/50 p-4 sm:p-6 w-full">
+                <div class="py-10 text-center text-slate-400">请自上方导入数据报表。</div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 系统配置与常驻地维护 Modal -->
+    <div id="systemConfigModal" class="fixed inset-0 bg-black/50 z-[99999] hidden flex items-center justify-center">
+        <div class="bg-white rounded-2xl shadow-xl w-[700px] max-w-[95%] max-h-[90vh] flex flex-col">
+            <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl shrink-0">
+                <h3 class="font-bold text-slate-800 flex items-center gap-2"><i data-lucide="sliders-horizontal" class="w-5 h-5 text-blue-600"></i>审计规则与常驻地配置中心</h3>
+                <button onclick="closeSystemConfigModal()" class="text-slate-400 hover:text-rose-500 transition"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            
+            <div class="p-4 overflow-y-auto flex-grow text-sm text-slate-600">
+                
+                <!-- 模块一：量化审计阈值配置 -->
+                <div class="mb-5 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                    <h4 class="font-bold text-slate-800 text-sm mb-4 border-b border-slate-100 pb-2 flex items-center gap-2"><i data-lucide="calculator" class="w-4 h-4 text-indigo-500"></i>量化审计算法参数</h4>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                        <label class="flex flex-col text-xs text-slate-500 gap-1.5">
+                            <span class="font-semibold text-slate-700">店房偏离容差 (公里)</span>
+                            <input type="number" id="cfg_hotelDistance" class="border border-slate-300 p-2 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition">
+                            <span class="text-[10px] text-slate-400">超出此距离判定为偏离/时空冲突</span>
+                        </label>
+                        <label class="flex flex-col text-xs text-slate-500 gap-1.5">
+                            <span class="font-semibold text-slate-700">单地超期驻留 (天)</span>
+                            <input type="number" id="cfg_overstayDays" class="border border-slate-300 p-2 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition">
+                            <span class="text-[10px] text-slate-400">单城市连续停留触发警告天数</span>
+                        </label>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                        <div class="col-span-2 md:col-span-4 text-xs font-bold text-rose-600 mb-1">🚨 物理瞬移判定 (高危)</div>
+                        <label class="flex flex-col text-xs text-slate-500 gap-1.5">
+                            <span class="font-semibold text-slate-700">时间差少于 (分钟)</span>
+                            <input type="number" id="cfg_teleportTime" class="border border-slate-300 p-2 rounded-lg outline-none focus:ring-2 focus:ring-rose-500 transition">
+                        </label>
+                        <label class="flex flex-col text-xs text-slate-500 gap-1.5">
+                            <span class="font-semibold text-slate-700">且距离大于 (公里)</span>
+                            <input type="number" id="cfg_teleportDist" class="border border-slate-300 p-2 rounded-lg outline-none focus:ring-2 focus:ring-rose-500 transition">
+                        </label>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                        <div class="col-span-2 md:col-span-4 text-xs font-bold text-purple-600 mb-1">🟣 轨迹过密判定 (中低)</div>
+                        <label class="flex flex-col text-xs text-slate-500 gap-1.5">
+                            <span class="font-semibold text-slate-700">时间差少于 (分钟)</span>
+                            <input type="number" id="cfg_denseTime" class="border border-slate-300 p-2 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 transition">
+                        </label>
+                        <label class="flex flex-col text-xs text-slate-500 gap-1.5">
+                            <span class="font-semibold text-slate-700">且距离大于 (公里)</span>
+                            <input type="number" id="cfg_denseDist" class="border border-slate-300 p-2 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 transition">
+                        </label>
+                    </div>
+
+                    <div class="grid grid-cols-4 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                        <div class="col-span-4 text-xs font-bold text-emerald-700 mb-1">🌟 广度与深度双轨评级标准</div>
+                        <label class="flex flex-col text-xs text-slate-500 gap-1.5">
+                            <span class="font-semibold text-slate-700">广度·优秀线 (家)</span>
+                            <input type="number" id="cfg_clientExcellent" class="border border-slate-300 p-2 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 transition">
+                        </label>
+                        <label class="flex flex-col text-xs text-slate-500 gap-1.5">
+                            <span class="font-semibold text-slate-700">广度·合格线 (家)</span>
+                            <input type="number" id="cfg_clientPass" class="border border-slate-300 p-2 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 transition">
+                        </label>
+                        <label class="flex flex-col text-xs text-slate-500 gap-1.5">
+                            <span class="font-semibold text-slate-700">广度·警告线 (家)</span>
+                            <input type="number" id="cfg_clientWarn" class="border border-slate-300 p-2 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 transition">
+                        </label>
+                        <label class="flex flex-col text-xs text-slate-500 gap-1.5">
+                            <span class="font-semibold text-slate-700">深度·达标总次数</span>
+                            <input type="number" id="cfg_visitDepthPass" class="border border-indigo-300 bg-indigo-50 p-2 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                            <span class="text-[9px] text-indigo-500">客户数不足但总频次达标，视作深耕达标</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 模块二：常驻地维护 -->
+                <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col">
+                    <h4 class="font-bold text-slate-800 text-sm mb-2 border-b border-slate-100 pb-2 flex items-center gap-2"><i data-lucide="home" class="w-4 h-4 text-amber-600"></i>人员常驻地维护</h4>
+                    <p class="mb-3 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 p-2.5 rounded-lg leading-relaxed">
+                        💡 <b>拦截原则：</b>员工在常驻地开展业务不予核销住宿。此外，【东莞】作为总部，系统底层已强制拦截，在此无需配置。<br>
+                        <b>输入格式：</b>一行一个，姓名和城市之间用等号或空格分隔（如：王亚钊 = 石家庄）。
+                    </p>
+                    <textarea id="homeCityTextarea" class="w-full h-[180px] p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-y font-mono text-sm shadow-inner"></textarea>
+                </div>
+
+            </div>
+            
+            <div class="p-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex justify-end gap-3 shrink-0">
+                <button onclick="closeSystemConfigModal()" class="px-5 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-100 transition shadow-sm">取消</button>
+                <button onclick="saveSystemConfig()" class="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 shadow-md transition flex items-center gap-1.5">
+                    <i data-lucide="save" class="w-4 h-4"></i> 保存并重新核算
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================
+        // 1. 底层字典、坐标引擎与参数配置
+        // ==========================
+        let AUDIT_PARAMS = {
+            hotelDistance: 60,
+            overstayDays: 3,
+            teleportTime: 2,
+            teleportDist: 5,
+            denseTime: 15,
+            denseDist: 20,
+            clientExcellent: 15,
+            clientPass: 12,
+            clientWarn: 8,
+            visitDepthPass: 20, // 深度帮扶双轨制合格线
+            fillRateBad: 30,
+            fillRatePass: 70
+        };
+
+        const CITY_COORDINATES = {
+            "北京": [39.9042, 116.4074], "天津": [39.3434, 117.3616], "石家庄": [38.0428, 114.5149],
+            "唐山": [39.6308, 118.1802], "秦皇岛": [39.9354, 119.6005], "邯郸": [36.6123, 114.4894],
+            "邢台": [37.0707, 114.5048], "保定": [38.8671, 115.4645], "张家口": [40.7675, 114.8863],
+            "承德": [40.9715, 117.9624], "沧州": [38.3045, 116.8388], "廊坊": [39.5283, 116.7036],
+            "衡水": [37.7383, 115.6563], "太原": [37.8735, 112.5627], "大同": [40.0768, 113.3001],
+            "阳泉": [37.8572, 113.5788], "长治": [36.1953, 113.1163], "晋城": [35.4903, 112.8643],
+            "朔州": [39.3313, 112.4313], "晋中": [37.6874, 112.7523], "运城": [35.0220, 111.0068],
+            "忻州": [38.4163, 112.7342], "临汾": [36.0841, 111.5190], "吕梁": [37.5173, 111.1445],
+            "呼和浩特": [40.8415, 111.7483], "包头": [40.6574, 109.8403], "乌海": [39.6543, 106.8243],
+            "赤峰": [42.2573, 118.8843], "通辽": [43.6142, 122.2603], "鄂尔多斯": [39.6083, 109.7813],
+            "呼伦贝尔": [49.2142, 119.7603], "巴彦淖尔": [40.7432, 107.4168], "乌兰察布": [40.9943, 113.1323],
+            "沈阳": [41.7968, 123.4315], "大连": [38.9140, 121.6147], "鞍山": [41.1074, 122.9946],
+            "抚顺": [41.8814, 123.9572], "本溪": [41.2943, 123.7663], "丹东": [40.1243, 124.3852],
+            "锦州": [41.1042, 121.1243], "营口": [40.6642, 122.2352], "阜新": [42.0242, 121.6542],
+            "辽阳": [41.2742, 123.1843], "盘锦": [41.1242, 122.0642], "铁岭": [42.2942, 123.8432],
+            "朝阳": [41.5742, 120.4542], "葫芦岛": [40.7542, 120.8342], "长春": [43.8171, 125.3235],
+            "吉林": [43.8436, 126.5494], "四平": [43.1642, 124.3542], "辽源": [42.9042, 125.1442],
+            "通化": [41.7242, 125.9442], "白山": [41.9442, 126.4242], "松原": [45.1442, 124.8242],
+            "白城": [45.6242, 122.8442], "延边": [42.8883, 129.4789], "哈尔滨": [45.8038, 126.5350],
+            "齐齐哈尔": [47.3442, 123.9542], "牡丹江": [44.5842, 129.6042], "佳木斯": [46.8042, 130.3542],
+            "大庆": [46.5942, 125.0342], "绥化": [46.6342, 126.9842], "上海": [31.2304, 121.4737],
+            "杭州": [30.2741, 120.1551], "宁波": [29.8683, 121.5440], "温州": [27.9943, 120.6994],
+            "嘉兴": [30.7453, 120.7555], "湖州": [30.8671, 120.1024], "绍兴": [30.0024, 120.5821],
+            "金华": [29.0791, 119.6475], "衢州": [28.9569, 118.8593], "舟山": [29.9855, 122.2072],
+            "台州": [28.6563, 121.4208], "丽水": [28.4563, 119.9231], "南京": [32.0603, 118.7969],
+            "无锡": [31.5747, 120.3016], "徐州": [34.2610, 117.1859], "常州": [31.8112, 119.9737],
+            "苏州": [31.2990, 120.6186], "南通": [31.9802, 120.8943], "连云港": [34.5966, 119.2216],
+            "淮安": [33.6103, 119.0153], "盐城": [33.3474, 120.1631], "扬州": [32.3942, 119.4129],
+            "镇江": [32.1887, 119.4210], "泰州": [32.4555, 119.9234], "宿迁": [33.9634, 118.2753],
+            "合肥": [31.8206, 117.2272], "芜湖": [31.3524, 118.3846], "蚌埠": [32.9163, 117.3897],
+            "淮南": [32.6255, 116.9978], "马鞍山": [31.6743, 118.5064], "淮北": [33.9558, 116.7914],
+            "铜陵": [30.9453, 117.8122], "安庆": [30.5084, 117.0587], "黄山": [29.7147, 118.3375],
+            "滁州": [32.2963, 118.3163], "阜阳": [32.8901, 115.8146], "宿州": [33.6368, 116.9847],
+            "六安": [31.7543, 116.5072], "亳州": [33.8445, 115.7787], "池州": [30.6562, 117.4891],
+            "宣城": [30.9407, 118.7578], "济南": [36.6758, 117.0009], "青岛": [36.0670, 120.3826],
+            "淄博": [36.8135, 118.0550], "枣庄": [34.8677, 117.5580], "东营": [37.4618, 118.4920],
+            "烟台": [37.5396, 121.3913], "潍坊": [36.7079, 119.1426], "济宁": [35.4111, 116.5872], "邹城": [35.4053, 116.9902],
+            "泰安": [36.1950, 117.1190], "威海": [37.5131, 122.1204], "日照": [35.4164, 119.5269],
+            "临沂": [35.0610, 118.3403], "德州": [37.4341, 116.3575], "聊城": [36.4560, 115.9855],
+            "滨州": [37.3820, 117.9702], "菏泽": [35.2444, 115.4693], "郑州": [34.7466, 113.6253],
+            "开封": [34.7972, 114.3075], "洛阳": [34.6196, 112.4542], "平顶山": [33.7663, 113.1917],
+            "安阳": [36.0975, 114.3924], "鹤壁": [35.7482, 114.2974], "新乡": [35.3032, 113.8824],
+            "焦作": [35.2158, 113.2418], "濮阳": [35.7618, 115.0294], "许昌": [34.0371, 113.8524],
+            "漯河": [33.5813, 114.0164], "三门峡": [34.7743, 111.2003], "南阳": [32.9985, 112.5293],
+            "商丘": [34.4143, 115.6563], "信阳": [32.1263, 114.0913], "周口": [33.6253, 114.6972],
+            "驻马店": [32.9803, 114.0293], "济源": [35.0913, 112.6023], "武汉": [30.5928, 114.3055],
+            "黄石": [30.1996, 115.0386], "十堰": [32.6464, 110.7983], "宜昌": [30.6983, 111.2853],
+            "襄阳": [32.0083, 112.1224], "鄂州": [30.3914, 114.8914], "荆门": [31.0354, 112.2003],
+            "孝感": [30.9262, 113.9262], "荆州": [30.3343, 112.2413], "黄冈": [30.4462, 114.8793],
+            "咸宁": [29.8413, 114.3224], "随州": [31.7113, 113.3824], "恩施": [30.2742, 109.4893],
+            "长沙": [28.2277, 112.9388], "株洲": [27.8285, 113.1337], "湘潭": [27.8309, 112.9439],
+            "衡阳": [26.8942, 112.5714], "邵阳": [27.2423, 111.4692], "岳阳": [29.3573, 113.1293],
+            "常德": [29.0316, 111.6983], "张家界": [29.1174, 110.4793], "益阳": [28.5523, 112.3483],
+            "郴州": [25.7702, 113.0148], "永州": [26.4203, 111.6134], "怀化": [27.5502, 110.0013],
+            "娄底": [27.7003, 112.0123], "南昌": [28.6833, 115.8575], "景德镇": [29.2693, 117.1793],
+            "萍乡": [27.6224, 113.8546], "九江": [29.7053, 116.0023], "新余": [27.8173, 114.9174],
+            "鹰潭": [28.2603, 117.0573], "赣州": [25.8313, 114.9353], "吉安": [27.1134, 114.9853],
+            "宜春": [27.8043, 114.3914], "抚州": [27.9423, 116.3572], "上饶": [28.4419, 117.9620],
+            "重庆": [29.5630, 106.5516], "成都": [30.5728, 104.0665], "自贡": [29.3394, 104.7783],
+            "攀枝花": [26.5823, 101.7183], "泸州": [28.8714, 105.4419], "德阳": [31.1274, 104.3984],
+            "绵阳": [31.4674, 104.6790], "广元": [32.4354, 105.8432], "遂宁": [30.5342, 105.5943],
+            "内江": [29.5843, 105.0543], "乐山": [29.5542, 103.7642], "南充": [30.7942, 106.0843],
+            "眉山": [30.0742, 103.8423], "宜宾": [28.7423, 104.6234], "广安": [30.4542, 106.6342],
+            "达州": [31.2084, 107.4943], "雅安": [30.0042, 103.0123], "资阳": [30.1242, 104.6242],
+            "贵阳": [26.6477, 106.6302], "遵义": [27.7114, 106.9242], "六盘水": [26.5942, 104.8342],
+            "安顺": [26.2442, 105.9242], "毕节": [27.3042, 105.2842], "铜仁": [27.7142, 109.1852],
+            "昆明": [25.0453, 102.7103], "曲靖": [25.4900, 103.7978], "玉溪": [24.3541, 102.5441],
+            "拉萨": [29.6442, 91.1142], "日喀则": [29.2642, 88.8842], "西安": [34.3416, 108.9398],
+            "咸阳": [34.3296, 108.7089], "汉中": [33.0684, 107.0286], "安康": [32.6845, 109.0293],
+            "商洛": [33.8683, 109.9392], "延安": [36.5853, 109.4893], "宝鸡": [34.3623, 107.1432],
+            "渭南": [34.4994, 109.5093], "铜川": [34.8967, 108.9398], "榆林": [38.2913, 109.7412],
+            "兰州": [36.0614, 103.8342], "天水": [34.5808, 105.7242], "白银": [36.5453, 104.1794],
+            "庆阳": [35.7384, 107.6324], "平凉": [35.5423, 106.6653], "酒泉": [39.7342, 98.4943],
+            "张掖": [38.9342, 100.4543], "武威": [37.9284, 102.6342], "定西": [35.5806, 104.6262],
+            "银川": [38.4864, 106.2324], "石嘴山": [39.0234, 106.3764], "吴忠": [37.9943, 106.1984],
+            "中卫": [37.5143, 105.1874], "固原": [36.0042, 106.2842], "西宁": [36.6234, 101.7783],
+            "乌鲁木齐": [43.8266, 87.6168], "克拉玛依": [45.5802, 84.8693], "哈密": [42.8174, 93.5143],
+            "昌吉": [44.0123, 87.3013], "喀什": [39.4674, 75.9893], "伊犁": [43.9174, 81.3143],
+            "阿克苏": [41.1674, 80.2643], "库尔勒": [41.7242, 86.1423], "吐鲁番": [42.9423, 89.1742],
+            "广州": [23.1291, 113.2644], "深圳": [22.5431, 114.0579], "东莞": [23.0210, 113.7518],
+            "珠海": [22.2707, 113.5767], "韶关": [24.8033, 113.5975], "佛山": [23.0215, 113.1214],
+            "江门": [22.5787, 113.0819], "湛江": [21.2707, 110.3567], "茂名": [21.6627, 110.9248],
+            "肇庆": [23.0482, 112.4697], "惠州": [23.1114, 114.4161], "梅州": [24.2883, 116.1225],
+            "汕头": [23.3538, 116.6819], "汕尾": [22.7843, 115.3752], "河源": [23.7433, 114.7005],
+            "阳江": [21.8582, 111.9827], "清远": [23.6821, 113.0563], "中山": [22.5175, 113.3924],
+            "潮州": [23.6571, 116.6224], "揭阳": [23.5497, 116.3727], "云浮": [22.9152, 112.0444],
+            "南宁": [22.8170, 108.3661], "柳州": [24.3255, 109.4160], "桂林": [25.2742, 110.2943],
+            "梧州": [23.4742, 111.2943], "北海": [21.4812, 109.1243], "防城港": [21.6142, 108.3543],
+            "钦州": [21.9642, 108.6234], "贵港": [23.1142, 109.6234], "玉林": [22.6342, 110.1543],
+            "百色": [23.8942, 106.6234], "贺州": [24.4142, 111.5543], "河池": [24.6942, 108.0293],
+            "来宾": [23.7242, 109.3842], "崇左": [22.4142, 107.3542], "海口": [20.0174, 110.3388],
+            "三亚": [18.2524, 109.5123], "福州": [26.0745, 119.2965], "厦门": [24.4798, 118.0894],
+            "泉州": [24.8742, 118.5893], "漳州": [24.5142, 117.6543], "莆田": [25.4342, 119.0123],
+            "三明": [26.2642, 117.6342], "南平": [26.6342, 118.1742], "龙岩": [25.0742, 117.0234],
+            "宁德": [26.6542, 119.5242], "福清": [25.7210, 119.3851], "成县": [33.7431, 105.7335], 
+            "徽县": [33.7744, 106.0829], "武都": [33.3934, 104.9221], "陇南": [33.3934, 104.9221], 
+            "两当": [33.9103, 106.3051], "康县": [33.3275, 105.5976], "密山": [45.5478, 131.8797], 
+            "鸡西": [45.3000, 130.9700], "虎林": [45.7618, 132.9693], "鸡东": [45.2612, 131.1444],
+            "昭通": [27.3188, 103.7172], "永善": [28.2274, 103.6366], "万荣": [35.4138, 110.7878]
+        };
+
+        const CITY_TO_PROV = { "北京": "北京", "天津": "天津", "上海": "上海", "重庆": "重庆" };
+        const PROVINCE_NAMES = ["北京", "上海", "天津", "重庆", "河北", "山西", "内蒙", "辽宁", "吉林", "黑龙江", "江苏", "浙江", "安徽", "福建", "江西", "山东", "河南", "湖北", "湖南", "广东", "广西", "海南", "四川", "贵州", "云南", "西藏", "陕西", "甘肃", "青海", "宁夏", "新疆"];
+        
+        const EXTENDED_COUNTIES = {
+            "浙江": ["杭州","宁波","温州","嘉兴","湖州","绍兴","金华","衢州","舟山","台州","丽水","缙云","青田","龙泉","松阳","遂昌","云和","庆元","景宁","仙居","三门","天台","临海","温岭","玉环","淳安","建德","桐庐","慈溪","余姚","宁海","象山","奉化","苍南","平阳","泰顺","瑞安","乐清","永嘉","洞头","文成","嘉善","海盐","海宁","平湖","桐乡","德清","长兴","安吉","诸暨","嵊州","新昌","武义","浦江","磐安","兰溪","义乌","东阳","永康","常山","开化","龙游","江山","柯桥","上虞","南湖","秀洲"],
+            "江苏": ["南京","无锡","徐州","常州","苏州","南通","连云港","淮安","盐城","扬州","镇江","泰州","宿迁","江阴","宜兴","邳州","新沂","丰县","沛县","睢宁","溧阳","昆山","常熟","张家港","太仓","启东","如皋","海安","如东","东台","兴化","靖江","泰兴","沭阳","泗阳","泗洪","丹阳","扬中","句容","宝应","仪征","高邮","建湖","射阳","阜宁","滨海","响水","涟水","洪泽","金湖","盱眙","灌南","灌云","东海","海门"],
+            "福建": ["福州","厦门","泉州","漳州","莆田","三明","南平","龙岩","宁德","闽侯","连江","罗源","闽清","永泰","平潭","福清","长乐","仙游","尤溪","大田","明溪","清流","宁化","建宁","泰宁","将乐","沙县","顺昌","浦城","光泽","松溪","政和","邵武","武夷山","建瓯","长汀","永定","上杭","武平","连城","漳平","霞浦","古田","屏南","寿宁","周宁","柘荣","福安","福鼎","南安","惠安","安溪","永春","德化","石狮","晋江","云霄","漳浦","诏安","长泰","东山","南靖","平和","华安","龙海","建阳"],
+            "广东": ["广州","深圳","东莞","珠海","韶关","佛山","江门","湛江","茂名","肇庆","惠州","梅州","汕头","汕尾","河源","阳江","清远","中山","潮州","揭阳","云浮","增城","从化","乐昌","南雄","仁化","始兴","翁源","新丰","乳源","阳山","佛冈","广宁","怀集","封开","德庆","四会","台山","开平","鹤山","恩平","廉江","雷州","吴川","遂溪","徐闻","高州","化州","信宜","电白","高要","阳春","阳西","陆丰","海丰","陆河","普宁","揭东","揭西","惠来","兴宁","梅县","平远","蕉岭","大埔","丰顺","五华","紫金","龙川","连平","和平","东源","博罗","惠东","龙门","顺德","南海","番禺","三水","高明"],
+            "山东": ["济南","青岛","淄博","枣庄","东营","烟台","潍坊","济宁","泰安","威海","日照","临沂","德州","聊城","滨州","菏泽","胶州","平度","莱西","滕州","邹城","曲阜","肥城","龙口","莱州","招远","蓬莱","栖霞","海阳","青州","寿光","诸城","昌邑","高密","安丘","昌乐","乳山","荣成","临清","莘县","阳谷","茌平","东阿","冠县","高唐","曹县","单县","成武","巨野","郓城","鄄城","定陶","东明","广饶","临朐","宁阳","东平","汶上","泗水","微山","鱼台","金乡","嘉祥","宁津","齐河","禹城","乐陵","临邑","平原","夏津","武城","桓台","沂源"],
+            "河南": ["郑州","开封","洛阳","平顶山","安阳","鹤壁","新乡","焦作","濮阳","许昌","漯河","三门峡","南阳","商丘","信阳","周口","驻马店","济源","巩义","荥阳","新密","新郑","登封","中牟","杞县","通许","尉氏","兰考","孟津","新安","栾川","嵩县","汝阳","宜阳","洛宁","伊川","偃师","宝丰","叶县","鲁山","郏县","舞钢","汝州","浚县","淇县","卫辉","汤阴","滑县","内黄","原阳","延津","封丘","长垣","辉县","修武","博爱","武陟","温县","沁阳","孟州","清丰","南乐","范县","台前","濮阳县","鄢陵","襄城","禹州","长葛","舞阳","临颍","卢氏","渑池","灵宝","项城","林州","新乡县","淇县"],
+            "安徽": ["合肥","芜湖","蚌埠","淮南","马鞍山","淮北","铜陵","安庆","黄山","滁州","阜阳","宿州","六安","亳州","池州","宣城","肥东","肥西","长丰","庐江","巢湖","无为","怀远","五河","固镇","凤台","当涂","濉溪","怀宁","潜山","太湖","宿松","望江","岳西","桐城","歙县","休宁","黟县","祁门","全椒","来安","定远","凤阳","广德","宁国","泾县","绩溪","旌德","临泉","太和","阜南","颍上","萧县","砀山","寿县","霍邱","舒城","金寨","霍山","蒙城","涡阳","界首","明光","天长","南陵","繁昌"],
+            "四川": ["成都","自贡","攀枝花","泸州","德阳","绵阳","广元","遂宁","内江","乐山","南充","眉山","宜宾","广安","达州","雅安","资阳","双流","都江堰","彭州","邛崃","崇州","简阳","广汉","什邡","绵竹","江油","峨眉山","阆中","万源","华蓥","西昌","隆昌","泸县","合江","叙永","古蔺","仁寿","安岳","洪雅","丹棱","青神","大英","平昌","营山","蓬安","仪陇","南部","宣汉","开江","通江","渠县","大竹","达川","米易","盐边","安州","梓潼","北川","平武","射洪","蓬溪"],
+            "湖北": ["武汉","黄石","十堰","宜昌","襄阳","鄂州","荆门","孝感","荆州","黄冈","咸宁","随州","恩施","大冶","阳新","丹江口","郧阳","郧西","竹山","竹溪","房县","宜都","当阳","枝江","远安","兴山","秭归","长阳","五峰","老河口","枣阳","宜城","南漳","谷城","保康","钟祥","京山","沙洋","应城","汉川","松滋","监利","恩施市","利川","建始","巴东","宣恩","咸丰","来凤","鹤峰","仙桃","安陆","大悟","云梦","孝昌","麻城","武穴","罗田","红安","浠水","蕲春","黄梅","团风","赤壁","嘉鱼","通城","崇阳","通山","广水","天门","潜江"],
+            "湖南": ["长沙","株洲","湘潭","衡阳","邵阳","岳阳","常德","张家界","益阳","郴州","永州","怀化","娄底","浏阳","宁乡","醴陵","湘乡","韶山","耒阳","常宁","武冈","临湘","汨罗","津市","沅江","资兴","洪江","冷水江","涟源","吉首","邵东","祁阳","邵阳县","隆回","洞口","新宁","城步","绥宁","新邵","湘阴","华容","平江","安化","石门","澧县","临澧","桃源","慈利","攸县","茶陵","炎陵"],
+            "江西": ["南昌","景德镇","萍乡","九江","新余","鹰潭","赣州","吉安","宜春","抚州","上饶","南昌县","新建","安义","进贤","乐平","浮梁","修水","彭泽","瑞昌","都昌","湖口","武宁","星子","永修","德安","分宜","贵溪","鄱阳","婺源","铅山","弋阳","余干","横峰","德兴","上栗","井冈山","丰城","樟树","高安","奉新","万载","上高","宜丰","靖安","铜鼓","瑞金","南康","信丰","大余","宁都","龙南","寻乌","定南","全南","安远","兴国","于都","赣县","会昌","石城","万安","泰和","吉水","安福","永新"],
+            "云南": ["昆明","曲靖","玉溪","昭通","保山","丽江","普洱","临沧","安宁","晋宁","呈贡","宜良","嵩明","石林","禄劝","寻甸","富民","宣威","陆良","师宗","罗平","富源","会泽","沾益","巧家","盐津","大关","永善","绥江","镇雄","彝良","威信","水富","鲁甸","楚雄","个旧","开远","蒙自","弥勒","建水","石屏","泸西","景洪","勐海","勐腊","瑞丽","腾冲","芒市","大理市","祥云","宾川"],
+            "河北": ["石家庄","唐山","秦皇岛","邯郸","邢台","保定","张家口","承德","沧州","廊坊","衡水","辛集","藁城","晋州","新乐","定州","涿州","安国","高碑店","霸州","迁安","遵化","滦州","平泉","鹿泉","正定","井陉","栾城","赵县","灵寿","高邑","深泽","赞皇","无极","平山","元氏","任丘","黄骅","河间","泊头","武安","沙河","南宫","南和"],
+            "陕西": ["西安","咸阳","汉中","安康","商洛","延安","宝鸡","渭南","铜川","榆林","兴平","三原","泾阳","乾县","礼泉","淳化","武功","长武","旬邑","彬州","眉县","岐山","扶风","千阳","陇县","凤县","太白","凤翔","神木","府谷","靖边","定边","绥德","米脂","佳县","吴堡","清涧","子洲","韩城","华阴","蒲城","大荔","城固","勉县"],
+            "广西": ["南宁","柳州","桂林","梧州","北海","防城港","钦州","贵港","玉林","百色","贺州","河池","来宾","崇左","武鸣","隆安","马山","上林","宾阳","横县","柳江","柳城","鹿寨","融安","融水","三江","阳朔","临桂","灵川","全州","兴安","永福","灌阳","龙胜","资源","平乐","荔浦","恭城","岑溪","桂平","平南","北流","容县","陆川","博白","兴业","合浦"],
+            "山西": ["太原","大同","阳泉","长治","晋城","朔州","晋中","运城","忻州","临汾","吕梁","古交","清徐","阳曲","娄烦","大同县","天镇","灵丘","阳高","左云","浑源","广灵","平城","怀仁","平定","襄垣","平顺","黎城","壶关","长子","武乡","沁县","沁源","泽州","高平","阳城","陵川","沁水","侯马","霍州","曲沃","翼城","襄汾","洪洞","万荣","临猗","稷山","闻喜","绛县","垣曲","夏县","平陆","芮城","永济","河津","吉县","乡宁","大宁","隰县","永和","蒲县","汾西"],
+            "内蒙": ["呼和浩特","包头","乌海","赤峰","通辽","鄂尔多斯","呼伦贝尔","巴彦淖尔","乌兰察布","土默特左旗","托克托","和林格尔","清水河","武川","土默特右旗","固阳","达尔罕茂明安联合旗","准格尔旗","伊金霍洛旗","乌审旗","杭锦旗","鄂托克旗","鄂托克前旗","乌审","宁城","敖汉旗","喀喇沁旗","翁牛特旗","巴林右旗"],
+            "辽宁": ["沈阳","大连","鞍山","抚顺","本溪","丹东","锦州","营口","阜新","辽阳","盘锦","铁岭","朝阳","葫芦岛","新民","法库","康平","庄河","瓦房店","普兰店","长海","海城","台安","岫岩","东港","凤城","凌海","盖州","大石桥","大洼","盘山","灯塔","北票","凌源","建平","绥中","建昌","兴城","调兵山"],
+            "吉林": ["长春","吉林","四平","辽源","通化","白山","松原","白城","延边","榆树","农安","德惠","九台","磐石","蛟河","桦甸","舒兰","双辽","公主岭","梅河口","梨树","伊通","东丰","辉南","柳河","集安","临江","抚松","靖宇","长白","江源","前郭尔罗斯","长岭","乾安","扶余","洮南","大安","镇赉","通榆","延吉","图们","敦化","珲春","龙井","和龙","汪清","安图"],
+            "黑龙江": ["哈尔滨","齐齐哈尔","牡丹江","佳木斯","大庆","绥化","密山","鸡西","虎林","鸡东","阿城","双城","尚志","五常","宾县","方正","依兰","巴彦","木兰","通河","延寿","讷河","宁安","海林","穆棱","林口","东宁","同江","富锦","桦南","桦川","汤原","抚远","肇东","安达","海伦","肇州","兰西","青冈","庆安","明水","绥棱","望奎"],
+            "贵州": ["贵阳","遵义","六盘水","安顺","毕节","铜仁","清镇","开阳","修文","息烽","水城","盘州","六枝特区","赤水","仁怀","桐梓","绥阳","正安","道真","务川","凤冈","湄潭","余庆","习水","西秀","平坝","普定","镇宁","关岭","紫云","大方","黔西","金沙","织金","纳雍","威宁","赫章","江口","玉屏","兴义","凯里","都匀","福泉"],
+            "甘肃": ["兰州","嘉峪关","金昌","白银","天水","武威","张掖","平凉","酒泉","庆阳","定西","陇南","临夏","甘南","成县","徽县","武都","康县","文县","宕昌","西和","礼县","两当","麦积","秦州","武山","甘谷","清水","平川","靖远","会宁","景泰","西峰","庆城","环县","华池","合水","正宁","宁县","镇原","崆峒","泾川","灵台","崇信","华亭","庄浪","静宁","肃州","金塔","玉门","敦煌","瓜州","肃北","阿克塞","甘州","临泽","高台","山丹","民乐","肃南","凉州","民勤","古浪","天祝","安定","通渭","陇西","渭源","临洮","漳县","岷县"],
+            "宁夏": ["银川","石嘴山","吴忠","固原","中卫","灵武","青铜峡","平罗","盐池","同心","海原","西吉","隆德","泾源","彭阳"],
+            "青海": ["西宁","海东","海北","黄南","海南","果洛","玉树","海西","大通","湟中","湟源","平安","民和","乐都","互助","化隆","循化","格尔木","德令哈","茫崖"],
+            "新疆": ["乌鲁木齐","克拉玛依","吐鲁番","哈密","阿克苏","喀什","和田","昌吉","博尔塔拉","巴音郭楞","克孜勒苏","伊犁","塔城","阿勒泰","石河子","阿拉尔","图木舒克","五家渠","北屯","铁门关","双河","可克达拉","昆玉"],
+            "西藏": ["拉萨","日喀则","昌都","林芝","山南","那曲","阿里","堆龙德庆","达孜","林周","当雄","尼木","曲水","墨竹工卡"],
+            "海南": ["海口","三亚","三沙","儋州","五指山","琼海","文昌","万宁","东方","澄迈","定安","屯昌","临高","白沙","昌江","乐东","陵水","保亭","琼中"]
+        };
+
+        for (const prov in EXTENDED_COUNTIES) { EXTENDED_COUNTIES[prov].forEach(county => { CITY_TO_PROV[county] = prov; }); }
+
+        function resolveProvince(rawStr) {
+            if (!rawStr) return "未知";
+            for (const prov of PROVINCE_NAMES) { if (rawStr.includes(prov)) return prov; }
+            if (rawStr.includes("内蒙古")) return "内蒙";
+            let clean = rawStr.replace(/[省市区县]/g, "");
+            if (CITY_TO_PROV[clean]) return CITY_TO_PROV[clean];
+            for (const cityKey in CITY_TO_PROV) { if (rawStr.includes(cityKey)) return CITY_TO_PROV[cityKey]; }
+            return clean;
+        }
+        
+        const PROVINCE_FALLBACK = {
+            "北京": CITY_COORDINATES["北京"], "上海": CITY_COORDINATES["上海"], "天津": CITY_COORDINATES["天津"], "重庆": CITY_COORDINATES["重庆"],
+            "河北": CITY_COORDINATES["石家庄"], "山西": CITY_COORDINATES["太原"], "内蒙": [40.8, 111.7], "内蒙古": [40.8, 111.7], "辽宁": CITY_COORDINATES["沈阳"],
+            "吉林": CITY_COORDINATES["长春"], "黑龙江": CITY_COORDINATES["哈尔滨"], "江苏": CITY_COORDINATES["南京"], "浙江": CITY_COORDINATES["杭州"],
+            "安徽": CITY_COORDINATES["合肥"], "福建": CITY_COORDINATES["福州"], "江西": CITY_COORDINATES["南昌"], "山东": [36.6758, 117.0009],
+            "河南": CITY_COORDINATES["郑州"], "湖北": CITY_COORDINATES["武汉"], "湖南": CITY_COORDINATES["长沙"], "广东": CITY_COORDINATES["广州"],
+            "广西": CITY_COORDINATES["南宁"], "海南": CITY_COORDINATES["海口"], "四川": CITY_COORDINATES["成都"], "贵州": CITY_COORDINATES["贵阳"],
+            "云南": CITY_COORDINATES["昆明"], "西藏": CITY_COORDINATES["拉萨"], "陕西": CITY_COORDINATES["西安"], "甘肃": CITY_COORDINATES["兰州"],
+            "青海": [36.6, 101.7], "宁夏": CITY_COORDINATES["银川"], "新疆": CITY_COORDINATES["乌鲁木齐"]
+        };
+
+        function getCityCoordinatesFallback(cityStr) {
+            if (!cityStr) return { coords: null, isProvince: false };
+            let clean = cityStr.replace(/[省市区县]/g, "");
+            if (CITY_COORDINATES[clean]) return { coords: [...CITY_COORDINATES[clean]], isProvince: false };
+            for (const cityKey in CITY_COORDINATES) {
+                if (cityStr.includes(cityKey)) return { coords: [...CITY_COORDINATES[cityKey]], isProvince: false };
+            }
+            const prov = resolveProvince(cityStr);
+            if (PROVINCE_FALLBACK[prov]) return { coords: [...PROVINCE_FALLBACK[prov]], isProvince: true };
+            return { coords: null, isProvince: false };
+        }
+
+        const MANAGER_REGIONS = {
+            "刘媛媛": "北京、天津、内蒙、内蒙古", "董琥": "黑龙江、吉林、辽宁", "苑傲华": "河南、山东", "袁海亮": "湖北、湖南、江西",
+            "王亚钊": "河北、山西", "黄祥明": "江苏、上海", "曾耸俊": "安徽、浙江", "刘文平": "全部",
+            "李曾灵": "西安、咸阳、汉中、安康、商洛、新疆、陕西", "冯广科": "榆林、延安、宝鸡、渭南、铜川、甘肃、陕西",
+            "高承栋": "宁夏、甘肃、青海", "蓝俊": "云南、贵州、重庆", "王甜": "四川、西藏", "黄勇志": "广东、粤、广西、海南",
+            "伍海波": "深圳、福建、广东、粤", "谢健": "东莞、广东、粤", "刘伟": "全部",
+            "韩洋洋": "北京、天津、河北、山西、内蒙、内蒙古、黑龙江、吉林、辽宁", "肖帆": "湖北、湖南、江西、福建",
+            "张娟": "陕西、甘肃、青海、宁夏、新疆", "陈明芳": "云南、贵州、四川、重庆、西藏", "周鹏": "上海、浙江、安徽",
+            "徐俊飞": "上海、江苏、山东、河南", "谢镇旺": "广东、粤、广西、海南", "蔡志强": "全部",
+            "戴继锋": "北京、天津、河北、山西、山东、河南、内蒙、内蒙古、黑龙江、吉林、辽宁",
+            "王毅": "陕西、甘肃、青海、宁夏、新疆、云南、贵州、四川、重庆、西藏", "郑云峰": "上海、浙江、江苏",
+            "胡松": "广东、粤、广西、海南、湖北、湖南、江西、福建、安徽"
+        };
+
+        const MANAGER_COLORS = { "胡松": "#10b981", "戴继锋": "#2563eb", "王毅": "#f59e0b", "郑云峰": "#ef4444", "苑傲华": "#6366f1", "徐俊飞": "#8b5cf6", "谢健": "#ec4899", "王甜": "#06b6d4", "曾耸俊": "#0284c7", "蓝俊": "#f97316" };
+
+        let HOME_CITIES = {};
+        const DEFAULT_HOME_CITIES = { "刘媛媛": "北京", "袁海亮": "武汉", "王亚钊": "石家庄", "黄祥明": "南京", "刘文平": "北京", "李曾灵": "渭南", "高承栋": "白银", "蓝俊": "重庆", "王甜": "成都", "谢健": "东莞", "刘伟": "西安", "肖帆": "武汉", "张娟": "西安", "陈明芳": "成都", "周鹏": "杭州", "蔡志强": "佛山", "胡松": "广州", "王毅": "南充" };
+
+        let rawHotelDataSet = []; let parsedData = [];
+        let map; let visitLayerGroup, attendanceLayerGroup, hotelLayerGroup;
+        let activeMonths = []; let viewState = { visit: true, attendance: true, hotel: true, anomalyOnly: false };
+        let playbackInterval = null; let playbackMarker = null; let currentlyPlayingManager = null;
+
+        let filterScopeType = "all"; let selectedDeptId = null; let allowedUsersPool = []; let currentDetailView = 'table'; 
+
+        // ==========================
+        // 2. 系统配置与界面初始化
+        // ==========================
+        window.onload = function() { lucide.createIcons(); initSystemConfig(); initMap(); };
+
+        function switchDetailView(view) {
+            currentDetailView = view;
+            if (view === 'table') {
+                document.getElementById('btnViewTable').className = "px-3 py-1.5 text-xs font-bold rounded-lg bg-white shadow-sm text-slate-800 transition";
+                document.getElementById('btnViewTimeline').className = "px-3 py-1.5 text-xs font-bold rounded-lg text-slate-500 hover:text-slate-800 transition";
+                document.getElementById('tableViewContainer').classList.remove('hidden');
+                document.getElementById('timelineViewContainer').classList.add('hidden');
+            } else {
+                document.getElementById('btnViewTimeline').className = "px-3 py-1.5 text-xs font-bold rounded-lg bg-white shadow-sm text-slate-800 transition";
+                document.getElementById('btnViewTable').className = "px-3 py-1.5 text-xs font-bold rounded-lg text-slate-500 hover:text-slate-800 transition";
+                document.getElementById('tableViewContainer').classList.add('hidden');
+                document.getElementById('timelineViewContainer').classList.remove('hidden');
+            }
+        }
+
+        function initSystemConfig() { 
+            const storedCities = localStorage.getItem('audit_home_cities'); 
+            if (storedCities) { 
+                try { 
+                    HOME_CITIES = JSON.parse(storedCities); 
+                    for (const key in DEFAULT_HOME_CITIES) {
+                        if (!(key in HOME_CITIES)) HOME_CITIES[key] = DEFAULT_HOME_CITIES[key];
+                    }
+                } catch(e) { HOME_CITIES = {...DEFAULT_HOME_CITIES}; } 
+            } 
+            else { HOME_CITIES = {...DEFAULT_HOME_CITIES}; } 
+
+            const storedParams = localStorage.getItem('audit_system_params');
+            if (storedParams) { try { Object.assign(AUDIT_PARAMS, JSON.parse(storedParams)); } catch(e) {} }
+        }
+
+        function openSystemConfigModal() { 
+            const textarea = document.getElementById('homeCityTextarea'); let text = ""; 
+            for (const [name, city] of Object.entries(HOME_CITIES)) { text += `${name} = ${city}\n`; } 
+            textarea.value = text; 
+            
+            document.getElementById('cfg_hotelDistance').value = AUDIT_PARAMS.hotelDistance;
+            document.getElementById('cfg_overstayDays').value = AUDIT_PARAMS.overstayDays;
+            document.getElementById('cfg_teleportTime').value = AUDIT_PARAMS.teleportTime;
+            document.getElementById('cfg_teleportDist').value = AUDIT_PARAMS.teleportDist;
+            document.getElementById('cfg_denseTime').value = AUDIT_PARAMS.denseTime;
+            document.getElementById('cfg_denseDist').value = AUDIT_PARAMS.denseDist;
+            document.getElementById('cfg_clientExcellent').value = AUDIT_PARAMS.clientExcellent;
+            document.getElementById('cfg_clientPass').value = AUDIT_PARAMS.clientPass;
+            document.getElementById('cfg_clientWarn').value = AUDIT_PARAMS.clientWarn;
+            document.getElementById('cfg_visitDepthPass').value = AUDIT_PARAMS.visitDepthPass;
+
+            document.getElementById('systemConfigModal').classList.remove('hidden'); 
+        }
+
+        function closeSystemConfigModal() { document.getElementById('systemConfigModal').classList.add('hidden'); }
+        
+        function saveSystemConfig() {
+            const text = document.getElementById('homeCityTextarea').value; const lines = text.split('\n'); const newMapping = {};
+            lines.forEach(line => {
+                const parts = line.split(/=|:|：/).filter(Boolean);
+                if (parts.length >= 2) newMapping[parts[0].trim()] = parts[1].trim();
+                else if (line.trim().includes(' ')) { const spaceParts = line.trim().split(/\s+/); if (spaceParts.length >= 2) newMapping[spaceParts[0].trim()] = spaceParts[1].trim(); }
+            });
+            HOME_CITIES = newMapping; localStorage.setItem('audit_home_cities', JSON.stringify(HOME_CITIES)); 
+
+            AUDIT_PARAMS.hotelDistance = parseFloat(document.getElementById('cfg_hotelDistance').value) || 60;
+            AUDIT_PARAMS.overstayDays = parseInt(document.getElementById('cfg_overstayDays').value) || 3;
+            AUDIT_PARAMS.teleportTime = parseFloat(document.getElementById('cfg_teleportTime').value) || 2;
+            AUDIT_PARAMS.teleportDist = parseFloat(document.getElementById('cfg_teleportDist').value) || 5;
+            AUDIT_PARAMS.denseTime = parseFloat(document.getElementById('cfg_denseTime').value) || 15;
+            AUDIT_PARAMS.denseDist = parseFloat(document.getElementById('cfg_denseDist').value) || 20;
+            AUDIT_PARAMS.clientExcellent = parseInt(document.getElementById('cfg_clientExcellent').value) || 15;
+            AUDIT_PARAMS.clientPass = parseInt(document.getElementById('cfg_clientPass').value) || 12;
+            AUDIT_PARAMS.clientWarn = parseInt(document.getElementById('cfg_clientWarn').value) || 8;
+            AUDIT_PARAMS.visitDepthPass = parseInt(document.getElementById('cfg_visitDepthPass').value) || 20;
+            localStorage.setItem('audit_system_params', JSON.stringify(AUDIT_PARAMS));
+
+            closeSystemConfigModal();
+            if (parsedData.length > 0 || rawHotelDataSet.length > 0) { 
+                if (parsedData.length > 0) auditDisplacements(parsedData); 
+                refreshDashboard(); 
+                alert("✅ 审计配置更新成功！系统已基于新规则重新核算。"); 
+            } else { 
+                alert("✅ 审计配置更新成功！"); 
+            }
+        }
+
+        function initMap() {
+            map = L.map('map', { center: [35, 105], zoom: 4, attributionControl: false });
+            L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}', { subdomains: ["1", "2", "3", "4"], maxZoom: 18 }).addTo(map);
+            visitLayerGroup = L.layerGroup().addTo(map); attendanceLayerGroup = L.layerGroup().addTo(map); hotelLayerGroup = L.layerGroup().addTo(map);
+        }
+
+        function updateFilter(type, value) {
+            viewState[type] = value;
+            if (type === 'visit' || type === 'attendance' || type === 'hotel') {
+                const mapChk = document.getElementById(`chk_map_${type}`);
+                const tblChk = document.getElementById(`chk_tbl_${type}`);
+                if (mapChk) mapChk.checked = value;
+                if (tblChk) tblChk.checked = value;
+                const layer = type === 'visit' ? visitLayerGroup : (type === 'attendance' ? attendanceLayerGroup : hotelLayerGroup);
+                if (layer) { if (value) map.addLayer(layer); else map.removeLayer(layer); }
+            }
+            if (type === 'anomalyOnly') {
+                const btnAll = document.getElementById('btnFilterAll'); const btnDelta = document.getElementById('btnFilterAnomaly');
+                if (!value) { 
+                    btnAll.className = "px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-950 text-white transition-all duration-200";
+                    btnDelta.className = "px-3 py-1.5 text-xs font-semibold rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-rose-50 hover:text-rose-700 flex items-center gap-1 transition-all duration-200";
+                } else {
+                    btnAll.className = "px-3 py-1.5 text-xs font-semibold rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 transition-all duration-200";
+                    btnDelta.className = "px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-500 text-white shadow-sm flex items-center gap-1 transition-all duration-200";
+                }
+            }
+
+            if (playbackInterval) {
+                clearInterval(playbackInterval);
+                if (playbackMarker) map.removeLayer(playbackMarker);
+                playbackInterval = null;
+                currentlyPlayingManager = null;
+                updatePlaybackButtons();
+            }
+
+            refreshDashboardViewsOnly();
+        }
+
+        function selectDeptFilter(deptId, usersArr) { filterScopeType = "dept"; selectedDeptId = deptId; allowedUsersPool = usersArr; updateTreeDOMHighlight(); refreshDashboard(); }
+        function selectUserFilter(username) { filterScopeType = "user"; selectedDeptId = null; allowedUsersPool = [username]; updateTreeDOMHighlight(); refreshDashboard(); }
+        function clearTreeFilter() { filterScopeType = "all"; selectedDeptId = null; allowedUsersPool = []; updateTreeDOMHighlight(); refreshDashboard(); }
+
+        function updateTreeDOMHighlight() {
+            document.querySelectorAll('.dept-node').forEach(n => n.className = "dept-node px-2.5 py-2 font-bold text-slate-700 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition");
+            document.querySelectorAll('.user-node').forEach(n => n.className = "user-node text-left p-1 rounded hover:bg-slate-50 border border-transparent truncate text-slate-600");
+            const scopeLabel = document.getElementById('scopeLabel');
+            if (filterScopeType === 'dept') {
+                const activeDept = document.getElementById(`dept-btn-${selectedDeptId}`);
+                if(activeDept) activeDept.className = "dept-node px-2.5 py-2 font-bold bg-indigo-50 text-indigo-700 flex justify-between items-center cursor-pointer border border-indigo-200 rounded transition";
+                scopeLabel.innerText = `营销部门级别展示`;
+            } else if (filterScopeType === 'user') {
+                document.querySelectorAll('.user-node').forEach(n => { if(n.innerText.includes(allowedUsersPool[0])) n.className = "user-node text-left p-1 rounded bg-blue-50 border border-blue-400 font-bold text-blue-700 truncate animate-pulse"; });
+                scopeLabel.innerText = `单责任人：${allowedUsersPool[0]}`;
+            } else { scopeLabel.innerText = `全公司视角`; }
+        }
+
+        function getHaversineDistance(coords1, coords2) {
+            const R = 6371; const dLat = (coords2[0] - coords1[0]) * Math.PI / 180; const dLon = (coords2[1] - coords1[1]) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(coords1[0] * Math.PI / 180) * Math.cos(coords2[0] * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        // 经纬度方位角计算（用于绘制箭头指示方向）
+        function getBearing(p1, p2) {
+            const lat1 = p1[0] * Math.PI / 180; const lon1 = p1[1] * Math.PI / 180;
+            const lat2 = p2[0] * Math.PI / 180; const lon2 = p2[1] * Math.PI / 180;
+            const y = Math.sin(lon2 - lon1) * Math.cos(lat2);
+            const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1);
+            const brng = Math.atan2(y, x) * 180 / Math.PI;
+            return (brng + 360) % 360;
+        }
+
+        // 给折线添加方向箭头的方法
+        function addArrowToLayer(layerGroup, latlngs, color) {
+            for (let i = 0; i < latlngs.length - 1; i++) {
+                const p1 = latlngs[i]; const p2 = latlngs[i+1];
+                if (getHaversineDistance(p1, p2) < 2) continue; // 距离太近不画箭头
+                const bearing = getBearing(p1, p2);
+                const midPoint = [(p1[0]+p2[0])/2, (p1[1]+p2[1])/2];
+                const arrowIcon = L.divIcon({
+                    className: 'arrow-icon',
+                    html: `<div style="transform: rotate(${bearing - 90}deg); color: ${color}; font-size: 14px; font-weight: 900; line-height: 14px; width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; text-shadow: 1px 1px 2px rgba(255,255,255,0.8);">➤</div>`,
+                    iconSize: [14, 14],
+                    iconAnchor: [7, 7]
+                });
+                L.marker(midPoint, { icon: arrowIcon, interactive: false }).addTo(layerGroup);
+            }
+        }
+
+        function extractGlobalMonths() { const months = new Set(); parsedData.forEach(item => months.add(item.monthGroup)); rawHotelDataSet.forEach(h => { if (h.monthGroup) months.add(h.monthGroup); }); return [...months].sort(); }
+
+        function formatStandardDate(dStr) {
+            if(!dStr) return ""; let cleanStr = dStr.trim().replace(/[年月]/g, '-').replace(/日/g, ''); const partsAll = cleanStr.split(/\s+/);
+            const datePart = partsAll[0]; const timePart = partsAll.length > 1 ? ' ' + partsAll.slice(1).join(' ') : '';
+            const parts = datePart.split(/[-/]/); if(parts.length >= 3) { return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}${timePart}`; } return cleanStr;
+        }
+
+        function padTime(timeStr) {
+            if (!timeStr || timeStr === '--:--' || timeStr.includes('全天')) return timeStr;
+            const parts = timeStr.split(':'); if (parts.length >= 2) return parts[0].padStart(2, '0') + ':' + parts[1].padStart(2, '0'); return timeStr;
+        }
+
+        function isWeekend(dateStr) {
+            if (!dateStr) return false; const cleanStr = dateStr.split(' ')[0].replace(/-/g, '/');
+            const d = new Date(cleanStr); if (isNaN(d.getTime())) return false;
+            return d.getDay() === 0 || d.getDay() === 6;
+        }
+
+        // 🔥 统一的正序排序规则（早晨在上，晚上在下，住宿放最后）
+        const sortByTimeAsc = (a, b) => {
+            const getSortTime = (item) => {
+                if (item.type === 'hotel') return '23:59:59';
+                let timeStr = item.data.d.split(' ')[1];
+                if (!timeStr) return '00:00:00';
+                return timeStr.split(':').map(p => p.padStart(2, '0')).join(':');
+            };
+            return getSortTime(a).localeCompare(getSortTime(b));
+        };
+
+        function getDaysInMonth(year, month) { return new Date(year, month, 0).getDate(); }
+        function getFirstDayOfMonth(year, month) { let day = new Date(year, month - 1, 1).getDay(); return day === 0 ? 6 : day - 1; }
+
+        function renderAnomalyTagsInline(anomalies) {
+            if (!anomalies || anomalies.length === 0) return `<span style="display:inline-block; padding: 4px 8px; font-size:12px; font-weight:bold; border-radius:4px; background-color:#ecfdf5; color:#047857; border: 1px solid #a7f3d0;">✅ 时空合理 (房-店闭环或本地常驻)</span>`;
+            return `<div style="display:flex; flex-direction:column; gap:6px;">` + anomalies.map(a => {
+                let bg, text, border; 
+                if (a.level === 'severe') { bg = '#fff1f2'; text = '#be123c'; border = '#fecdd3'; } 
+                else if (a.level === 'warning') { bg = '#fffbeb'; text = '#b45309'; border = '#fde68a'; } 
+                else { bg = '#f5f3ff'; text = '#6d28d9'; border = '#ede9fe'; }
+                return `<span class="anomaly-text" style="display:inline-block; padding: 6px 10px; font-size:12px; border-radius:6px; background-color:${bg}; color:${text}; border: 1px solid ${border}; line-height: 1.5;">${a.text}</span>`;
+            }).join('') + `</div>`;
+        }
+
+        function renderAnomalyTags(anomalies, customSuccessText = "✅ 时空完全合理 (房-店闭环 或 本地常驻)") {
+            if (!anomalies || anomalies.length === 0) return `<span class="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200/60 inline-flex items-center gap-1 shadow-sm w-full">${customSuccessText}</span>`;
+            return `<div class="flex flex-col gap-1.5 w-full anomaly-text">` + anomalies.map(a => {
+                let colorClass = ""; 
+                if (a.level === 'severe') colorClass = "bg-rose-50 text-rose-700 border-rose-200"; 
+                else if (a.level === 'warning') colorClass = "bg-amber-50 text-amber-700 border-amber-200"; 
+                else colorClass = "bg-purple-50 text-purple-700 border-purple-200";
+                return `<span class="px-2 py-1.5 text-[11px] rounded-lg border flex items-start gap-1.5 shadow-sm whitespace-normal leading-relaxed ${colorClass}"><span>${a.text}</span></span>`;
+            }).join('') + `</div>`;
+        }
+
+        function exportDeptImage(event, deptName, usersArr) {
+            event.stopPropagation();
+            if (activeMonths.length === 0) { alert("⚠️ 请先从右上角导入数据文件并选择月份！"); return; }
+
+            const btn = event.currentTarget; const originalHTML = btn.innerHTML; btn.innerHTML = `<span class="animate-pulse">⏳</span>`;
+            const renderContainer = document.createElement('div');
+            renderContainer.style.position = 'absolute'; renderContainer.style.top = '0'; renderContainer.style.left = '-9999px';
+            renderContainer.style.zIndex = '-1000'; renderContainer.style.width = '1450px'; renderContainer.style.backgroundColor = '#ffffff';
+
+            const activeMonthsStr = activeMonths.join(', ');
+            let htmlContent = `<div style="padding: 40px 60px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b;"><div style="text-align: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 3px solid #e2e8f0;"><h1 style="font-size: 32px; font-weight: bold; color: #0f172a; margin-bottom: 12px; letter-spacing: 2px;">【${deptName}】行程与费用时空客观核验报告</h1><p style="font-size: 16px; color: #64748b; margin: 0;">审计月份: ${activeMonthsStr} &nbsp;&nbsp;|&nbsp;&nbsp; 报告生成时间: ${new Date().toLocaleString()}</p></div><div style="font-size: 16px; color: #334155; margin: 25px 0; text-align: left; line-height: 1.8; background-color: #f8fafc; padding: 20px; border-radius: 8px; border-left: 5px solid #3b82f6;">尊敬的 <b>${deptName}负责人</b>：<br>您好！本报告基于客观的经纬度定位与时间戳，对 <b>${activeMonthsStr}</b> 月份团队的物理行程进行了还原。核销判定严格以外勤拜访打卡事实为依据，为您呈现客观、可量化的违规风险与效能画像。</div>`;
+
+            let hasAnyData = false; let summaryRowsHTML = ""; let individualDetailsArr = [];
+
+            usersArr.forEach((user, index) => {
+                const pData = parsedData.filter(d => activeMonths.includes(d.monthGroup) && d.m === user);
+                const uHotels = rawHotelDataSet.filter(h => activeMonths.includes(h.monthGroup) && h.m === user);
+                if (pData.length === 0 && uHotels.length === 0) return;
+                hasAnyData = true;
+                
+                const visitData = pData.filter(r => r.type !== 'attendance'); const attData = pData.filter(r => r.type === 'attendance');
+                let crossRegion = 0, homeAnomalies = 0, unmatchedHotels = 0, noHotels = 0, offsets = 0, speeds = 0; let attAnomalies = 0; let userOverstays = {}; 
+
+                pData.forEach(r => {
+                    (r.anomalies || []).forEach(a => {
+                        const txt = a.text || '';
+                        if (txt.includes('超辖区业务')) crossRegion++; 
+                        else if (txt.includes('异地无住宿凭证') || txt.includes('住宿未明')) noHotels++; 
+                        else if (txt.includes('业务-住宿地偏离') || txt.includes('位置偏离') || txt.includes('时空冲突')) offsets++; 
+                        else if (txt.includes('物理瞬移异常') || txt.includes('轨迹过密') || txt.includes('位移异常')) speeds++; 
+                        else if (txt.includes('异地考勤未闭环')) attAnomalies++;
+                        else if (txt.includes('连续驻留超期') || txt.includes('超期停留')) { 
+                            const match = txt.match(/达\s*(\d+)\s*天/); 
+                            if (match && r.detectedCityName) { let days = parseInt(match[1]); if (!userOverstays[r.detectedCityName] || days > userOverstays[r.detectedCityName]) userOverstays[r.detectedCityName] = days; } 
+                        }
+                    });
+                });
+                
+                uHotels.forEach(h => {
+                    (h.anomalies || []).forEach(a => { 
+                        const txt = a.text || '';
+                        if (txt.includes('常驻地留宿') || txt.includes('属地留宿') || txt.includes('总部所在地留宿')) homeAnomalies++; 
+                        else if (txt.includes('住宿无业务支撑') || txt.includes('数据断层')) unmatchedHotels++; 
+                        else if (txt.includes('超辖区业务') || txt.includes('跨区预警')) crossRegion++; 
+                        else if (txt.includes('时空冲突')) offsets++;
+                    });
+                });
+
+                let noBizDays = new Set();
+                pData.forEach(r => {
+                    (r.anomalies || []).forEach(a => {
+                        const txt = a.text || '';
+                        if (txt.includes('在岗无业务记录')) noBizDays.add(r.d.split(' ')[0]);
+                    });
+                });
+
+                const overstayCitiesArr = Object.entries(userOverstays).map(([city, days]) => `${city}连续${days}天`);
+                const totalVisits = visitData.length; const totalAtt = attData.length;
+                let totalAnomalies = pData.filter(r => r.isAnomaly).length + uHotels.filter(h => h.isAnomaly).length;
+                const totalEvents = pData.length + uHotels.length;
+                const activeDays = new Set(pData.map(r => r.d.split(' ')[0])).size;
+                
+                let monthlyClientsSum = 0; activeMonths.forEach(mStr => { const mData = visitData.filter(r => r.monthGroup === mStr); monthlyClientsSum += new Set(mData.map(r => r.c)).size; });
+                const avgMonthlyClients = activeMonths.length > 0 ? Math.round(monthlyClientsSum / activeMonths.length) : 0;
+                
+                let monthlyVisitsSum = visitData.length;
+                let avgMonthlyVisits = activeMonths.length > 0 ? Math.round(monthlyVisitsSum / activeMonths.length) : 0;
+
+                const uClientsTotal = new Set(visitData.map(r => r.c)).size;
+                const uniqueHotelsCount = new Set(uHotels.map(h => h.hotel)).size;
+                const totalRoomNights = uHotels.reduce((sum, h) => sum + (h.roomNights || 1), 0);
+                const cities = new Set(); pData.forEach(r => { if(r.detectedCityName) cities.add(r.detectedCityName); }); uHotels.forEach(h => cities.add(h.city));
+
+                let insights = []; let hasMajorWarning = false;
+                
+                if (homeAnomalies > 0) { insights.push(`<span style="color: #e11d48;"><b style="font-weight:900;">🔴 常驻/总部地留宿：</b>系统检测到常驻地或东莞总部存在 ${homeAnomalies} 笔留宿记录，不符合不予核销的规定。</span>`); hasMajorWarning = true; }
+                if (unmatchedHotels > 0) { insights.push(`<span style="color: #e11d48;"><b style="font-weight:900;">🔴 住宿无业务支撑：</b>存在 ${unmatchedHotels} 条住宿记录周边(及前后2天)无任何外勤拜访事实，缺乏核销依据。</span>`); hasMajorWarning = true; }
+                if (crossRegion > 0) { insights.push(`<span style="color: #e11d48;"><b style="font-weight:900;">🚨 超辖区业务：</b>检测到 ${crossRegion} 次脱离预设管辖片区的出差/住宿事实。</span>`); hasMajorWarning = true; }
+                if (overstayCitiesArr.length > 0) { insights.push(`<span style="color: #d97706;"><b style="font-weight:900;">🟠 连续驻留超期：</b>在 ${overstayCitiesArr.join('、')} 连续停留，超过${AUDIT_PARAMS.overstayDays}天公司规定。</span>`); hasMajorWarning = true; }
+                if (noHotels > 0) { insights.push(`<span style="color: #e11d48;"><b style="font-weight:900;">❌ 异地无住宿凭证：</b>有 ${noHotels} 次外勤期间(非常驻地)未能匹配到酒店住宿凭证。</span>`); hasMajorWarning = true; }
+                if (offsets > 0) { insights.push(`<span style="color: #d97706;"><b style="font-weight:900;">⚠️ 店房偏离与冲突：</b>发现 ${offsets} 次住宿地与当天的打卡定位物理距离超过合理范围，行程存疑。</span>`); hasMajorWarning = true; }
+                if (speeds > 0) { insights.push(`<span style="color: #9333ea;"><b style="font-weight:900;">🟣 物理位置异常：</b>识别到 ${speeds} 次物理位移速度超出常理限制(如不足${AUDIT_PARAMS.teleportTime}分钟跨越${AUDIT_PARAMS.teleportDist}公里)。</span>`); hasMajorWarning = true; }
+
+                let intensityStatus = ""; let intensityColor = "";
+                let breadthPass = avgMonthlyClients >= AUDIT_PARAMS.clientPass;
+                let breadthExcellent = avgMonthlyClients >= AUDIT_PARAMS.clientExcellent;
+                let depthPass = avgMonthlyVisits >= AUDIT_PARAMS.visitDepthPass;
+
+                if (breadthExcellent) {
+                    intensityStatus = "🌟 独立客户覆盖优秀"; intensityColor = "#059669";
+                    insights.push(`<span style="color: #059669;"><b style="font-weight:900;">🌟 独立客户覆盖优秀：</b>月均覆盖 ${avgMonthlyClients} 家独立客户，广度拓客饱和。</span>`);
+                } else if (breadthPass) {
+                    intensityStatus = "✅ 独立客户覆盖达标"; intensityColor = "#2563eb";
+                    insights.push(`<span style="color: #2563eb;"><b style="font-weight:900;">✅ 独立客户覆盖达标：</b>月均覆盖 ${avgMonthlyClients} 家独立客户，符合广度合格标准。</span>`);
+                } else if (depthPass) {
+                    intensityStatus = "✅ 大客深耕达标(双轨)"; intensityColor = "#4f46e5";
+                    insights.push(`<span style="color: #4f46e5;"><b style="font-weight:900;">✅ 大客深耕达标：</b>虽然月均独立客户仅 ${avgMonthlyClients} 家，但月均总拜访频次达 ${avgMonthlyVisits} 次，符合深度帮扶双轨标准。</span>`);
+                } else if (avgMonthlyClients >= AUDIT_PARAMS.clientWarn) {
+                    intensityStatus = "⚠️ 拓客与拜访量双低"; intensityColor = "#d97706";
+                    insights.push(`<span style="color: #d97706;"><b style="font-weight:900;">⚠️ 业务量双低预警：</b>月均仅覆盖 ${avgMonthlyClients} 家独立客户，且总拜访仅 ${avgMonthlyVisits} 次，未达到广度或深度考核要求。</span>`);
+                    hasMajorWarning = true;
+                } else if (avgMonthlyClients >= 1) {
+                    intensityStatus = "🚨 业务覆盖严重不足"; intensityColor = "#e11d48";
+                    insights.push(`<span style="color: #e11d48;"><b style="font-weight:900;">🚨 覆盖严重不足：</b>独立客户数(${avgMonthlyClients})与总频次(${avgMonthlyVisits})均严重偏低，工作密度不足。</span>`);
+                    totalAnomalies += 1; hasMajorWarning = true;
+                } else if (avgMonthlyClients === 0 && totalVisits === 0) {
+                    intensityStatus = "❌ 零客户拜访"; intensityColor = "#be123c";
+                    insights.push(`<span style="color: #be123c;"><b style="font-weight:900; background-color: #fff1f2; padding: 2px 4px;">❌ 零客户拜访：</b>当月实际独立客户拜访量为 0。</span>`);
+                    totalAnomalies += 1; hasMajorWarning = true;
+                } else {
+                    intensityStatus = "⚪ 无记录"; intensityColor = "#94a3b8";
+                }
+                
+                const anomalyRate = totalEvents ? ((totalAnomalies / totalEvents) * 100).toFixed(1) : '0.0';
+
+                if (totalVisits > 0) {
+                    let meaningfulFillCount = 0; visitData.forEach(r => { const cleanText = (r.i + r.s).trim().replace(/\s+/g, ''); if (cleanText.length > 4 && !/^(无|没有|正常|都好|没问题|无建议|暂无|无异常|一切正常)$/.test(cleanText)) meaningfulFillCount++; });
+                    const fillRate = (meaningfulFillCount / totalVisits) * 100;
+                    if (fillRate < AUDIT_PARAMS.fillRateBad) { insights.push(`<span style="color: #e11d48;"><b style="font-weight:900;">✍️ 反馈质量偏低：</b>报表实质填报率仅 ${fillRate.toFixed(0)}%，低于${AUDIT_PARAMS.fillRateBad}%有效信息不足。</span>`); hasMajorWarning = true; }
+                    else if (fillRate <= AUDIT_PARAMS.fillRatePass) { insights.push(`<span style="color: #d97706;"><b style="font-weight:900;">✍️ 反馈质量一般：</b>报表实质填报率 ${fillRate.toFixed(0)}%，业务洞察较少。</span>`); hasMajorWarning = true; }
+                    else insights.push(`<span style="color: #2563eb;"><b style="font-weight:900;">📝 反馈详实合格：</b>报表实质填报率达 ${fillRate.toFixed(0)}%，市场洞察完整。</span>`);
+                }
+                if (!hasMajorWarning) insights.unshift(`<span style="color: #16a34a;"><b style="font-weight:900;">🟢 轨迹合理：</b>基础时空轨迹客观连贯，无明显异常事实。</span>`);
+
+                const finalRouteMsg = insights.map(msg => `<div style="margin-bottom: 6px; line-height: 1.5; word-wrap: break-word; word-break: break-all;">${msg}</div>`).join('');
+                
+                summaryRowsHTML += `
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 12px; font-weight: bold; word-wrap: break-word;">${user}</td>
+                        <td style="padding: 12px;"><div style="font-weight: bold; font-size: 15px;">${activeDays || 0} 天</div><div style="font-size: 12px; color: #d97706; margin-top: 5px;">🏨 ${uniqueHotelsCount}家 / ${totalRoomNights}间夜</div></td>
+                        <td style="padding: 12px;">${cities.size} 域<br><span style="font-size: 11px; color: #94a3b8; word-wrap: break-word;">${Array.from(cities).join('、') || '-'}</span></td>
+                        <td style="padding: 12px; font-weight: bold; color: #059669;">${totalVisits} 访</td>
+                        <td style="padding: 12px; font-weight: bold; color: #0891b2;">${totalAtt} 勤</td>
+                        <td style="padding: 12px; color: #059669; font-weight: bold;">${uClientsTotal} 家</td>
+                        <td style="padding: 12px;"><div style="font-weight: bold; font-size: 14px; color: ${intensityColor}">${intensityStatus}</div><div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">(客:${avgMonthlyClients}家 / 频:${avgMonthlyVisits}次)</div></td>
+                        <td style="padding: 12px; font-weight: bold; font-size: 14px; color: ${totalAnomalies > 0 ? '#e11d48' : '#1e293b'}">${anomalyRate}%</td>
+                        <td style="padding: 12px;">${finalRouteMsg}</td>
+                    </tr>
+                `;
+
+                let detailHtml = `<div>
+                        <div style="background-color: #f8fafc; padding: 16px 20px; border-left: 5px solid #3b82f6; border-radius: 6px; margin-bottom: 20px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;"><h2 style="font-size: 20px; font-weight: bold; margin: 0; color: #1e293b;">👤 责任人：${user}</h2><span style="font-size: 16px; font-weight: bold; color: ${intensityColor};">${intensityStatus} (独立客户 ${avgMonthlyClients}家 / 拜访 ${avgMonthlyVisits}次)</span></div>
+                            <div style="font-size: 14px; color: #475569; margin-top: 12px; display: flex; gap: 25px;"><span>工作判定打卡: <b style="color:#059669;">${totalVisits} 访</b></span><span>辅助定位打卡: <b style="color:#0891b2;">${totalAtt} 勤</b></span><span>住宿事实: <b style="color:#1e293b;">${uHotels.length}</b> 笔 (${totalRoomNights} 间夜)</span><span>异常项: <b style="color:#e11d48;">${totalAnomalies}</b> 项</span></div>
+                        </div>`;
+
+                const mixedEvents = [];
+                pData.forEach(v => mixedEvents.push({ type: 'visit', time: v.parsedDate.getTime(), data: v }));
+                uHotels.forEach(h => {
+                    const timeStr = h.checkIn.replace(/-/g, '/'); let hTime = new Date(timeStr).getTime() || 0; if (timeStr.length <= 10) hTime += (23 * 3600 + 59 * 60 + 59) * 1000;
+                    mixedEvents.push({ type: 'hotel', time: hTime, data: h });
+                });
+                mixedEvents.sort((a, b) => b.time - a.time); 
+
+                if (mixedEvents.length > 0) {
+                    detailHtml += `
+                        <h3 style="font-size: 16px; font-weight: bold; color: #334155; margin-bottom: 12px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 8px;">⏱️ 客观打卡记录与住宿凭证混排轴 (时间倒序)</h3>
+                        <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 20px; text-align: left; table-layout: fixed;">
+                            <thead><tr style="background-color: #f1f5f9; color: #475569;"><th style="padding: 10px; border: 1px solid #cbd5e1; font-weight: bold; width: 14%;">时间戳</th><th style="padding: 10px; border: 1px solid #cbd5e1; font-weight: bold; width: 12%;">数据类型</th><th style="padding: 10px; border: 1px solid #cbd5e1; font-weight: bold; width: 16%;">业务对象 / 酒店</th><th style="padding: 10px; border: 1px solid #cbd5e1; font-weight: bold; width: 22%;">GPS定位 / 城市</th><th style="padding: 10px; border: 1px solid #cbd5e1; font-weight: bold; width: 14%;">附加内容</th><th style="padding: 10px; border: 1px solid #cbd5e1; font-weight: bold; width: 22%;">时空事实判定</th></tr></thead><tbody>`;
+                    mixedEvents.forEach(evt => {
+                        if (evt.type === 'visit') {
+                            const v = evt.data; const isAttendance = v.type === 'attendance';
+                            const isWknd = isWeekend(v.d); const dStr = isWknd ? `<span style="color:#7e22ce; font-weight:bold;">${v.d}<br>(周末)</span>` : v.d;
+                            let combinedText, typeLabel, typeColor, cDisplay;
+                            if (isAttendance) { combinedText = `<div style="margin-bottom: 4px;"><b>结果:</b> ${v.i || '正常'}</div>${v.s ? `<div><b>异常原因:</b> ${v.s}</div>` : ''}`; typeLabel = '🕒 考勤定位'; typeColor = '#0891b2'; cDisplay = `<span style="color:#0891b2;">${v.c}</span>`; } 
+                            else { combinedText = `<div style="margin-bottom: 4px;"><b>问:</b> ${v.i || '无'}</div><div><b>答:</b> ${v.s || '无'}</div>`; typeLabel = '📍 外勤拜访'; typeColor = '#059669'; cDisplay = v.c; }
+                            const compliance = renderAnomalyTagsInline(v.anomalies);
+                            detailHtml += `<tr style="${v.isAnomaly ? 'background-color: #fff1f2;' : ''}"><td style="padding: 10px; border: 1px solid #e2e8f0; word-wrap: break-word; word-break: break-all;">${dStr}</td><td style="padding: 10px; border: 1px solid #e2e8f0; word-wrap: break-word; word-break: break-all; color:${typeColor}; font-weight:bold;">${typeLabel}</td><td style="padding: 10px; border: 1px solid #e2e8f0; word-wrap: break-word; word-break: break-all; font-weight:bold; color:#0f172a;">${cDisplay}</td><td style="padding: 10px; border: 1px solid #e2e8f0; word-wrap: break-word; word-break: break-all; color:#64748b;">${v.l}</td><td style="padding: 10px; border: 1px solid #e2e8f0; word-wrap: break-word; word-break: break-all;">${combinedText}</td><td style="padding: 10px; border: 1px solid #e2e8f0; word-wrap: break-word; word-break: break-all; vertical-align: top;">${compliance}</td></tr>`;
+                        } else {
+                            const h = evt.data; const isWknd = isWeekend(h.checkIn);
+                            const dStr = isWknd ? `<span style="color:#7e22ce; font-weight:bold;">${h.checkIn}<br>(周末入住)</span>` : h.checkIn;
+                            const compliance = renderAnomalyTagsInline(h.anomalies); const rowBg = h.isAnomaly ? 'background-color: #fef2f2;' : 'background-color: #fffbeb;';
+                            detailHtml += `<tr style="${rowBg}"><td style="padding: 10px; border: 1px solid #e2e8f0; word-wrap: break-word; word-break: break-all;">${dStr} <br><span style="font-size:12px;color:#94a3b8;">至 ${h.checkOut}</span></td><td style="padding: 10px; border: 1px solid #e2e8f0; word-wrap: break-word; word-break: break-all; color:#d97706; font-weight:bold;">🏨 留宿酒店</td><td style="padding: 10px; border: 1px solid #e2e8f0; word-wrap: break-word; word-break: break-all; font-weight:bold; color:#0f172a;">${h.hotel}</td><td style="padding: 10px; border: 1px solid #e2e8f0; word-wrap: break-word; word-break: break-all; color:#64748b;">${h.city}${h.district ? `(${h.district})` : ''}</td><td style="padding: 10px; border: 1px solid #e2e8f0; word-wrap: break-word; word-break: break-all; font-weight:bold; color:#d97706;">核销事实: ${h.roomNights} 间夜</td><td style="padding: 10px; border: 1px solid #e2e8f0; word-wrap: break-word; word-break: break-all; vertical-align: top;">${compliance}</td></tr>`;
+                        }
+                    });
+                    detailHtml += `</tbody></table>`;
+                }
+
+                detailHtml += `</div>`; individualDetailsArr.push(detailHtml);
+            });
+
+            if(!hasAnyData) {
+                htmlContent += `<div style="text-align:center; color:#94a3b8; padding: 60px 0; font-size:18px;">当前选定范围（${activeMonthsStr}）暂无数据。</div>`;
+            } else {
+                htmlContent += `
+                    <h2 style="font-size: 22px; font-weight: bold; color: #0f172a; margin: 40px 0 20px 0; border-left: 5px solid #3b82f6; padding-left: 12px;">📊 图1: 团队成员客观效能透视看板</h2>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 40px; text-align: left; table-layout: fixed;">
+                        <thead>
+                            <tr style="background-color: #e2e8f0; color: #334155;">
+                                <th style="padding: 12px; font-weight: bold; width: 8%;">责任人</th>
+                                <th style="padding: 12px; font-weight: bold; width: 12%;">定位活跃与住宿</th>
+                                <th style="padding: 12px; font-weight: bold; width: 12%;">覆盖城市</th>
+                                <th style="padding: 12px; font-weight: bold; width: 7%;">业务拜访</th>
+                                <th style="padding: 12px; font-weight: bold; width: 7%;">考勤打卡</th>
+                                <th style="padding: 12px; font-weight: bold; width: 10%;">独立客群</th>
+                                <th style="padding: 12px; font-weight: bold; width: 10%;">强度评级</th>
+                                <th style="padding: 12px; font-weight: bold; width: 8%;">异常率</th>
+                                <th style="padding: 12px; font-weight: bold; width: 36%;">客观画像（陈述违规事实）</th>
+                            </tr>
+                        </thead>
+                        <tbody>${summaryRowsHTML}</tbody>
+                    </table>
+                `;
+                htmlContent += '<div style="height: 3px; background-color: #cbd5e1; margin: 50px 0;"></div>';
+                htmlContent += individualDetailsArr.join('<div style="height: 3px; background-color: #cbd5e1; margin: 50px 0;"></div>');
+            }
+
+            htmlContent += `</div>`; renderContainer.innerHTML = htmlContent; document.body.appendChild(renderContainer);
+
+            setTimeout(() => {
+                html2canvas(renderContainer, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false }).then(canvas => {
+                    const imgData = canvas.toDataURL('image/jpeg', 0.95); const link = document.createElement('a');
+                    link.download = `${deptName}_客观时空校验明细_${activeMonths.join('_')}.jpg`; link.href = imgData; link.click();
+                    document.body.removeChild(renderContainer); btn.innerHTML = originalHTML; lucide.createIcons();
+                }).catch(err => {
+                    console.error("生成失败: ", err); alert("长图生成发生错误，请查看控制台。");
+                    document.body.removeChild(renderContainer); btn.innerHTML = originalHTML; lucide.createIcons();
+                });
+            }, 300);
+        }
+
+        // ==========================
+        // 3. 核心计算与调度控制
+        // ==========================
+        function processImportedDataset(data) {
+            parsedData = [];
+            data.forEach(item => {
+                let matchedCoords = item.exactCoords ? [...item.exactCoords] : null; 
+                let detectedCityName = ""; const textPool = (item.l + " " + item.c);
+
+                if (matchedCoords) {
+                    for (const city in CITY_COORDINATES) { if (textPool.includes(city + "市") || textPool.includes(city + "县") || textPool.includes(city + "区")) { detectedCityName = city; break; } }
+                    if (!detectedCityName) detectedCityName = resolveProvince(textPool);
+                } else {
+                    for (const city in CITY_COORDINATES) { if (textPool.includes(city + "市") || textPool.includes(city + "县") || textPool.includes(city + "区")) { matchedCoords = [...CITY_COORDINATES[city]]; detectedCityName = city; break; } }
+                    if (!matchedCoords) {
+                        for (const city in CITY_COORDINATES) {
+                            if (city === "上海" && (textPool.includes("山东") || textPool.includes("菏泽") || textPool.includes("青岛"))) continue;
+                            if (city === "北京" && (textPool.includes("山东") || textPool.includes("济南") || textPool.includes("临沂"))) continue;
+                            if (textPool.includes(city)) { matchedCoords = [...CITY_COORDINATES[city]]; detectedCityName = city; break; }
+                        }
+                    }
+                    if (!matchedCoords) {
+                        const resolvedProv = resolveProvince(textPool);
+                        if (PROVINCE_FALLBACK[resolvedProv]) { matchedCoords = [...PROVINCE_FALLBACK[resolvedProv]]; detectedCityName = resolvedProv + "(省域兜底)"; }
+                    }
+                }
+
+                const normDateStr = formatStandardDate(item.d);
+                const dateObj = new Date(normDateStr.replace(/-/g, '/')); 
+                
+                parsedData.push({ ...item, d: normDateStr, coords: matchedCoords, detectedCityName: detectedCityName, parsedDate: dateObj, monthGroup: normDateStr.substring(0, 7) });
+            });
+
+            parsedData.sort((a, b) => a.parsedDate - b.parsedDate);
+            const userLastCoords = {}; const spiralGridCount = {};
+
+            parsedData.forEach(item => {
+                if (!item.coords) {
+                    if (userLastCoords[item.m]) { item.coords = [...userLastCoords[item.m]]; item.detectedCityName = item.detectedCityName || "沿用上段路径"; } 
+                    else { item.coords = [35.0, 105.0]; item.detectedCityName = "未解析区域"; }
+                } else { userLastCoords[item.m] = [...item.coords]; }
+
+                const baseGridKey = item.coords[0].toFixed(3) + "_" + item.coords[1].toFixed(3);
+                const pointIndex = spiralGridCount[baseGridKey] || 0;
+                spiralGridCount[baseGridKey] = pointIndex + 1;
+
+                if (pointIndex > 0) {
+                    const goldenAngle = 137.5 * Math.PI / 180; const radius = 0.02 * Math.sqrt(pointIndex); const theta = pointIndex * goldenAngle;
+                    item.coords = [ item.coords[0] + radius * Math.cos(theta), item.coords[1] + radius * Math.sin(theta) ];
+                }
+                item.hasValidCoords = true;
+            });
+            auditDisplacements(parsedData);
+        }
+
+        function auditDisplacements(rows) {
+            const ONE_DAY = 24 * 60 * 60 * 1000;
+            
+            // [PRE-PASS] 全局预判断：某次住宿在周期内是否发生过真实的闭环轨迹？（解决跨市跑动途经点的误判）
+            rawHotelDataSet.forEach(h => {
+                h.isMatched = false; h.isHomeAnomaly = false; h.anomalies = []; h._isValidDestination = false;
+                
+                const inD = new Date(h.checkIn.split(' ')[0].replace(/-/g, '/')).getTime();
+                const outD = new Date(h.checkOut.split(' ')[0].replace(/-/g, '/')).getTime();
+
+                let fallbackResult = getCityCoordinatesFallback(h.city);
+                const hotelBaseCoords = fallbackResult.coords;
+                const distanceThreshold = fallbackResult.isProvince ? 250 : AUDIT_PARAMS.hotelDistance;
+                const cleanHotelCity = h.city.replace(/[市区县]/g, '');
+
+                const relatedRows = rows.filter(r => {
+                    if (r.m !== h.m) return false;
+                    const rTime = r.parsedDate.getTime();
+                    // 只要在入住到退房(含退房当天)有打卡，都纳入闭环扫描
+                    return rTime >= inD && rTime < outD + ONE_DAY; 
+                });
+
+                for (let r of relatedRows) {
+                    const cleanDetected = (r.detectedCityName || "").replace(/[市区县]/g, '');
+                    let isTextMatch = false;
+                    if ((r.l && r.l.includes(cleanHotelCity)) || (cleanDetected && cleanHotelCity && (cleanHotelCity.includes(cleanDetected) || cleanDetected.includes(cleanHotelCity)))) {
+                        isTextMatch = true;
+                    }
+                    if (!isTextMatch && h.district && h.district.length >= 2 && r.l && r.l.includes(h.district)) isTextMatch = true;
+                    
+                    let distToHotel = 9999;
+                    if (hotelBaseCoords && r.coords) distToHotel = getHaversineDistance(hotelBaseCoords, r.coords);
+                    
+                    if (isTextMatch || distToHotel <= distanceThreshold) {
+                        h._isValidDestination = true; // 存在至少一次近距离打卡，证明本次住宿目的地合法
+                        h.isMatched = true; 
+                        break;
+                    }
+                }
+                
+                const homeCity = HOME_CITIES[h.m];
+                if (homeCity && h.city.includes(homeCity)) h.isHomeAnomaly = true;
+                
+                if (h.city.includes("东莞")) {
+                    h.anomalies.push({ level: 'severe', text: `❌ <b>总部所在地留宿：</b>【东莞】为公司总部所在地，不允许报销差旅住宿费用。` });
+                    h.isHomeAnomaly = true; 
+                }
+            });
+
+            rows.forEach(r => { r.anomalies = []; r.hotelMatch = null; r.isAnomaly = false; });
+
+            const cleanCityForOverstay = (str) => {
+                if (!str) return '未知';
+                return str.replace(/[省市区县]/g, '');
+            };
+
+            const userDailyTimeline = {};
+            const getDateStr = (ts) => {
+                const d = new Date(ts);
+                return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            };
+
+            // [重构算法1] 构建每人每日的“主轴”时空视图，杜绝打卡途经地造成的连天污染
+            rawHotelDataSet.forEach(h => {
+                const m = h.m;
+                if (!userDailyTimeline[m]) userDailyTimeline[m] = {};
+                const inD = new Date(h.checkIn.split(' ')[0].replace(/-/g, '/'));
+                const outD = new Date(h.checkOut.split(' ')[0].replace(/-/g, '/'));
+                let curr = new Date(inD);
+                while (curr < outD) {
+                    const dStr = getDateStr(curr.getTime());
+                    if (!userDailyTimeline[m][dStr]) userDailyTimeline[m][dStr] = { hotelCity: null, visitCities: [], attCities: [] };
+                    userDailyTimeline[m][dStr].hotelCity = cleanCityForOverstay(h.city);
+                    curr.setDate(curr.getDate() + 1);
+                }
+                if (inD.getTime() === outD.getTime()) {
+                    const dStr = getDateStr(inD.getTime());
+                    if (!userDailyTimeline[m][dStr]) userDailyTimeline[m][dStr] = { hotelCity: null, visitCities: [], attCities: [] };
+                    userDailyTimeline[m][dStr].hotelCity = cleanCityForOverstay(h.city);
+                }
+            });
+
+            rows.forEach(r => {
+                const m = r.m;
+                const dStr = getDateStr(r.parsedDate.getTime());
+                if (!userDailyTimeline[m]) userDailyTimeline[m] = {};
+                if (!userDailyTimeline[m][dStr]) userDailyTimeline[m][dStr] = { hotelCity: null, visitCities: [], attCities: [] };
+
+                const cName = cleanCityForOverstay(r.detectedCityName);
+                if (r.type === 'attendance') userDailyTimeline[m][dStr].attCities.push(cName);
+                else userDailyTimeline[m][dStr].visitCities.push(cName);
+            });
+
+            const overstayWarnings = {}; 
+
+            // [重构算法2] 基于每日唯一“锚点城市”推算连续超期，彻底切断途经打卡造成的跨城干扰
+            Object.keys(userDailyTimeline).forEach(m => {
+                const dates = Object.keys(userDailyTimeline[m]).sort();
+                let currentStreakCity = null;
+                let currentStreakDays = 0;
+                let streakStartIdx = 0;
+
+                dates.forEach((dStr, idx) => {
+                    const dayData = userDailyTimeline[m][dStr];
+                    let anchorCity = null;
+
+                    // 锚点优先级：住宿地 > 拜访最频地 > 考勤最频地
+                    if (dayData.hotelCity) {
+                        anchorCity = dayData.hotelCity;
+                    } else if (dayData.visitCities.length > 0) {
+                        const counts = {}; let maxCity = dayData.visitCities[0]; let maxCount = 0;
+                        dayData.visitCities.forEach(c => { counts[c] = (counts[c] || 0) + 1; if (counts[c] > maxCount) { maxCount = counts[c]; maxCity = c; } });
+                        anchorCity = maxCity;
+                    } else if (dayData.attCities.length > 0) {
+                        const counts = {}; let maxCity = dayData.attCities[0]; let maxCount = 0;
+                        dayData.attCities.forEach(c => { counts[c] = (counts[c] || 0) + 1; if (counts[c] > maxCount) { maxCount = counts[c]; maxCity = c; } });
+                        anchorCity = maxCity;
+                    }
+
+                    if (anchorCity === currentStreakCity && anchorCity !== null) {
+                        const prevDate = new Date(dates[idx-1].replace(/-/g, '/'));
+                        const currDate = new Date(dStr.replace(/-/g, '/'));
+                        const diffDays = Math.round((currDate - prevDate) / (1000 * 60 * 60 * 24));
+
+                        if (diffDays === 1) {
+                            currentStreakDays++;
+                        } else {
+                            if (currentStreakDays > AUDIT_PARAMS.overstayDays) {
+                                for(let i = streakStartIdx; i < idx; i++) overstayWarnings[`${m}_${dates[i]}`] = { city: currentStreakCity, days: currentStreakDays };
+                            }
+                            currentStreakCity = anchorCity; currentStreakDays = 1; streakStartIdx = idx;
+                        }
+                    } else {
+                        if (currentStreakDays > AUDIT_PARAMS.overstayDays) {
+                            for(let i = streakStartIdx; i < idx; i++) overstayWarnings[`${m}_${dates[i]}`] = { city: currentStreakCity, days: currentStreakDays };
+                        }
+                        currentStreakCity = anchorCity; currentStreakDays = anchorCity ? 1 : 0; streakStartIdx = idx;
+                    }
+                });
+
+                if (currentStreakDays > AUDIT_PARAMS.overstayDays) {
+                    for(let i = streakStartIdx; i < dates.length; i++) overstayWarnings[`${m}_${dates[i]}`] = { city: currentStreakCity, days: currentStreakDays };
+                }
+            });
+
+            const lastVisits = {};
+            
+            rows.forEach((row) => {
+                const manager = row.m; const currentCoords = row.coords;
+                const homeCity = HOME_CITIES[manager];
+                
+                const allowedRegions = MANAGER_REGIONS[manager] || "全部";
+                if (allowedRegions !== "全部" && row.detectedCityName !== "未解析区域") {
+                    const cityProv = resolveProvince(row.detectedCityName);
+                    const allowedArr = allowedRegions.split(/[、,，]/);
+                    const isAllowed = allowedArr.some(reg => row.detectedCityName.includes(reg) || cityProv.includes(reg) || reg.includes(cityProv));
+                    
+                    if (!isAllowed && !row.detectedCityName.includes("东莞")) {
+                        row.anomalies.push({ level: 'severe', text: `🚨 <b>超辖区业务：</b>检测到外勤打卡/定位城市【${row.detectedCityName}】非系统绑定的业务管辖片区（${allowedRegions}）。` });
+                    }
+                }
+
+                if (rawHotelDataSet.length > 0) {
+                    const visitDate = new Date(row.d.split(' ')[0].replace(/-/g, '/'));
+                    const overlappingHotels = rawHotelDataSet.filter(h => {
+                        if (h.isHomeAnomaly) return false; 
+                        const inD = new Date(h.checkIn.split(' ')[0].replace(/-/g, '/')); const outD = new Date(h.checkOut.split(' ')[0].replace(/-/g, '/'));
+                        return h.m === manager && visitDate >= inD && visitDate <= outD;
+                    });
+                    
+                    if (overlappingHotels.length > 0) {
+                        row.hotelMatch = overlappingHotels[0]; 
+                    } else { 
+                        if (homeCity && row.detectedCityName && row.detectedCityName.includes(homeCity)) {
+                            // 🏠 合规本地常驻拜访/考勤，放行
+                        } else if (row.detectedCityName.includes("东莞")) {
+                            // 🏠 东莞打卡无酒店也是合规的(回总部无需报销酒店)
+                        } else {
+                            // 仅外勤拜访才强制要求住宿凭证，考勤定位不再抛出"未闭环"警告
+                            if (row.type !== 'attendance') {
+                                row.anomalies.push({ level: 'severe', text: `❌ <b>异地无住宿凭证：</b>系统在非登记常驻地【${row.detectedCityName}】检测到外勤拜访，但未匹配到当期异地住宿凭证。` });
+                            }
+                        }
+                    }
+                }
+
+                if (lastVisits[manager]) {
+                    const prev = lastVisits[manager];
+                    const timeDiffMin = (new Date(row.parsedDate) - new Date(prev.parsedDate)) / 60000;
+                    const distance = getHaversineDistance(prev.coords, currentCoords);
+                    if (timeDiffMin > 0 && timeDiffMin < AUDIT_PARAMS.teleportTime && distance > AUDIT_PARAMS.teleportDist) row.anomalies.push({ level: 'severe', text: `🚨 <b>物理瞬移异常：</b>相邻打卡时间差不足${AUDIT_PARAMS.teleportTime}分钟，但物理坐标跨越了${distance.toFixed(1)}公里，不符合正常物理通勤逻辑。` });
+                    else if (timeDiffMin > 0 && timeDiffMin < AUDIT_PARAMS.denseTime && distance > AUDIT_PARAMS.denseDist) row.anomalies.push({ level: 'minor', text: `🟣 <b>轨迹过密：</b>两次打卡间隔时间极短，但位移距离达到${distance.toFixed(1)}公里，请核实行程客观情况。` });
+                }
+                lastVisits[manager] = row;
+
+                if (row.detectedCityName) {
+                    const dStr = getDateStr(row.parsedDate.getTime());
+                    const warning = overstayWarnings[`${manager}_${dStr}`];
+                    const cleanName = cleanCityForOverstay(row.detectedCityName);
+                    
+                    // 仅当当前行的城市符合当天的警告主轴城市时，才打上异常标签
+                    if (warning && (warning.city.includes(cleanName) || cleanName.includes(warning.city))) {
+                        const msg = `🟠 <b>连续驻留超期：</b>在【${warning.city}】连续不间断产生业务/住宿记录已达 ${warning.days} 天，超过单次单地最多停留${AUDIT_PARAMS.overstayDays}天的规定。`;
+                        if (!row.anomalies.some(a => a.text === msg)) {
+                            row.anomalies.push({ level: 'warning', text: msg });
+                        }
+                    }
+                }
+
+                row.isAnomaly = row.anomalies.length > 0;
+            });
+
+            rawHotelDataSet.forEach(h => {
+                if (!h.isMatched && !h.isHomeAnomaly && rows.length > 0) {
+                    const inDTime = new Date(h.checkIn.split(' ')[0].replace(/-/g, '/')).getTime(); 
+                    const outDTime = new Date(h.checkOut.split(' ')[0].replace(/-/g, '/')).getTime();
+                    const nearbyVisit = rows.find(r => {
+                        if (r.m !== h.m) return false;
+                        if (r.type === 'attendance') return false; 
+                        const vTime = r.parsedDate.getTime(); 
+                        const distDaysIn = (vTime - inDTime) / ONE_DAY; 
+                        const distDaysOut = (vTime - outDTime) / ONE_DAY;
+                        if ((distDaysIn >= -2 && distDaysIn <= 2) || (distDaysOut >= -2 && distDaysOut <= 2)) {
+                            let fallbackResult = getCityCoordinatesFallback(h.city);
+                            if (fallbackResult.coords && r.coords) {
+                                const threshold = fallbackResult.isProvince ? 250 : AUDIT_PARAMS.hotelDistance;
+                                const cleanHotelCity = h.city.replace(/[市区县]/g, ''); 
+                                const cleanDetected = (r.detectedCityName || "").replace(/[市区县]/g, '');
+                                
+                                let isTextMatch = false;
+                                if ((r.l && r.l.includes(cleanHotelCity)) || (cleanDetected && cleanHotelCity && (cleanHotelCity.includes(cleanDetected) || cleanDetected.includes(cleanHotelCity)))) {
+                                    isTextMatch = true;
+                                }
+                                if (!isTextMatch && h.district && h.district.length >= 2) {
+                                    if (r.l && r.l.includes(h.district)) isTextMatch = true;
+                                }
+                                if (isTextMatch || getHaversineDistance(fallbackResult.coords, r.coords) <= threshold) return true;
+                            }
+                        }
+                        return false;
+                    });
+                    if (nearbyVisit) h._isValidDestination = true;
+                }
+
+                // 绑定酒店本身的驻留超期异常 (已对接新算法)
+                const inD = new Date(h.checkIn.split(' ')[0].replace(/-/g, '/'));
+                const outD = new Date(h.checkOut.split(' ')[0].replace(/-/g, '/'));
+                let curr = new Date(inD);
+                const cleanName = cleanCityForOverstay(h.city);
+                
+                while (curr <= outD) {
+                    const dStr = getDateStr(curr.getTime());
+                    const warning = overstayWarnings[`${h.m}_${dStr}`];
+                    
+                    if (warning && (warning.city.includes(cleanName) || cleanName.includes(warning.city))) {
+                        const msg = `🟠 <b>连续驻留超期：</b>在【${warning.city}】连续不间断产生业务/住宿记录已达 ${warning.days} 天，超过单次单地最多停留${AUDIT_PARAMS.overstayDays}天的规定。`;
+                        if (!h.anomalies) h.anomalies = [];
+                        if (!h.anomalies.some(a => a.text === msg)) {
+                            h.anomalies.push({ level: 'warning', text: msg });
+                        }
+                    }
+                    curr.setDate(curr.getDate() + 1);
+                    if (inD.getTime() === outD.getTime()) break;
+                }
+
+                if (h.isHomeAnomaly && !h.city.includes("东莞")) h.anomalies.push({ level: 'severe', text: `❌ <b>常驻地留宿：</b>【${h.city}】为登记的常驻地，系统在该地匹配到住宿记录，不符合常驻地不予核销出差住宿的财务规定。` });
+                else if (!h._isValidDestination && !h.isHomeAnomaly && (!h.anomalies || !h.anomalies.some(a => a.text.includes('时空冲突')))) h.anomalies.push({ level: 'severe', text: `❌ <b>住宿无业务支撑：</b>系统存在【${h.hotel}】的住宿记录，但在入住及离店当天期间，未匹配到任何靠近该城市的有效外勤打卡数据。` });
+                
+                // [NEW] 按天与城市分组：查找与酒店偏离最大的唯一打卡点 (解决海量重复提示，智能判断夜间跨城)
+                if (!h._isValidDestination && rows.length > 0) {
+                    const inDTime = new Date(h.checkIn.split(' ')[0].replace(/-/g, '/')).getTime(); 
+                    const outDTime = new Date(h.checkOut.split(' ')[0].replace(/-/g, '/')).getTime();
+                    const relatedRows = rows.filter(r => r.m === h.m && r.parsedDate.getTime() >= inDTime && r.parsedDate.getTime() < outDTime + ONE_DAY);
+
+                    if (relatedRows.length > 0) {
+                        let fallbackResult = getCityCoordinatesFallback(h.city);
+                        const hotelBaseCoords = fallbackResult.coords;
+                        const distanceThreshold = fallbackResult.isProvince ? 250 : AUDIT_PARAMS.hotelDistance;
+
+                        const dailyMax = {};
+                        relatedRows.forEach(r => {
+                            const dStr = r.d.split(' ')[0];
+                            let dist = 9999;
+                            if (hotelBaseCoords && r.coords) dist = getHaversineDistance(hotelBaseCoords, r.coords);
+                            
+                            const cleanHotelCity = h.city.replace(/[市区县]/g, ''); 
+                            const cleanDetected = (r.detectedCityName || "").replace(/[市区县]/g, '');
+                            if ((r.l && r.l.includes(cleanHotelCity)) || (cleanDetected && cleanHotelCity && (cleanHotelCity.includes(cleanDetected) || cleanDetected.includes(cleanHotelCity)))) dist = 0;
+                            if (h.district && h.district.length >= 2 && r.l && r.l.includes(h.district)) dist = 0;
+
+                            // 每天仅保留最远的一个点作为代表
+                            if (!dailyMax[dStr] || dist > dailyMax[dStr].dist) {
+                                dailyMax[dStr] = { row: r, dist: dist };
+                            }
+                        });
+
+                        Object.keys(dailyMax).forEach(dStr => {
+                            const { row, dist } = dailyMax[dStr];
+                            if (dist > distanceThreshold) {
+                                // 智能推算时间差与速度，识别跨城/夜间返回合理性
+                                const rowTime = row.parsedDate.getTime();
+                                const endOfDay = new Date(dStr.replace(/-/g, '/') + ' 23:59:59').getTime();
+                                const hoursToMidnight = Math.max(0.5, (endOfDay - rowTime) / (1000 * 60 * 60));
+                                const requiredSpeed = dist / hoursToMidnight;
+
+                                if (requiredSpeed <= 120) { // 速度在合理通行范围内
+                                    const msg = `🚗 <b>跨城/夜间合理移动：</b>当日定位距住宿地【${h.city}】最远达${dist.toFixed(0)}公里，但按时间推算处于合理通行时效内，已智能过滤严重冲突警告。`;
+                                    if (!row.anomalies.some(a => a.text === msg)) row.anomalies.push({ level: 'minor', text: msg });
+                                    if (!h.anomalies) h.anomalies = [];
+                                    if (!h.anomalies.some(a => a.text === msg)) h.anomalies.push({ level: 'minor', text: msg });
+                                } else { // 速度超过物理可能，产生峰值报错
+                                    const isAtt = row.type === 'attendance';
+                                    const msg = isAtt
+                                        ? `⚠️ <b>位置偏离(日峰值)：</b>本日考勤在【${row.detectedCityName}】，距住宿地【${h.city}】最远偏离${dist.toFixed(0)}公里，不符合物理移动规律。`
+                                        : `⚠️ <b>业务-住宿地偏离(日峰值)：</b>当日住宿在【${h.city}】，最远业务定位在【${row.detectedCityName}】(偏离${dist.toFixed(0)}公里)，时空冲突。`;
+                                    if (!row.anomalies.some(a => a.text === msg)) row.anomalies.push({ level: isAtt ? 'severe' : 'warning', text: msg });
+                                    
+                                    const hMsg = `🚨 <b>时空冲突(${dStr})：</b>员工距住宿地最远偏离${dist.toFixed(0)}公里(定位: ${row.detectedCityName})，且通行时间极短速度超限，违背物理常理。`;
+                                    if (!h.anomalies) h.anomalies = [];
+                                    if (!h.anomalies.some(a => a.text === hMsg)) h.anomalies.push({ level: 'severe', text: hMsg });
+                                }
+                            }
+                        });
+                    }
+                }
+
+                h.isAnomaly = h.anomalies.length > 0;
+            });
+            
+            // 需要最终统一刷新一次 row 的异常状态（因为在外部追加了日峰值警告）
+            rows.forEach(r => r.isAnomaly = (r.anomalies && r.anomalies.length > 0));
+        }
+
+        function updateMonthSelector(months) {
+            const container = document.getElementById('monthSelectorContainer'); container.innerHTML = '';
+            if (!months || months.length === 0) return;
+            months.forEach(month => {
+                const btn = document.createElement('button'); const isActive = activeMonths.includes(month);
+                btn.className = `px-3 py-1 rounded-xl text-xs font-semibold ${isActive ? 'bg-blue-600 text-white shadow-md' : 'bg-white border text-slate-600 hover:bg-slate-50'}`;
+                btn.innerText = month; btn.onclick = () => switchMonth(month); container.appendChild(btn);
+            });
+            document.getElementById('dataRangeLabel').innerText = `已选 ${activeMonths.length} / 共 ${months.length} 个月`;
+        }
+
+        function switchMonth(month) { 
+            const idx = activeMonths.indexOf(month);
+            if (idx > -1) { if (activeMonths.length > 1) activeMonths.splice(idx, 1); } else { activeMonths.push(month); }
+            activeMonths.sort(); updateMonthSelector(extractGlobalMonths()); refreshDashboard(); 
+        }
+
+        function refreshDashboardViewsOnly() {
+            const currentMonthData = parsedData.filter(item => activeMonths.includes(item.monthGroup));
+            const filteredData = (filterScopeType === "all") ? currentMonthData : currentMonthData.filter(item => allowedUsersPool.includes(item.m));
+            const currentMonthHotels = rawHotelDataSet.filter(h => activeMonths.includes(h.monthGroup));
+            const filteredHotels = (filterScopeType === "all") ? currentMonthHotels : currentMonthHotels.filter(h => allowedUsersPool.includes(h.m));
+            renderDetailViews(filteredData, filteredHotels);
+        }
+
+        function refreshDashboard() {
+            const currentMonthData = parsedData.filter(item => activeMonths.includes(item.monthGroup));
+            const filteredData = (filterScopeType === "all") ? currentMonthData : currentMonthData.filter(item => allowedUsersPool.includes(item.m));
+            const currentMonthHotels = rawHotelDataSet.filter(h => activeMonths.includes(h.monthGroup));
+            const filteredHotels = (filterScopeType === "all") ? currentMonthHotels : currentMonthHotels.filter(h => allowedUsersPool.includes(h.m));
+
+            document.getElementById('statTotalVisits').innerText = filteredData.filter(item => item.type !== 'attendance').length;
+            document.getElementById('statTotalAttendances').innerText = filteredData.filter(item => item.type === 'attendance').length;
+
+            refreshAuditSummary(filteredData, filteredHotels); 
+            renderTrajectoriesOnMap(filteredData, filteredHotels);
+            generateCoreInsights(filteredData);
+            renderManagerAnalysis(filteredData, filteredHotels); 
+            renderDetailViews(filteredData, filteredHotels);
+        }
+
+        function refreshAuditSummary(scopedData, scopedHotels = []) {
+            const container = document.getElementById('auditSummaryContainer'); container.innerHTML = '';
+            const managers = [...new Set([...scopedData.map(r => r.m), ...scopedHotels.map(h => h.m)])];
+            if (managers.length === 0) { container.innerHTML = '<div class="text-xs text-slate-400 py-4 text-center">无打卡及住宿数据</div>'; return; }
+            
+            managers.forEach(name => {
+                const pData = scopedData.filter(r => r.m === name); const pHotels = scopedHotels.filter(h => h.m === name);
+                const visitData = pData.filter(r => r.type !== 'attendance');
+
+                let monthlyClientsSum = 0;
+                activeMonths.forEach(mStr => { const mData = visitData.filter(r => r.monthGroup === mStr); monthlyClientsSum += new Set(mData.map(r => r.c)).size; });
+                const avgMonthlyClients = activeMonths.length > 0 ? Math.round(monthlyClientsSum / activeMonths.length) : 0;
+                
+                let monthlyVisitsSum = visitData.length;
+                let avgMonthlyVisits = activeMonths.length > 0 ? Math.round(monthlyVisitsSum / activeMonths.length) : 0;
+
+                let intensityAnomalyCount = 0; 
+                // 双轨制判定，若满足任意其一，均不计入强度异常
+                if (avgMonthlyClients < AUDIT_PARAMS.clientPass && avgMonthlyVisits < AUDIT_PARAMS.visitDepthPass && visitData.length > 0) {
+                    intensityAnomalyCount = 1; 
+                }
+                const anomalies = pData.filter(r => r.isAnomaly).length + pHotels.filter(h => h.isAnomaly).length + intensityAnomalyCount;
+                
+                const card = document.createElement('div');
+                card.className = "p-2.5 rounded-xl border text-xs bg-white border-slate-100 flex justify-between shadow-sm";
+                card.innerHTML = `<span class="font-bold text-slate-700">👤 ${name}</span><span class="${anomalies>0?'text-rose-600 font-bold bg-rose-50 px-2 rounded':'text-emerald-600 bg-emerald-50 px-2 rounded'}">异常项: ${anomalies}</span>`;
+                container.appendChild(card);
+            });
+        }
+
+        // ==========================
+        // 4. 三轨解耦可视化 (Map Rendering)
+        // ==========================
+        function renderTrajectoriesOnMap(scopedData, scopedHotels) {
+            visitLayerGroup.clearLayers();
+            attendanceLayerGroup.clearLayers();
+            hotelLayerGroup.clearLayers();
+            
+            const allLatLngs = []; const legend = document.getElementById('mapLegend'); legend.innerHTML = '';
+            const hotelCoordsCache = {}; const hotelCityCounts = {};
+
+            const hotelMap = {};
+            scopedHotels.forEach(h => {
+                const key = `${h.m}_${h.city}_${h.hotel}`;
+                if (!hotelMap[key]) hotelMap[key] = { m: h.m, city: h.city, hotel: h.hotel, stays: [], allAnomalies: [], isMatched: false, isAnomaly: false };
+                hotelMap[key].stays.push({ in: h.checkIn, out: h.checkOut, nights: h.roomNights });
+                if (h.isMatched) hotelMap[key].isMatched = true;
+                if (h.isAnomaly) hotelMap[key].isAnomaly = true;
+                if (h.anomalies) h.anomalies.forEach(a => { if (!hotelMap[key].allAnomalies.some(ext => ext.text === a.text)) hotelMap[key].allAnomalies.push(a); });
+            });
+            
+            Object.values(hotelMap).forEach((hGroup) => {
+                let fallbackResult = getCityCoordinatesFallback(hGroup.city); let hCoords = fallbackResult.coords;
+                if ((!hCoords || fallbackResult.isProvince) && hGroup.isMatched) {
+                    const matchedVisit = scopedData.find(v => v.hotelMatch && v.hotelMatch.hotel === hGroup.hotel && v.hotelMatch.city === hGroup.city && v.m === hGroup.m);
+                    if (matchedVisit && matchedVisit.coords) hCoords = [...matchedVisit.coords];
+                }
+                if (!hCoords) hCoords = [35.8617, 104.1954]; 
+
+                const hIdx = hotelCityCounts[hGroup.city] || 0; hotelCityCounts[hGroup.city] = hIdx + 1;
+                const finalHCoords = [hCoords[0] + 0.01 + (hIdx * 0.005), hCoords[1] + 0.01 + (hIdx * 0.005)];
+                hotelCoordsCache[`${hGroup.m}_${hGroup.city}`] = finalHCoords; allLatLngs.push(finalHCoords);
+
+                const hColor = hGroup.isMatched ? "bg-amber-500" : "bg-rose-500";
+                const hShadow = hGroup.isMatched ? "rgba(245,158,11,0.8)" : "rgba(244,63,94,0.8)";
+                const badgeHtml = hGroup.stays.length > 1 ? `<span class="absolute -top-1.5 -right-1.5 bg-rose-600 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center border-2 border-white shadow-sm font-bold z-10">${hGroup.stays.length}</span>` : '';
+
+                let staysHtml = hGroup.stays.map(s => `
+                    <div class="flex justify-between items-center bg-slate-50 border border-slate-100 rounded px-2 py-1.5 mb-1 text-[11px]">
+                        <span class="text-slate-600">${s.in.split(' ')[0]} 至 ${s.out.split(' ')[0]}</span>
+                        <span class="text-slate-800 font-bold">${s.nights}晚</span>
+                    </div>
+                `).join('');
+
+                let anomalyHtml = '';
+                if (hGroup.isAnomaly) {
+                    anomalyHtml = hGroup.allAnomalies.map(a => `
+                        <div class="mt-1.5 bg-rose-50 border border-rose-200 text-rose-700 p-2 rounded text-[11px] font-medium leading-relaxed anomaly-text">
+                            ${a.text}
+                        </div>
+                    `).join('');
+                }
+                
+                let headerStatus = hGroup.isAnomaly 
+                    ? `<span class="text-rose-600">(⚠️ 涉违规)</span>` 
+                    : `<span class="text-emerald-600">(✅ 闭合)</span>`;
+                    
+                let popupHtml = `
+                    <div class="text-xs min-w-[260px] p-0.5">
+                        <div class="font-bold border-b border-rose-100 pb-2 mb-2 text-rose-700 flex items-center gap-1 text-[13px]">
+                            🏨 住宿驻地聚合 ${headerStatus}
+                        </div>
+                        <div class="mb-1"><b>员工:</b> <span class="text-slate-800">${hGroup.m}</span></div>
+                        <div class="mb-3"><b>酒店:</b> <span class="text-slate-800">${hGroup.hotel}</span> <span class="text-slate-400 text-[10px]">(${hGroup.city})</span></div>
+                        
+                        <div class="text-slate-500 font-bold mb-1.5 text-[11px]">打卡区间明细 (${hGroup.stays.length}次入住聚合):</div>
+                        ${staysHtml}
+                        ${anomalyHtml}
+                    </div>
+                `;
+
+                const hotelMarker = L.marker(finalHCoords, {
+                    icon: L.divIcon({ className: 'leaflet-div-icon', html: `<div class="relative ${hColor} text-white rounded-full border-2 border-white flex items-center justify-center w-8 h-8 font-bold text-xs" style="margin-left:-16px; margin-top:-16px; box-shadow: 0 0 10px ${hShadow}; z-index: 500;">🏨${badgeHtml}</div>` })
+                }).bindPopup(popupHtml, { maxWidth: 320 });
+                
+                hotelMarker._hotelGroup = hGroup;
+                hotelLayerGroup.addLayer(hotelMarker);
+            });
+
+            const tracks = {}; scopedData.forEach(r => { if(!tracks[r.m]) tracks[r.m] = []; tracks[r.m].push(r); });
+            
+            for (const m in tracks) {
+                const list = tracks[m].sort((a,b) => a.parsedDate - b.parsedDate);
+                const color = MANAGER_COLORS[m] || `hsl(${Math.random()*360}, 70%, 50%)`; 
+                const pts = list.map(i => i.coords); pts.forEach(p => allLatLngs.push(p));
+                
+                const visitList = list.filter(i => i.type !== 'attendance');
+                const attList = list.filter(i => i.type === 'attendance');
+
+                if (visitList.length > 1) {
+                    const polyVPts = visitList.map(v => v.coords);
+                    const polyV = L.polyline(polyVPts, { color: color, weight: 3, opacity: 0.8 }); 
+                    visitLayerGroup.addLayer(polyV);
+                    addArrowToLayer(visitLayerGroup, polyVPts, color);
+                }
+                
+                if (attList.length > 1) {
+                    const polyAPts = attList.map(a => a.coords);
+                    const polyA = L.polyline(polyAPts, { color: '#06b6d4', weight: 2.5, opacity: 0.8, dashArray: '6,4' }); 
+                    attendanceLayerGroup.addLayer(polyA);
+                    addArrowToLayer(attendanceLayerGroup, polyAPts, '#06b6d4');
+                }
+                
+                let visitIdx = 1;
+                list.forEach((item) => {
+                    const isAnomaly = item.isAnomaly;
+                    const isAttendance = item.type === 'attendance';
+                    
+                    let pinColor = color; let iconHtml = '';
+                    if (isAttendance) {
+                        pinColor = isAnomaly ? '#ef4444' : '#06b6d4'; 
+                        const ringStyle = isAnomaly ? 'box-shadow: 0 0 12px #ef4444; border: 2px solid #fee2e2; z-index:999;' : 'box-shadow: 0 2px 4px rgba(0,0,0,0.3); border: 2px solid #fff;';
+                        iconHtml = `<div class="marker-pin" style="background-color:${pinColor}; ${ringStyle}; border-radius: 50%;"><span style="transform: rotate(0deg); font-size:12px;">🕒</span></div>`;
+                    } else {
+                        pinColor = isAnomaly ? '#ef4444' : color;
+                        const ringStyle = isAnomaly ? 'box-shadow: 0 0 12px #ef4444; border: 2px solid #fee2e2; z-index:999;' : 'box-shadow: 0 2px 4px rgba(0,0,0,0.3);';
+                        iconHtml = `<div class="marker-pin" style="background-color:${pinColor}; ${ringStyle}"><span>${isAnomaly ? '⚠️' : visitIdx}</span></div>`;
+                        visitIdx++;
+                    }
+                    
+                    const pin = L.divIcon({ className: 'leaflet-div-icon', html: iconHtml });
+                    const marker = L.marker(item.coords, { icon: pin, zIndexOffset: isAnomaly ? 1000 : 0 }).bindPopup(`
+                        <div class="text-xs p-1 min-w-[210px] max-w-sm">
+                            <div class="font-bold border-b pb-1 mb-1 flex justify-between items-center" style="color: ${pinColor}">
+                                <span>👤 ${item.m} ${isAttendance ? '(考勤定位)' : '(业务拜访)'}</span>
+                            </div>
+                            <div class="mb-0.5"><b>🕒 时间节点:</b> ${item.d}</div>
+                            <div class="mb-0.5"><b>🎯 对象/备注:</b> <span class="text-slate-900 font-bold">${item.c}</span></div>
+                        </div>
+                    `);
+                    
+                    marker._itemData = item;
+
+                    if (isAttendance) attendanceLayerGroup.addLayer(marker);
+                    else visitLayerGroup.addLayer(marker);
+
+                    if (item.hotelMatch) {
+                        let targetHotelCoords = hotelCoordsCache[`${item.m}_${item.hotelMatch.city}`];
+                        if (!targetHotelCoords) targetHotelCoords = getCityCoordinatesFallback(item.hotelMatch.city).coords || item.coords;
+                        
+                        if (targetHotelCoords && getHaversineDistance(item.coords, targetHotelCoords) > 2) {
+                            const gapLineColor = isAnomaly ? '#ef4444' : '#22c55e';
+                            const gapLine = L.polyline([item.coords, targetHotelCoords], { color: gapLineColor, weight: isAnomaly ? 2.5 : 1.2, dashArray: isAnomaly ? '4, 4' : '6, 6', opacity: isAnomaly ? 0.9 : 0.4 });
+                            const targetLayer = isAttendance ? attendanceLayerGroup : visitLayerGroup;
+                            targetLayer.addLayer(gapLine);
+                            addArrowToLayer(targetLayer, [item.coords, targetHotelCoords], gapLineColor);
+                        }
+                    }
+                });
+                
+                const itemDiv = document.createElement('div'); itemDiv.className = "flex items-center gap-1 bg-slate-800 px-2 py-1 rounded text-[11px]";
+                itemDiv.innerHTML = `<span class="w-2 h-2 rounded-full" style="background:${color}"></span><span class="text-slate-100 font-medium">${m}</span><button id="btn-play-${m}" onclick="toggleTrajectoryPlayback('${m}')" class="text-emerald-400 ml-1 hover:text-amber-400 font-bold transition">▶</button>`;
+                legend.appendChild(itemDiv);
+            }
+
+            if (!viewState.visit) map.removeLayer(visitLayerGroup); else map.addLayer(visitLayerGroup);
+            if (!viewState.attendance) map.removeLayer(attendanceLayerGroup); else map.addLayer(attendanceLayerGroup);
+            if (!viewState.hotel) map.removeLayer(hotelLayerGroup); else map.addLayer(hotelLayerGroup);
+
+            if (map && allLatLngs.length > 0) {
+                map.invalidateSize(); const totalBounds = L.latLngBounds(allLatLngs);
+                if (!totalBounds.getNorthEast().equals(totalBounds.getSouthWest())) map.fitBounds(totalBounds, { padding: [50, 50], maxZoom: 12 });
+            }
+
+            updatePlaybackButtons();
+        }
+
+        function toggleTrajectoryPlayback(manager) {
+            if (currentlyPlayingManager === manager && playbackInterval) {
+                clearInterval(playbackInterval);
+                if (playbackMarker) map.removeLayer(playbackMarker);
+                playbackInterval = null;
+                currentlyPlayingManager = null;
+                updatePlaybackButtons();
+                return;
+            }
+            playTrajectory(manager);
+        }
+
+        function updatePlaybackButtons() {
+            document.querySelectorAll('[id^="btn-play-"]').forEach(btn => {
+                const mgr = btn.id.replace('btn-play-', '');
+                if (mgr === currentlyPlayingManager) {
+                    btn.innerHTML = '⏹';
+                    btn.className = "text-rose-400 ml-1 hover:text-rose-300 font-bold transition text-[12px]";
+                } else {
+                    btn.innerHTML = '▶';
+                    btn.className = "text-emerald-400 ml-1 hover:text-amber-400 font-bold transition text-[12px]";
+                }
+            });
+        }
+
+        function playTrajectory(manager) {
+            if (playbackInterval) clearInterval(playbackInterval);
+            if (playbackMarker) map.removeLayer(playbackMarker);
+            
+            currentlyPlayingManager = manager;
+            updatePlaybackButtons();
+
+            const currentMonthData = parsedData.filter(item => {
+                if (!activeMonths.includes(item.monthGroup)) return false;
+                if (item.m !== manager) return false;
+                if (item.type === 'attendance' && !viewState.attendance) return false;
+                if (item.type !== 'attendance' && !viewState.visit) return false;
+                return true;
+            });
+
+            if (currentMonthData.length === 0) {
+                alert("当前未勾选该人员任何需播放的轨迹类型（拜访/考勤）。");
+                currentlyPlayingManager = null;
+                updatePlaybackButtons();
+                return; 
+            }
+            const sortedPoints = [...currentMonthData].sort((a, b) => new Date(a.parsedDate) - new Date(b.parsedDate));
+            
+            const avatarIcon = L.divIcon({ className: 'leaflet-div-icon', html: `<div class="bg-white px-2 py-0.5 rounded shadow-lg border-2 border-emerald-500 text-[11px] font-bold text-slate-800" style="transform:translate(-50%,-50%); z-index:99999;">🏃 ${manager}</div>` });
+            playbackMarker = L.marker(sortedPoints[0].coords, { icon: avatarIcon }).addTo(map);
+            let step = 0;
+            playbackInterval = setInterval(() => {
+                if (step >= sortedPoints.length) { 
+                    clearInterval(playbackInterval); 
+                    playbackInterval = null;
+                    currentlyPlayingManager = null;
+                    updatePlaybackButtons();
+                    return; 
+                }
+                const item = sortedPoints[step]; playbackMarker.setLatLng(item.coords);
+                
+                const isWknd = isWeekend(item.d);
+                const dateDisplay = isWknd ? `<span class="bg-purple-100 text-purple-700 px-1 rounded-sm border border-purple-200 font-bold">${item.d} (周末)</span>` : `<span class="text-slate-600">${item.d}</span>`;
+                const typeText = item.type === 'attendance' ? `<span class="text-cyan-600 bg-cyan-50 px-1 rounded">考勤点</span>` : `<span class="text-emerald-600 bg-emerald-50 px-1 rounded">拜访点</span>`;
+
+                playbackMarker.bindPopup(`
+                    <div class="text-xs p-1 min-w-[190px]">
+                        <div class="font-bold border-b border-slate-100 pb-1 mb-1 text-slate-800 flex justify-between items-center">
+                            <span>🏃 ${item.m} ${typeText}</span> <span class="text-slate-400">第 ${step + 1}/${sortedPoints.length} 站</span>
+                        </div>
+                        <div class="mb-0.5"><b>🕒 打卡时间:</b> ${dateDisplay}</div>
+                        <div class="mb-0.5"><b>🎯 对象/备注:</b> <span class="text-slate-900 font-semibold">${item.c}</span></div>
+                        <div class="mb-0.5"><b>📍 定位点:</b> <span class="text-slate-500 max-w-[180px] truncate block">${item.l}</span></div>
+                    </div>
+                `).openPopup(); 
+                step++;
+            }, 1200);
+        }
+
+        function generateCoreInsights(data) {
+            const visitData = data.filter(d => d.type !== 'attendance');
+            const iList = document.getElementById('insightIssuesList'); const sList = document.getElementById('insightSolutionsList');
+            const issues = [...new Set(visitData.map(d => d.i).filter(Boolean))].slice(0, 3);
+            const solutions = [...new Set(visitData.map(d => d.s).filter(Boolean))].slice(0, 3);
+            iList.innerHTML = issues.length === 0 ? '<li class="text-slate-400">暂无反馈</li>' : ''; issues.forEach(i => iList.innerHTML += `<li>${i}</li>`);
+            sList.innerHTML = solutions.length === 0 ? '<li class="text-slate-400">暂无对策</li>' : ''; solutions.forEach(s => sList.innerHTML += `<li>${s}</li>`);
+        }
+
+        function renderManagerAnalysis(scopedData, scopedHotels = []) {
+            const tbody = document.getElementById('managerAnalysisTbody'); tbody.innerHTML = '';
+            const uniqueManagers = [...new Set([...scopedData.map(r => r.m), ...scopedHotels.map(h => h.m)])];
+            
+            if (uniqueManagers.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" class="py-8 text-center text-slate-400 italic">⏳ 暂无数据。</td></tr>`; return;
+            }
+            
+            uniqueManagers.forEach(name => {
+                const pData = scopedData.filter(r => r.m === name); const pHotels = scopedHotels.filter(h => h.m === name);
+                const visitData = pData.filter(r => r.type !== 'attendance');
+                const attData = pData.filter(r => r.type === 'attendance');
+
+                let crossRegion = 0, homeAnomalies = 0, unmatchedHotels = 0, noHotels = 0, offsets = 0, speeds = 0;
+                let attAnomalies = 0;
+                let userOverstays = {}; 
+
+                pData.forEach(r => {
+                    (r.anomalies || []).forEach(a => {
+                        const txt = a.text || '';
+                        if (txt.includes('超辖区业务')) crossRegion++;
+                        else if (txt.includes('异地无住宿凭证') || txt.includes('住宿未明')) noHotels++;
+                        else if (txt.includes('业务-住宿地偏离') || txt.includes('位置偏离') || txt.includes('时空冲突')) offsets++;
+                        else if (txt.includes('物理瞬移异常') || txt.includes('轨迹过密') || txt.includes('位移异常')) speeds++;
+                        else if (txt.includes('异地考勤未闭环')) attAnomalies++;
+                        else if (txt.includes('连续驻留超期') || txt.includes('超期停留')) {
+                            const match = txt.match(/达\s*(\d+)\s*天/);
+                            if (match && r.detectedCityName) {
+                                let days = parseInt(match[1]);
+                                if (!userOverstays[r.detectedCityName] || days > userOverstays[r.detectedCityName]) userOverstays[r.detectedCityName] = days;
+                            }
+                        }
+                    });
+                });
+                
+                pHotels.forEach(h => {
+                    (h.anomalies || []).forEach(a => {
+                        const txt = a.text || '';
+                        if (txt.includes('常驻地留宿') || txt.includes('属地留宿') || txt.includes('总部所在地留宿')) homeAnomalies++;
+                        else if (txt.includes('住宿无业务支撑') || txt.includes('数据断层')) unmatchedHotels++;
+                        else if (txt.includes('超辖区业务') || txt.includes('跨区预警')) crossRegion++;
+                        else if (txt.includes('时空冲突')) offsets++;
+                    });
+                });
+
+                let noBizDays = new Set();
+                pData.forEach(r => {
+                    (r.anomalies || []).forEach(a => {
+                        const txt = a.text || '';
+                        if (txt.includes('在岗无业务记录')) noBizDays.add(r.d.split(' ')[0]);
+                    });
+                });
+
+                const overstayCitiesArr = Object.entries(userOverstays).map(([city, days]) => `${city}连续${days}天`);
+
+                const totalVisits = visitData.length;
+                const totalAtt = attData.length;
+                let totalAnomalies = pData.filter(r => r.isAnomaly).length + pHotels.filter(h => h.isAnomaly).length;
+                const totalEvents = pData.length + pHotels.length;
+                
+                let activeDays = new Set(pData.map(r => r.d.split(' ')[0])).size;
+                
+                let monthlyClientsSum = 0;
+                activeMonths.forEach(mStr => { const mData = visitData.filter(r => r.monthGroup === mStr); monthlyClientsSum += new Set(mData.map(r => r.c)).size; });
+                const avgMonthlyClients = activeMonths.length > 0 ? Math.round(monthlyClientsSum / activeMonths.length) : 0;
+                
+                let monthlyVisitsSum = visitData.length;
+                let avgMonthlyVisits = activeMonths.length > 0 ? Math.round(monthlyVisitsSum / activeMonths.length) : 0;
+
+                const uClientsTotal = new Set(visitData.map(r => r.c)).size;
+
+                const cities = new Set(); pData.forEach(r => { if(r.detectedCityName) cities.add(r.detectedCityName); }); pHotels.forEach(h => cities.add(h.city));
+                const uniqueHotelsCount = new Set(pHotels.map(h => h.hotel)).size;
+                const totalRoomNights = pHotels.reduce((sum, h) => sum + (h.roomNights || 1), 0);
+
+                let insights = []; 
+                let hasMajorWarning = false;
+
+                if (homeAnomalies > 0) { insights.push(`<div class="flex items-start gap-1.5 mb-1.5"><span class="text-rose-600 shrink-0">🔴</span><span class="text-rose-600 font-bold whitespace-nowrap">常驻/总部地留宿：</span><span class="text-rose-600">系统检测到常驻地或东莞总部存在 ${homeAnomalies} 笔留宿记录，不符合不予核销的规定。</span></div>`); hasMajorWarning = true; }
+                if (unmatchedHotels > 0) { insights.push(`<div class="flex items-start gap-1.5 mb-1.5"><span class="text-rose-600 shrink-0">🔴</span><span class="text-rose-600 font-bold whitespace-nowrap">住宿无业务支撑：</span><span class="text-rose-600">存在 ${unmatchedHotels} 条住宿记录周边(及前后2天)无任何外勤拜访打卡数据，缺乏核销事实依据。</span></div>`); hasMajorWarning = true; }
+                if (crossRegion > 0) { insights.push(`<div class="flex items-start gap-1.5 mb-1.5"><span class="text-rose-600 shrink-0">🚨</span><span class="text-rose-600 font-bold whitespace-nowrap">超辖区业务：</span><span class="text-rose-600">检测到 ${crossRegion} 次脱离预设管辖片区外的出差/住宿记录。</span></div>`); hasMajorWarning = true; }
+                if (overstayCitiesArr.length > 0) { insights.push(`<div class="flex items-start gap-1.5 mb-1.5"><span class="text-amber-500 shrink-0">🟠</span><span class="text-amber-600 font-bold whitespace-nowrap">连续驻留超期：</span><span class="text-amber-600">在 ${overstayCitiesArr.join('、')} 连续停留，超过${AUDIT_PARAMS.overstayDays}天公司规定。</span></div>`); hasMajorWarning = true; }
+                if (noHotels > 0) { insights.push(`<div class="flex items-start gap-1.5 mb-1.5"><span class="text-rose-500 shrink-0">❌</span><span class="text-rose-500 font-bold whitespace-nowrap">异地无住宿凭证：</span><span class="text-rose-500">有 ${noHotels} 次外勤期间(非常驻地)未能匹配到异地酒店住宿凭证。</span></div>`); hasMajorWarning = true; }
+                if (offsets > 0) { insights.push(`<div class="flex items-start gap-1.5 mb-1.5"><span class="text-amber-500 shrink-0">⚠️</span><span class="text-amber-600 font-bold whitespace-nowrap">店房偏离与冲突：</span><span class="text-amber-600">发现 ${offsets} 次住宿地与当天的打卡定位物理距离超过合理通勤范围，存在物理时空冲突。</span></div>`); hasMajorWarning = true; }
+                if (speeds > 0) { insights.push(`<div class="flex items-start gap-1.5 mb-1.5"><span class="text-purple-500 shrink-0">🟣</span><span class="text-purple-600 font-bold whitespace-nowrap">物理位置异常：</span><span class="text-purple-600">识别到 ${speeds} 次物理位移速度超出常理(如不足${AUDIT_PARAMS.teleportTime}分钟跨越${AUDIT_PARAMS.teleportDist}公里)，有违常理。</span></div>`); hasMajorWarning = true; }
+
+                let intensityStatus = ""; let intensityColor = "";
+                let breadthPass = avgMonthlyClients >= AUDIT_PARAMS.clientPass;
+                let breadthExcellent = avgMonthlyClients >= AUDIT_PARAMS.clientExcellent;
+                let depthPass = avgMonthlyVisits >= AUDIT_PARAMS.visitDepthPass;
+
+                if (breadthExcellent) {
+                    intensityStatus = "🌟 独立客户覆盖优秀"; intensityColor = "text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded";
+                    insights.push(`<div class="flex items-start gap-1.5 mb-1.5"><span class="text-emerald-500 shrink-0">🌟</span><span class="text-emerald-600 font-bold whitespace-nowrap">广度覆盖优秀：</span><span class="text-emerald-600">月均覆盖 ${avgMonthlyClients} 家独立客户，工作密度饱和。</span></div>`);
+                } else if (breadthPass) {
+                    intensityStatus = "✅ 独立客户覆盖达标"; intensityColor = "text-blue-700 bg-blue-50 px-2 py-0.5 rounded";
+                    insights.push(`<div class="flex items-start gap-1.5 mb-1.5"><span class="text-blue-500 shrink-0">✅</span><span class="text-blue-600 font-bold whitespace-nowrap">广度覆盖达标：</span><span class="text-blue-600">月均覆盖 ${avgMonthlyClients} 家独立客户，符合合格标准。</span></div>`);
+                } else if (depthPass) {
+                    intensityStatus = "✅ 大客深耕达标(双轨)"; intensityColor = "text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded";
+                    insights.push(`<div class="flex items-start gap-1.5 mb-1.5"><span class="text-indigo-500 shrink-0">✅</span><span class="text-indigo-600 font-bold whitespace-nowrap">大客深耕达标：</span><span class="text-indigo-600">虽月均独立客户仅 ${avgMonthlyClients} 家，但月均总频次达 ${avgMonthlyVisits} 次，符合深度帮扶双轨标准。</span></div>`);
+                } else if (avgMonthlyClients >= AUDIT_PARAMS.clientWarn) {
+                    intensityStatus = "⚠️ 拓客与拜访双低"; intensityColor = "text-amber-600 bg-amber-50 px-2 py-0.5 rounded";
+                    insights.push(`<div class="flex items-start gap-1.5 mb-1.5"><span class="text-amber-500 shrink-0">⚠️</span><span class="text-amber-600 font-bold whitespace-nowrap">业务量双低预警：</span><span class="text-amber-600">独立客户数(${avgMonthlyClients})与总频次(${avgMonthlyVisits})双低，未达广度或深度双轨要求。</span></div>`);
+                    hasMajorWarning = true;
+                } else if (avgMonthlyClients >= 1) {
+                    intensityStatus = "🚨 业务覆盖严重不足"; intensityColor = "text-rose-600 bg-rose-50 px-2 py-0.5 rounded";
+                    insights.push(`<div class="flex items-start gap-1.5 mb-1.5"><span class="text-rose-600 shrink-0">🚨</span><span class="text-rose-600 font-bold whitespace-nowrap">覆盖严重不足：</span><span class="text-rose-600">当月独立客户与拜访频次均严重不足，工作密度明显偏低。</span></div>`);
+                    totalAnomalies += 1; hasMajorWarning = true;
+                } else if (avgMonthlyClients === 0 && totalVisits === 0) {
+                    intensityStatus = "❌ 零客户拜访"; intensityColor = "text-rose-700 font-bold bg-rose-100 px-2 py-0.5 rounded";
+                    insights.push(`<div class="flex items-start gap-1.5 mb-1.5"><span class="text-rose-600 shrink-0">❌</span><span class="text-rose-600 font-bold whitespace-nowrap">零客户拜访：</span><span class="text-rose-600">当月实际有效拜访量为 0，缺乏工作产出支撑。</span></div>`);
+                    totalAnomalies += 1; hasMajorWarning = true;
+                } else {
+                    intensityStatus = "⚪ 无记录"; intensityColor = "text-slate-400";
+                }
+
+                if (totalVisits > 0) {
+                    let meaningfulFillCount = 0;
+                    visitData.forEach(r => { const cleanText = (r.i + r.s).trim().replace(/\s+/g, ''); if (cleanText.length > 4 && !/^(无|没有|正常|都好|没问题|无建议|暂无|无异常|一切正常)$/.test(cleanText)) meaningfulFillCount++; });
+                    const fillRate = (meaningfulFillCount / totalVisits) * 100;
+                    if (fillRate < AUDIT_PARAMS.fillRateBad) { insights.push(`<div class="flex items-start gap-1.5 mb-1.5"><span class="text-rose-500 shrink-0">✍️</span><span class="text-rose-500 font-bold whitespace-nowrap">反馈质量偏低：</span><span class="text-rose-500">报表实质填报率仅为 ${fillRate.toFixed(0)}%，有效市场信息反馈不足，请完善填写。</span></div>`); hasMajorWarning = true; }
+                    else if (fillRate <= AUDIT_PARAMS.fillRatePass) { insights.push(`<div class="flex items-start gap-1.5 mb-1.5"><span class="text-amber-600 shrink-0">✍️</span><span class="text-amber-600 font-bold whitespace-nowrap">反馈质量一般：</span><span class="text-amber-600">报表实质填报率为 ${fillRate.toFixed(0)}%，有效业务洞察及对策较少。</span></div>`); hasMajorWarning = true; }
+                    else { insights.push(`<div class="flex items-start gap-1.5 mb-1.5"><span class="text-blue-600 shrink-0">📝</span><span class="text-blue-600 font-bold whitespace-nowrap">反馈详实合格：</span><span class="text-blue-600">实质填报率达到 ${fillRate.toFixed(0)}%，市场洞察及对策填报完整。</span></div>`); }
+                }
+
+                if (!hasMajorWarning) {
+                    insights.unshift(`<div class="flex items-start gap-1.5 mb-1.5"><span class="text-emerald-500 shrink-0">🟢</span><span class="text-emerald-600 font-bold whitespace-nowrap">轨迹合理：</span><span class="text-emerald-600">基础时空轨迹客观连贯，无明显异常。</span></div>`);
+                }
+
+                const anomalyRate = totalEvents ? ((totalAnomalies / totalEvents) * 100).toFixed(1) : '0.0';
+                const finalRouteMsg = `<div class="flex flex-col text-[12px] leading-relaxed">${insights.join('')}</div>`;
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition border-b border-slate-50">
+                        <td class="py-3 px-5 font-bold text-slate-800">${name}</td>
+                        <td class="py-3 px-5 font-medium whitespace-nowrap">
+                            <div class="text-slate-800 font-bold">${activeDays || 0} 天</div>
+                            <div class="text-[11px] text-amber-600 font-semibold mt-1 flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100/60 w-max">🏨 ${uniqueHotelsCount} 家酒店 / ${totalRoomNights} 间夜</div>
+                        </td>
+                        <td class="py-3 px-5">${cities.size} 域<br><span class="text-[10px] text-slate-400 block max-w-[120px] truncate" title="${Array.from(cities).join('、')}">${Array.from(cities).join('、') || '-'}</span></td>
+                        <td class="py-3 px-5 font-bold text-emerald-600 text-base">${totalVisits} 访</td>
+                        <td class="py-3 px-5 font-bold text-cyan-600">${totalAtt} 勤</td>
+                        <td class="py-3 px-5 text-emerald-600 font-bold">${uClientsTotal} 家</td>
+                        <td class="py-3 px-5">
+                            <div class="font-bold inline-flex ${intensityColor}">${intensityStatus}</div>
+                            <div class="text-[11px] text-slate-400 mt-0.5 font-bold">(客:${avgMonthlyClients}家 / 频:${avgMonthlyVisits}次)</div>
+                        </td>
+                        <td class="py-3 px-5 font-bold ${totalAnomalies > 0 ? 'text-rose-600' : ''}">${anomalyRate}%</td>
+                        <td class="py-3 px-5">${finalRouteMsg}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        // ==========================
+        // 5. 核心重构：七列日历网格卡片与聚合细表视图
+        // ==========================
+        function renderDetailViews(data, scopedHotels = []) {
+            const tbody = document.getElementById('auditDetailTbody'); tbody.innerHTML = '';
+            const tlContainer = document.getElementById('timelineViewContainer'); tlContainer.innerHTML = '';
+            
+            const mixedData = [];
+            data.forEach(item => {
+                if (viewState.anomalyOnly && !item.isAnomaly) return;
+                if (item.type === 'attendance' && !viewState.attendance) return;
+                if (item.type === 'visit' && !viewState.visit) return;
+                mixedData.push({ type: item.type, data: item, time: item.parsedDate.getTime() });
+            });
+            
+            scopedHotels.forEach(hotel => {
+                if (!viewState.hotel) return;
+                if (viewState.anomalyOnly && !hotel.isAnomaly) return; 
+                
+                const inD = new Date(hotel.checkIn.split(' ')[0].replace(/-/g, '/'));
+                const outD = new Date(hotel.checkOut.split(' ')[0].replace(/-/g, '/'));
+                let curr = new Date(inD);
+                let addedDays = 0;
+                
+                while (curr < outD || (curr.getTime() === outD.getTime() && addedDays === 0)) {
+                    mixedData.push({ 
+                        type: 'hotel', 
+                        data: hotel, 
+                        time: curr.getTime() + 86399000, 
+                        displayDate: `${curr.getFullYear()}-${String(curr.getMonth()+1).padStart(2,'0')}-${String(curr.getDate()).padStart(2,'0')}`
+                    });
+                    curr.setDate(curr.getDate() + 1);
+                    addedDays++;
+                }
+            });
+            
+            mixedData.sort((a, b) => b.time - a.time);
+
+            if (mixedData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="py-10 text-center text-slate-400 italic">当前筛选模式下无符合条件的轨迹明细</td></tr>`;
+                tlContainer.innerHTML = `<div class="py-10 text-center text-slate-400 italic">当前筛选模式下无符合条件的轨迹明细</div>`;
+                return;
+            }
+
+            // [5.1 细表聚合模式渲染 - Rowspan 逻辑]
+            const dayManagerGroups = {};
+            mixedData.forEach(row => {
+                const manager = row.data.m;
+                let dateStr = row.type === 'hotel' ? row.displayDate : row.data.d.split(' ')[0];
+                const key = `${manager}_${dateStr}`;
+                if (!dayManagerGroups[key]) {
+                    dayManagerGroups[key] = { manager, dateStr, events: [], hotels: new Set(), hotelData: [], allAnomalies: new Set() };
+                }
+                dayManagerGroups[key].events.push(row);
+                if (row.type === 'hotel') {
+                    const hKey = `${row.data.hotel}_${row.data.checkIn}`;
+                    if (!dayManagerGroups[key].hotels.has(hKey)) {
+                        dayManagerGroups[key].hotels.add(hKey);
+                        dayManagerGroups[key].hotelData.push(row.data);
+                    }
+                }
+                
+                if (row.data.anomalies && row.data.anomalies.length > 0) {
+                    row.data.anomalies.forEach(a => {
+                        dayManagerGroups[key].allAnomalies.add(JSON.stringify(a));
+                    });
+                }
+            });
+
+            const sortedGroupKeys = Object.keys(dayManagerGroups).sort((a, b) => {
+                const aTime = new Date(dayManagerGroups[a].dateStr.replace(/-/g, '/')).getTime();
+                const bTime = new Date(dayManagerGroups[b].dateStr.replace(/-/g, '/')).getTime();
+                return aTime - bTime; // 调整为正序（时间从小到大）排列
+            });
+
+            sortedGroupKeys.forEach(key => {
+                const group = dayManagerGroups[key];
+                
+                group.events.sort(sortByTimeAsc);
+
+                const mgrColor = MANAGER_COLORS[group.manager] || '#64748b';
+                const dateDisplay = isWeekend(group.dateStr) ? `<div class="flex flex-col gap-0.5"><span class="font-bold text-slate-700">${group.dateStr}</span><span class="bg-purple-100 text-purple-700 px-1 py-0.5 rounded border border-purple-200 font-bold w-max text-[10px]">周末</span></div>` : `<span class="font-bold text-slate-700">${group.dateStr}</span>`;
+                
+                let combinedHotelHtml = "";
+                if (group.hotelData.length > 0) {
+                    combinedHotelHtml = group.hotelData.map(h => `<div onclick="window.focusMapOnEvent(0, '${h.m}', 'hotel', '${h.city}')" class="flex flex-col gap-0.5 py-1 mb-0.5 border-b border-slate-50 last:border-0 cursor-pointer hover:bg-slate-100 transition rounded px-1"><div class="text-slate-800 font-bold text-[11px] flex items-center gap-1"><span class="${h.isAnomaly ? 'text-rose-500' : 'text-slate-600'}">🏨</span> <span class="truncate" title="${h.hotel}">${h.hotel}</span></div><div class="text-[10px] text-slate-500 flex flex-wrap items-center gap-1 mt-0.5"><span class="bg-white border border-slate-200 px-1 rounded shadow-sm">${h.city}${h.district?'·'+h.district:''}</span><span class="bg-white border border-slate-200 px-1 rounded shadow-sm">${h.checkIn.substring(5,10)}至${h.checkOut.substring(5,10)}</span><span class="px-1 rounded bg-emerald-50 text-emerald-700 font-bold border border-emerald-100/60">${h.roomNights}晚</span></div></div>`).join('');
+                } else {
+                    const homeCity = HOME_CITIES[group.manager];
+                    let hasDongguan = false; let hasHome = false;
+                    group.events.forEach(e => { if(e.data.detectedCityName && e.data.detectedCityName.includes("东莞")) hasDongguan = true; if(homeCity && e.data.detectedCityName && e.data.detectedCityName.includes(homeCity)) hasHome = true; });
+                    if (hasDongguan) combinedHotelHtml = `<span class="text-blue-500 font-bold text-xs bg-blue-50 px-1.5 py-1 rounded inline-block">🏢 总部，无需酒店</span>`;
+                    else if (hasHome) combinedHotelHtml = `<span class="text-emerald-600 font-bold text-xs bg-emerald-50 px-1.5 py-1 rounded inline-block">🏠 常驻地，无需酒店</span>`;
+                    else combinedHotelHtml = `<span class="text-slate-300 text-[11px] italic">-- 无关联住宿 --</span>`;
+                }
+
+                const nonHotelEvents = group.events.filter(e => e.type !== 'hotel');
+                const attEvents = nonHotelEvents.filter(e => e.type === 'attendance');
+                const visitEvents = nonHotelEvents.filter(e => e.type === 'visit');
+                const isWknd = isWeekend(group.dateStr);
+
+                let finalAnomaliesArray = Array.from(group.allAnomalies).map(str => JSON.parse(str));
+                
+                // 追加细表层面的当天汇总异常判定 (针对没有拜访记录的情况)
+                if (visitEvents.length === 0) {
+                    let noBizText = null;
+                    if (group.hotelData.length > 0 && !isWknd) {
+                        noBizText = `⚠️ <b>工作日无业务支撑：</b>发生异地留宿，但全天无业务拜访打卡，行程客观事实存疑。`;
+                    }
+                    
+                    if (noBizText && !finalAnomaliesArray.some(a => a.text.includes('无业务'))) {
+                        finalAnomaliesArray.push({ level: 'warning', text: noBizText });
+                    }
+                }
+
+                let successText = "✅ 时空合理 (房-店闭环 或 本地常驻)";
+                if (group.hotelData.length > 0 && visitEvents.length === 0 && isWknd) successText = "✅ 差旅周末留宿 (无异常)";
+                else if (nonHotelEvents.length === 0 && group.hotelData.length === 0) successText = "⚪ 休息或无外勤安排";
+                
+                const complianceContent = renderAnomalyTags(finalAnomaliesArray, successText);
+                const hasGlobalAnomaly = finalAnomaliesArray.length > 0;
+                
+                const trClassBase = hasGlobalAnomaly ? "bg-rose-50/10 hover:bg-rose-50/40" : "hover:bg-slate-50";
+
+                let attHtml = '';
+                if (attEvents.length > 0) {
+                    attHtml = '<div class="flex flex-col gap-1">' + attEvents.map(evt => {
+                        const item = evt.data;
+                        const timeStr = item.d.split(' ')[1] ? item.d.split(' ')[1].substring(0,5) : '--:--';
+                        let attLabel = "考勤";
+                        if(timeStr !== '--:--') {
+                            const hour = parseInt(timeStr.split(':')[0], 10);
+                            attLabel = hour < 12 ? "上班" : "下班";
+                        }
+                        return `<div class="bg-cyan-50/30 border border-cyan-100 rounded p-1 hover:shadow-sm transition cursor-pointer" onclick="window.focusMapOnEvent(${item.parsedDate.getTime()}, '${item.m}', '${evt.type}')">
+                            <div class="flex items-center gap-1 mb-0.5">
+                                <span class="bg-cyan-100 text-cyan-700 text-[9px] px-1 rounded font-bold">${attLabel}</span>
+                                <span class="text-cyan-800 font-bold text-[11px]">${timeStr}</span>
+                            </div>
+                            <div class="text-[9px] text-slate-400 truncate leading-tight" title="${item.l}">${item.l}</div>
+                        </div>`;
+                    }).join('') + '</div>';
+                } else {
+                    attHtml = '<span class="text-slate-300 text-xs italic">无考勤记录</span>';
+                }
+
+                let visitHtml = '';
+                if (visitEvents.length > 0) {
+                    visitHtml = '<div class="flex flex-col gap-1.5">' + visitEvents.map(evt => {
+                        const item = evt.data;
+                        const timeStr = item.d.split(' ')[1] ? item.d.split(' ')[1].substring(0,5) : '--:--';
+                        return `<div class="bg-emerald-50/40 border border-emerald-100 rounded p-1.5 hover:shadow-sm transition cursor-pointer" onclick="window.focusMapOnEvent(${item.parsedDate.getTime()}, '${item.m}', '${evt.type}')">
+                            <div class="flex justify-between items-start mb-1 gap-1">
+                                <div class="text-emerald-900 font-black text-[13px] leading-tight" style="word-break: break-word;">${item.c}</div>
+                                <span class="bg-emerald-100 text-emerald-700 text-[10px] px-1 rounded font-bold shrink-0">${timeStr}</span>
+                            </div>
+                            <div class="text-[10px] text-slate-500 truncate leading-tight" title="${item.l}">${item.l}</div>
+                        </div>`;
+                    }).join('') + '</div>';
+                } else {
+                    visitHtml = '<div class="text-rose-500 font-bold text-xs bg-rose-50 border border-rose-100 rounded p-1.5 text-center shadow-sm">❌ 当日无业务活动记录</div>';
+                }
+
+                const tr = document.createElement('tr');
+                tr.className = `${trClassBase} border-b border-slate-100/60`;
+                tr.innerHTML = `
+                    <td class="p-2 align-top border-r border-slate-50 font-bold text-slate-800 text-xs"><span class="inline-block w-2 h-2 rounded-full mr-1" style="background-color: ${mgrColor}"></span>${group.manager}</td>
+                    <td class="p-2 align-top border-r border-slate-50 text-[11px] text-slate-600 font-medium">${dateDisplay}</td>
+                    <td class="p-2 align-top border-r border-slate-50 min-w-0">${attHtml}</td>
+                    <td class="p-2 align-top border-r border-slate-50 min-w-0">${visitHtml}</td>
+                    <td class="p-2 align-top border-r border-slate-50 min-w-0">${combinedHotelHtml}</td>
+                    <td class="p-2 align-top min-w-0">${complianceContent}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // [5.2 原生七列月历网格模式渲染]
+            if (activeMonths.length === 0) {
+                tlContainer.innerHTML = `<div class="py-10 text-center text-slate-400">请选择上方月份生成日历网格。</div>`; return;
+            }
+
+            let calendarHtml = '';
+            
+            activeMonths.forEach(monthStr => {
+                const parts = monthStr.split('-'); const year = parseInt(parts[0]); const month = parseInt(parts[1]);
+                const daysInMonth = getDaysInMonth(year, month);
+                const firstDayIdx = getFirstDayOfMonth(year, month); 
+                
+                calendarHtml += `
+                <div class="mb-10 w-full max-w-[100%] overflow-x-auto">
+                    <div class="flex justify-between items-center mb-4 min-w-[1000px]">
+                        <h2 class="text-xl font-black text-slate-800 flex items-center gap-2">
+                            <i data-lucide="calendar-days" class="w-6 h-6 text-blue-600"></i>
+                            ${year}年${month}月 差旅时空审计日历
+                        </h2>
+                        <button onclick="exportCalendarImage(event, 'calendar-export-target-${monthStr}', '${year}年${month}月')" class="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-xl text-xs font-bold transition shadow-sm">
+                            <i data-lucide="image-down" class="w-4 h-4"></i> 保存本月日历为图片
+                        </button>
+                    </div>
+                    <div class="min-w-[1000px] bg-white p-2 rounded-xl" id="calendar-export-target-${monthStr}">
+                        <div class="grid grid-cols-7 gap-px bg-slate-200 border border-slate-200 rounded-t-xl overflow-hidden shadow-sm">
+                            <div class="bg-slate-100 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">周一</div>
+                            <div class="bg-slate-100 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">周二</div>
+                            <div class="bg-slate-100 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">周三</div>
+                            <div class="bg-slate-100 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">周四</div>
+                            <div class="bg-slate-100 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wider">周五</div>
+                            <div class="bg-purple-100/80 py-3 text-center text-xs font-bold text-purple-700 uppercase tracking-wider">周六</div>
+                            <div class="bg-purple-100/80 py-3 text-center text-xs font-bold text-purple-700 uppercase tracking-wider">周日</div>
+                        </div>
+                        <div class="grid grid-cols-7 gap-px bg-slate-200 border-x border-b border-slate-200 rounded-b-xl overflow-hidden shadow-sm">
+                `;
+
+                for (let i = 0; i < firstDayIdx; i++) {
+                    calendarHtml += `<div class="bg-slate-50/30 min-h-[380px] p-2"></div>`;
+                }
+
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const currentCellDateStr = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                    const currentDayOfWeek = new Date(year, month - 1, day).getDay();
+                    const isWknd = currentDayOfWeek === 0 || currentDayOfWeek === 6;
+                    const bgClass = isWknd ? "bg-purple-50/30" : "bg-white";
+                    
+                    const dayEvents = mixedData.filter(row => {
+                        let rowDate = row.type === 'hotel' ? row.displayDate : row.data.d.split(' ')[0];
+                        return rowDate === currentCellDateStr;
+                    });
+
+                    let cellContent = ''; let cellAnomalies = new Set();
+                    
+                    if (dayEvents.length > 0) {
+                        dayEvents.sort(sortByTimeAsc);
+
+                        dayEvents.forEach(evt => {
+                            if (evt.data.anomalies && evt.data.anomalies.length > 0) evt.data.anomalies.forEach(a => cellAnomalies.add(a.text));
+                            
+                            const mgrLabel = `<span class="bg-slate-800 text-white px-1.5 py-0.5 rounded text-[10px] font-bold mr-1 shrink-0">${evt.data.m}</span>`;
+                            
+                            if (evt.type === 'attendance') {
+                                const parts = evt.data.d.split(' '); const timeOnly = parts.length > 1 ? parts[1].substring(0,5) : '--:--';
+                                cellContent += `
+                                <div class="flex flex-col gap-0.5 text-[11px] bg-slate-50 border border-slate-100 rounded p-1.5 mb-1.5 hover:bg-slate-100 transition cursor-default">
+                                    <div class="flex items-center text-cyan-700 font-bold mb-0.5">
+                                        ${mgrLabel} <span>🕒 ${timeOnly} 考勤</span>
+                                    </div>
+                                    <div class="text-slate-500 truncate text-[10px]" title="${evt.data.l}">${evt.data.l}</div>
+                                </div>`;
+                            } else if (evt.type === 'visit') {
+                                const parts = evt.data.d.split(' '); const timeOnly = parts.length > 1 ? parts[1].substring(0,5) : '--:--';
+                                cellContent += `
+                                <div class="flex flex-col gap-0.5 text-[12px] bg-emerald-50 border border-emerald-200 rounded p-1.5 mb-1.5 shadow-sm hover:shadow transition cursor-default">
+                                    <div class="flex items-center text-emerald-800 font-bold mb-0.5">
+                                        ${mgrLabel} <span>📍 ${timeOnly} 拜访</span>
+                                    </div>
+                                    <div class="font-bold text-emerald-900 truncate" title="${evt.data.c}">${evt.data.c}</div>
+                                    ${evt.data.l ? `<div class="text-emerald-700/80 truncate text-[10px]" title="${evt.data.l}">${evt.data.l}</div>` : ''}
+                                </div>`;
+                            } else {
+                                let borderClass = evt.data.isAnomaly ? "border-amber-200 bg-amber-50" : "border-indigo-100 bg-indigo-50";
+                                let textClass = evt.data.isAnomaly ? "text-amber-700" : "text-indigo-700";
+                                cellContent += `
+                                <div onclick="window.focusMapOnEvent(0, '${evt.data.m}', 'hotel', '${evt.data.city}')" class="flex flex-col gap-0.5 text-[11px] border ${borderClass} rounded p-1.5 mb-1.5 hover:shadow-md transition cursor-pointer">
+                                    <div class="flex items-center font-bold mb-0.5">
+                                        ${mgrLabel} <span class="${textClass}">🏨 住宿 (${evt.data.roomNights}晚)</span>
+                                    </div>
+                                    <div class="font-bold text-slate-800 truncate" title="${evt.data.hotel}">${evt.data.hotel}</div>
+                                </div>`;
+                            }
+                        });
+                        
+                        // 追加：日历模式下如果有记录且无业务，则追加无业务警示块
+                        const hasVisit = dayEvents.some(e => e.type === 'visit');
+                        if (!hasVisit) {
+                            cellContent += `
+                            <div class="flex flex-col gap-0.5 text-[11px] bg-rose-50/50 border border-rose-200/60 rounded p-1.5 mb-1.5 cursor-default mt-1">
+                                <div class="font-bold text-rose-600 text-center">❌ 当日无业务活动记录</div>
+                            </div>`;
+                        }
+                    }
+
+                    let anomalyFooter = '';
+                    if (cellAnomalies.size > 0) {
+                        const aList = Array.from(cellAnomalies).join('&#10;• ');
+                        anomalyFooter = `
+                        <div class="mt-auto pt-1.5 border-t border-rose-200/60 shrink-0 cursor-help" title="异常明细:&#10;• ${aList.replace(/<[^>]*>?/gm, '')}">
+                            <div class="bg-rose-50 border border-rose-200 text-rose-600 text-[10px] font-bold py-1 px-1.5 rounded flex items-center justify-center gap-1 shadow-sm">
+                                🚨 发现 ${cellAnomalies.size} 项违规
+                            </div>
+                        </div>`;
+                    }
+
+                    calendarHtml += `
+                    <div class="${bgClass} h-[380px] p-2 flex flex-col hover:bg-slate-50 transition relative group">
+                        <div class="flex justify-between items-center mb-2 pb-1 border-b border-slate-100/80 shrink-0">
+                            <span class="font-black text-sm ${isWknd ? 'text-purple-700' : 'text-slate-700'}">${month}/${day}</span>
+                            <span class="text-[9px] text-slate-400 font-semibold">${dayEvents.length} 条记录</span>
+                        </div>
+                        <div class="flex flex-col flex-grow overflow-y-auto pr-1 custom-scrollbar mb-1 space-y-1">
+                            ${cellContent}
+                        </div>
+                        ${anomalyFooter}
+                    </div>`;
+                }
+                
+                const totalCells = firstDayIdx + daysInMonth;
+                const remainingCells = (7 - (totalCells % 7)) % 7;
+                for (let i = 0; i < remainingCells; i++) {
+                    calendarHtml += `<div class="bg-slate-50/30 h-[380px] p-2"></div>`;
+                }
+
+                calendarHtml += `
+                        </div>
+                    </div>
+                </div>`;
+            });
+
+            tlContainer.innerHTML = calendarHtml;
+            lucide.createIcons();
+        }
+
+        // ==========================
+        // 6. CSV导入与解析 (增强行政区域解析)
+        // ==========================
+        function handleMultiFileUpload(event) {
+            const inputElement = event.target; const files = Array.from(inputElement.files);
+            if (files.length === 0) return;
+
+            let processedCount = 0; let batchPoints = []; let batchHotels = [];
+            const btnText = document.getElementById('importBtnText'); const originalText = btnText.innerText;
+            btnText.innerText = "⏳ 解析中...";
+
+            files.forEach(file => {
+                Papa.parse(file, {
+                    header: true, skipEmptyLines: true,
+                    complete: function(res) {
+                        if (res.data && res.data.length > 0) {
+                            const headersStr = Object.keys(res.data[0]).join(',');
+                            const isHotel = headersStr.includes('入住') || headersStr.includes('酒店') || headersStr.includes('预订') || headersStr.includes('间夜');
+                            const isAttendance = headersStr.includes('考勤') || headersStr.includes('打卡结果') || headersStr.includes('异常打卡');
+                            
+                            if (isHotel) {
+                                res.data.forEach(r => {
+                                    const m = r['入住人'] || r['姓名']; const city = r['酒店城市'] || r['城市'];
+                                    const rawIn = r['入住日期'] || r['开始日期'] || r['预订日期']; const rawOut = r['离店日期'] || r['结束日期'];
+                                    const district = r['行政区域'] || r['区县'] || '';
+
+                                    if(m && city && rawIn) {
+                                        const normIn = formatStandardDate(rawIn); const normOut = formatStandardDate(rawOut) || normIn;
+                                        const inD = new Date(normIn.split(' ')[0].replace(/-/g, '/')); const outD = new Date(normOut.split(' ')[0].replace(/-/g, '/'));
+                                        const computedNights = Math.round((outD - inD) / (1000 * 60 * 60 * 24)) || 1;
+                                        
+                                        const rawNightsVal = r['间夜'] || r['间夜数'] || r['房间数'] || '';
+                                        const sanitizedNights = parseInt(String(rawNightsVal).replace(/[^0-9]/g, ''));
+                                        const finalNights = isNaN(sanitizedNights) ? computedNights : sanitizedNights;
+
+                                        batchHotels.push({ 
+                                            m: m.trim(), checkIn: normIn, checkOut: normOut, monthGroup: normIn.substring(0, 7), 
+                                            city: city.trim().replace("市",""), district: district.trim(), hotel: r['酒店名称']||'酒店', roomNights: finalNights, isMatched: false 
+                                        });
+                                    }
+                                });
+                            } else if (isAttendance) {
+                                res.data.forEach(r => {
+                                    const m = r['姓名']; const d = r['打卡时间'] || r['考勤时间']; const l = r['打卡地址'] || r['考勤地址']; 
+                                    const remark = r['打卡备注']; const result = r['打卡结果']; const reason = r['异常打卡原因'];
+                                    if(m && d && l && !d.includes('未打卡')) {
+                                        let latLng = null; const coordMatch = l.match(/经纬度:([\d\.]+),([\d\.]+)/);
+                                        if (coordMatch) latLng = [parseFloat(coordMatch[2]), parseFloat(coordMatch[1])];
+                                        batchPoints.push({ m: m.trim(), d: d.trim(), c: `${remark || '早晚考勤'}`, l: l.trim().replace(/\n.*/, ''), i: result || '', s: reason || '', type: 'attendance', exactCoords: latLng });
+                                    }
+                                });
+                            } else {
+                                res.data.forEach(r => {
+                                    const m = r['提交人'] || r['姓名']; const d = r['申请日期'] || r['签到时间'] || r['打卡时间'];
+                                    const c = r['客户名称'] || r['拜访客户'] || r['对象']; const l = r['店面签到'] || r['签到地址'] || r['签到定位地址'];
+                                    if(m && d && c && l) {
+                                        batchPoints.push({ m: m.trim(), d: d.trim(), c: c.trim(), l: l.trim(), i: r['存在问题']||'', s: r['建议和对策']||'', type: 'visit' });
+                                    }
+                                });
+                            }
+                        }
+
+                        processedCount++;
+                        if (processedCount === files.length) {
+                            setTimeout(() => { btnText.innerText = originalText; }, 500);
+                            if (batchPoints.length === 0 && batchHotels.length === 0) {
+                                alert("⚠️ 未能在选中的文件中提取到有效数据，请检查文件格式。");
+                            } else {
+                                finalizeImport(batchPoints, batchHotels);
+                            }
+                            inputElement.value = ''; 
+                        }
+                    }
+                });
+            });
+        }
+
+        function finalizeImport(points, hotels) {
+            if (hotels.length > 0) rawHotelDataSet = hotels; 
+            if (points.length > 0) processImportedDataset(points); 
+            else if (hotels.length > 0) {
+                if (parsedData.length > 0) auditDisplacements(parsedData);
+            }
+            
+            const months = extractGlobalMonths(); 
+            if (months.length > 0) {
+                if (activeMonths.length === 0) activeMonths = [months[months.length - 1]]; 
+                activeMonths = activeMonths.filter(m => months.includes(m));
+                if (activeMonths.length === 0) activeMonths = [months[months.length - 1]];
+                updateMonthSelector(months); refreshDashboard();
+            } else {
+                const noMonthPlaceholder = document.getElementById('noMonthPlaceholder');
+                if(noMonthPlaceholder) noMonthPlaceholder.innerText = "数据提取成功但无有效月份信息";
+            }
+        }
+
+        // 新增：日历视图导出图片功能
+        function exportCalendarImage(event, elementId, titleStr) {
+            const target = document.getElementById(elementId);
+            if (!target) return;
+            const btn = event.currentTarget;
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 生成中...`;
+            lucide.createIcons();
+            
+            setTimeout(() => {
+                html2canvas(target, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false }).then(canvas => {
+                    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                    const link = document.createElement('a');
+                    link.download = `时空审计日历视图_${titleStr}.jpg`;
+                    link.href = imgData;
+                    link.click();
+                    btn.innerHTML = originalHtml;
+                    lucide.createIcons();
+                }).catch(err => {
+                    console.error("生成失败: ", err); 
+                    alert("图片生成发生错误，请查看控制台。");
+                    btn.innerHTML = originalHtml;
+                    lucide.createIcons();
+                });
+            }, 300);
+        }
+
+        window.focusMapOnEvent = function(timestamp, manager, type, extraId) {
+            // 平滑滚动到顶部的地图区域
+            const mapElement = document.getElementById('map');
+            if (mapElement) {
+                mapElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            let matchedMarker = null; 
+            
+            if (type === 'hotel') {
+                hotelLayerGroup.eachLayer(layer => {
+                    if (layer._hotelGroup && layer._hotelGroup.m === manager && layer._hotelGroup.city === extraId) {
+                        matchedMarker = layer;
+                    }
+                });
+            } else {
+                const targetLayerGroup = type === 'attendance' ? attendanceLayerGroup : visitLayerGroup; 
+                targetLayerGroup.eachLayer(layer => { 
+                    if (layer._itemData && layer._itemData.parsedDate.getTime() === timestamp && layer._itemData.m === manager) {
+                        matchedMarker = layer; 
+                    }
+                }); 
+            }
+            
+            if (matchedMarker) { 
+                // 设置延时等滚动执行一小段后再进行地图中心放大，视觉更流畅
+                setTimeout(() => {
+                    map.setView(matchedMarker.getLatLng(), 13, { animate: true, duration: 1 }); 
+                    matchedMarker.openPopup(); 
+                }, 300);
+            }
+        };
+    </script>
+</body>
+</html>
