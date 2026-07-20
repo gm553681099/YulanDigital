@@ -552,12 +552,12 @@
             "来宾": [23.7242, 109.3842], "崇左": [22.4142, 107.3542], "海口": [20.0174, 110.3388],
             "三亚": [18.2524, 109.5123], "福州": [26.0745, 119.2965], "厦门": [24.4798, 118.0894],
             "泉州": [24.8742, 118.5893], "漳州": [24.5142, 117.6543], "莆田": [25.4342, 119.0123],
-            "成县": [33.7431, 105.7335], 
+            "三明": [26.2642, 117.6342], "南平": [26.6342, 118.1742], "龙岩": [25.0742, 117.0234],
+            "宁德": [26.6542, 119.5242], "福清": [25.7210, 119.3851], "成县": [33.7431, 105.7335], 
             "徽县": [33.7744, 106.0829], "武都": [33.3934, 104.9221], "陇南": [33.3934, 104.9221], 
             "两当": [33.9103, 106.3051], "康县": [33.3275, 105.5976], "密山": [45.5478, 131.8797], 
             "鸡西": [45.3000, 130.9700], "虎林": [45.7618, 132.9693], "鸡东": [45.2612, 131.1444],
-            "昭通": [27.3188, 103.7172], "永善": [28.2274, 103.6366], "万荣": [35.4138, 110.7878],
-            "粤西": [21.8500, 110.9200], "粤东": [23.5500, 116.3700]
+            "昭通": [27.3188, 103.7172], "永善": [28.2274, 103.6366], "万荣": [35.4138, 110.7878]
         };
 
         const CITY_TO_PROV = { "北京": "北京", "天津": "天津", "上海": "上海", "重庆": "重庆" };
@@ -628,22 +628,12 @@
             return { coords: null, isProvince: false };
         }
 
-        const PROVINCE_ADCODE = {
-            "北京": 110000, "天津": 120000, "河北": 130000, "山西": 140000, "内蒙": 150000, "内蒙古": 150000,
-            "辽宁": 210000, "吉林": 220000, "黑龙江": 230000, "上海": 310000, "江苏": 320000,
-            "浙江": 330000, "安徽": 340000, "福建": 350000, "江西": 360000, "山东": 370000,
-            "河南": 410000, "湖北": 420000, "湖南": 430000, "广东": 440000, "粤": 440000, "广西": 450000,
-            "海南": 460000, "重庆": 500000, "四川": 510000, "贵州": 520000, "云南": 530000,
-            "西藏": 540000, "陕西": 610000, "甘肃": 620000, "青海": 630000, "宁夏": 640000,
-            "新疆": 650000
-        };
-
         const MANAGER_REGIONS = {
             "刘媛媛": "北京、天津、内蒙、内蒙古", "董琥": "黑龙江、吉林、辽宁", "苑傲华": "河南、山东", "袁海亮": "湖北、湖南、江西",
             "王亚钊": "河北、山西", "黄祥明": "江苏、上海", "曾耸俊": "安徽、浙江", "刘文平": "全部",
-            "李曾灵": "西安、咸阳、汉中、安康、商洛、新疆、陕西", "冯广科": "榆林、延安、宝鸡、渭南、铜川、陕西",
-            "高承栋": "宁夏、甘肃、青海", "蓝俊": "云南、贵州、重庆", "王甜": "四川、西藏", "黄勇志": "粤西、广西、海南",
-            "伍海波": "深圳、福建、粤东", "谢健": "东莞", "刘伟": "全部",
+            "李曾灵": "西安、咸阳、汉中、安康、商洛、新疆、陕西", "冯广科": "榆林、延安、宝鸡、渭南、铜川、甘肃、陕西",
+            "高承栋": "宁夏、甘肃、青海", "蓝俊": "云南、贵州、重庆", "王甜": "四川、西藏", "黄勇志": "广东、粤、广西、海南",
+            "伍海波": "深圳、福建、广东、粤", "谢健": "东莞、广东、粤", "刘伟": "全部",
             "韩洋洋": "北京、天津、河北、山西、内蒙、内蒙古、黑龙江、吉林、辽宁", "肖帆": "湖北、湖南、江西、福建",
             "张娟": "陕西、甘肃、青海、宁夏、新疆", "陈明芳": "云南、贵州、四川、重庆、西藏", "周鹏": "上海、浙江、安徽",
             "徐俊飞": "上海、江苏、山东、河南", "谢镇旺": "广东、粤、广西、海南", "蔡志强": "全部",
@@ -658,24 +648,11 @@
         const DEFAULT_HOME_CITIES = { "刘媛媛": "北京", "袁海亮": "武汉", "王亚钊": "石家庄", "黄祥明": "南京", "刘文平": "北京", "李曾灵": "渭南", "高承栋": "白银", "蓝俊": "重庆", "王甜": "成都", "谢健": "东莞", "刘伟": "西安", "肖帆": "武汉", "张娟": "西安", "陈明芳": "成都", "周鹏": "杭州", "蔡志强": "佛山", "胡松": "广州", "王毅": "南充" };
 
         let rawHotelDataSet = []; let parsedData = [];
-        let map; let visitLayerGroup, attendanceLayerGroup, hotelLayerGroup, regionLayerGroup;
+        let map; let visitLayerGroup, attendanceLayerGroup, hotelLayerGroup;
         let activeMonths = []; let viewState = { visit: true, attendance: true, hotel: true, anomalyOnly: false };
         let playbackInterval = null; let playbackMarker = null; let currentlyPlayingManager = null;
 
         let filterScopeType = "all"; let selectedDeptId = null; let allowedUsersPool = []; let currentDetailView = 'table'; 
-
-        function stopTrajectoryPlayback() {
-            if (playbackInterval) {
-                clearInterval(playbackInterval);
-                playbackInterval = null;
-            }
-            if (playbackMarker && map) {
-                map.removeLayer(playbackMarker);
-                playbackMarker = null;
-            }
-            currentlyPlayingManager = null;
-            updatePlaybackButtons();
-        }
 
         // ==========================
         // 2. 系统配置与界面初始化
@@ -769,7 +746,6 @@
             map = L.map('map', { center: [35, 105], zoom: 4, attributionControl: false });
             L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}', { subdomains: ["1", "2", "3", "4"], maxZoom: 18 }).addTo(map);
             visitLayerGroup = L.layerGroup().addTo(map); attendanceLayerGroup = L.layerGroup().addTo(map); hotelLayerGroup = L.layerGroup().addTo(map);
-            regionLayerGroup = L.layerGroup().addTo(map);
         }
 
         function updateFilter(type, value) {
@@ -793,14 +769,20 @@
                 }
             }
 
-            stopTrajectoryPlayback();
+            if (playbackInterval) {
+                clearInterval(playbackInterval);
+                if (playbackMarker) map.removeLayer(playbackMarker);
+                playbackInterval = null;
+                currentlyPlayingManager = null;
+                updatePlaybackButtons();
+            }
 
             refreshDashboardViewsOnly();
         }
 
-        function selectDeptFilter(deptId, usersArr) { stopTrajectoryPlayback(); filterScopeType = "dept"; selectedDeptId = deptId; allowedUsersPool = usersArr; updateTreeDOMHighlight(); drawRegionsForUsers(usersArr); refreshDashboard(); }
-        function selectUserFilter(username) { stopTrajectoryPlayback(); filterScopeType = "user"; selectedDeptId = null; allowedUsersPool = [username]; updateTreeDOMHighlight(); drawRegionsForUsers([username]); refreshDashboard(); }
-        function clearTreeFilter() { stopTrajectoryPlayback(); filterScopeType = "all"; selectedDeptId = null; allowedUsersPool = []; updateTreeDOMHighlight(); if (regionLayerGroup) regionLayerGroup.clearLayers(); refreshDashboard(); }
+        function selectDeptFilter(deptId, usersArr) { filterScopeType = "dept"; selectedDeptId = deptId; allowedUsersPool = usersArr; updateTreeDOMHighlight(); refreshDashboard(); }
+        function selectUserFilter(username) { filterScopeType = "user"; selectedDeptId = null; allowedUsersPool = [username]; updateTreeDOMHighlight(); refreshDashboard(); }
+        function clearTreeFilter() { filterScopeType = "all"; selectedDeptId = null; allowedUsersPool = []; updateTreeDOMHighlight(); refreshDashboard(); }
 
         function updateTreeDOMHighlight() {
             document.querySelectorAll('.dept-node').forEach(n => n.className = "dept-node px-2.5 py-2 font-bold text-slate-700 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition");
@@ -1335,13 +1317,7 @@
                 if (allowedRegions !== "全部" && row.detectedCityName !== "未解析区域") {
                     const cityProv = resolveProvince(row.detectedCityName);
                     const allowedArr = allowedRegions.split(/[、,，]/);
-                    
-                    const isAllowed = allowedArr.some(reg => {
-                        // 增加对粤东、粤西这种非标准行政省市的智能映射匹配
-                        if (reg === '粤西' && ['湛江','茂名','阳江','云浮'].some(c => row.detectedCityName.includes(c))) return true;
-                        if (reg === '粤东' && ['汕头','潮州','揭阳','汕尾','梅州','惠州','河源'].some(c => row.detectedCityName.includes(c))) return true;
-                        return row.detectedCityName.includes(reg) || cityProv.includes(reg) || reg.includes(cityProv);
-                    });
+                    const isAllowed = allowedArr.some(reg => row.detectedCityName.includes(reg) || cityProv.includes(reg) || reg.includes(cityProv));
                     
                     if (!isAllowed && !row.detectedCityName.includes("东莞")) {
                         row.anomalies.push({ level: 'severe', text: `🚨 <b>超辖区业务：</b>检测到外勤打卡/定位城市【${row.detectedCityName}】非系统绑定的业务管辖片区（${allowedRegions}）。` });
@@ -1531,7 +1507,6 @@
         }
 
         function switchMonth(month) { 
-            stopTrajectoryPlayback();
             const idx = activeMonths.indexOf(month);
             if (idx > -1) { if (activeMonths.length > 1) activeMonths.splice(idx, 1); } else { activeMonths.push(month); }
             activeMonths.sort(); updateMonthSelector(extractGlobalMonths()); refreshDashboard(); 
@@ -1760,7 +1735,11 @@
 
         function toggleTrajectoryPlayback(manager) {
             if (currentlyPlayingManager === manager && playbackInterval) {
-                stopTrajectoryPlayback();
+                clearInterval(playbackInterval);
+                if (playbackMarker) map.removeLayer(playbackMarker);
+                playbackInterval = null;
+                currentlyPlayingManager = null;
+                updatePlaybackButtons();
                 return;
             }
             playTrajectory(manager);
@@ -1779,107 +1758,9 @@
             });
         }
 
-        function drawCircleForRegionMulti(reg, managersLabel, color, defaultRadius, drawToken) {
-            let coords = null;
-            let radius = defaultRadius;
-
-            // 1. 尝试匹配省份
-            for (const prov of PROVINCE_NAMES) {
-                if (prov.includes(reg) || reg.includes(prov)) {
-                    coords = PROVINCE_FALLBACK[prov];
-                    break;
-                }
-            }
-            if (!coords && (reg.includes("内蒙") || reg === "内蒙古")) coords = PROVINCE_FALLBACK["内蒙"];
-
-            // 2. 如果没匹配到省份，尝试匹配具体城市
-            if (!coords) {
-                for (const city in CITY_COORDINATES) {
-                    if (city.includes(reg) || reg.includes(city)) {
-                        coords = CITY_COORDINATES[city];
-                        // 粤东、粤西这种跨多个市的伪区域，把光晕半径扩大
-                        radius = (reg === '粤西' || reg === '粤东') ? 120000 : 60000; 
-                        break;
-                    }
-                }
-            }
-
-            if (coords && regionLayerGroup._drawToken === drawToken) {
-                L.circle(coords, {
-                    color: color,
-                    fillColor: color,
-                    fillOpacity: 0.1,
-                    weight: 2,
-                    dashArray: '6, 6',
-                    radius: radius
-                }).bindTooltip(`<div class="flex flex-col gap-1"><div class="flex items-center gap-1"><b>管辖区:</b> <span class="text-slate-600">${reg}</span></div><div class="text-[10px] text-slate-500 whitespace-normal max-w-[150px] leading-tight">负责人: ${managersLabel}</div></div>`, { permanent: false, direction: 'center', className: 'bg-white/90 border border-slate-200 shadow-sm text-[11px] text-slate-800 font-medium px-2 py-1 rounded' }).addTo(regionLayerGroup);
-            }
-        }
-
-        function drawRegionsForUsers(usersArr) {
-            if (!regionLayerGroup) return;
-            regionLayerGroup.clearLayers();
-            if (!usersArr || usersArr.length === 0) return;
-
-            let regionToUsers = {};
-            usersArr.forEach(manager => {
-                const regionsStr = MANAGER_REGIONS[manager];
-                if (!regionsStr || regionsStr === "全部") return;
-
-                const regions = [...new Set(regionsStr.split(/[、,，]/))];
-                regions.forEach(reg => {
-                    if (reg === "粤") reg = "广东";
-                    if (!regionToUsers[reg]) regionToUsers[reg] = [];
-                    regionToUsers[reg].push(manager);
-                });
-            });
-
-            // 记录当前正在绘制的批次，避免异步绘制发生重叠
-            const drawToken = Date.now().toString();
-            regionLayerGroup._drawToken = drawToken;
-
-            // 如果是单用户，使用他的专属颜色；如果是部门（多用户），使用靛蓝色
-            const isSingleUser = usersArr.length === 1;
-            const color = isSingleUser ? (MANAGER_COLORS[usersArr[0]] || '#3b82f6') : '#6366f1';
-
-            Object.keys(regionToUsers).forEach(reg => {
-                const managersLabel = regionToUsers[reg].join('，');
-                
-                if (PROVINCE_ADCODE[reg]) {
-                    // 如果是省级，获取真实多边形边界
-                    const adcode = PROVINCE_ADCODE[reg];
-                    fetch(`https://geo.datav.aliyun.com/areas_v3/bound/${adcode}.json`)
-                        .then(res => res.json())
-                        .then(data => {
-                            if (regionLayerGroup._drawToken !== drawToken) return;
-                            L.geoJSON(data, {
-                                style: {
-                                    color: color,
-                                    weight: 2.5,
-                                    opacity: 0.75,
-                                    fillColor: color,
-                                    fillOpacity: 0.15,
-                                    dashArray: '4, 4'
-                                }
-                            }).bindTooltip(`<div class="flex flex-col gap-1"><div class="flex items-center gap-1"><b>管辖省区:</b> <span class="text-slate-600 font-bold">${reg}</span></div><div class="text-[10px] text-slate-500 whitespace-normal max-w-[150px] leading-tight">负责人: ${managersLabel}</div></div>`, { 
-                                permanent: false, 
-                                direction: 'auto', 
-                                className: 'bg-white/90 border border-slate-200 shadow-sm text-[12px] text-slate-800 font-medium px-3 py-1.5 rounded-lg z-50' 
-                            }).addTo(regionLayerGroup);
-                        })
-                        .catch(err => {
-                            console.error("加载省份边界数据失败，降级为圆形展示:", err);
-                            drawCircleForRegionMulti(reg, managersLabel, color, 250000, drawToken);
-                        });
-                } else {
-                    // 如果是市级或县级，使用圆形示意以确保精确度并节约性能
-                    drawCircleForRegionMulti(reg, managersLabel, color, 60000, drawToken);
-                }
-            });
-        }
-
         function playTrajectory(manager) {
-            stopTrajectoryPlayback();
+            if (playbackInterval) clearInterval(playbackInterval);
+            if (playbackMarker) map.removeLayer(playbackMarker);
             
             currentlyPlayingManager = manager;
             updatePlaybackButtons();
@@ -1905,8 +1786,10 @@
             let step = 0;
             playbackInterval = setInterval(() => {
                 if (step >= sortedPoints.length) { 
-                    stopTrajectoryPlayback();
-                    if (regionLayerGroup) regionLayerGroup.clearLayers();
+                    clearInterval(playbackInterval); 
+                    playbackInterval = null;
+                    currentlyPlayingManager = null;
+                    updatePlaybackButtons();
                     return; 
                 }
                 const item = sortedPoints[step]; playbackMarker.setLatLng(item.coords);
@@ -2488,7 +2371,6 @@
         }
 
         function finalizeImport(points, hotels) {
-            stopTrajectoryPlayback();
             if (hotels.length > 0) rawHotelDataSet = hotels; 
             if (points.length > 0) processImportedDataset(points); 
             else if (hotels.length > 0) {
