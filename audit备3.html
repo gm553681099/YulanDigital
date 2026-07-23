@@ -80,7 +80,7 @@
                         <i data-lucide="git-merge" class="w-4 h-4 text-indigo-600"></i>
                         级联树形组织选择器
                     </h3>
-                    <button id="clearTreeBtn" onclick="clearTreeFilter()" class="text-[11px] text-blue-600 hover:underline font-medium">查看全公司</button>
+                    <button onclick="clearTreeFilter()" class="text-[11px] text-blue-600 hover:underline font-medium">查看全公司</button>
                 </div>
                 
                 <div class="overflow-y-auto space-y-2 text-xs pr-1" id="orgTreeContainer">
@@ -440,29 +440,6 @@
         </div>
     </div>
 
-    <!-- 密码鉴权 Modal -->
-    <div id="passwordModal" class="fixed inset-0 bg-slate-900/80 z-[99999] hidden flex items-center justify-center backdrop-blur-sm">
-        <div class="bg-white rounded-2xl shadow-2xl w-[400px] max-w-[95%] flex flex-col overflow-hidden">
-            <div class="p-6 border-b border-slate-100 bg-slate-50 flex flex-col items-center justify-center text-center">
-                <div class="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-3 shadow-inner">
-                    <i data-lucide="check-circle-2" class="w-7 h-7"></i>
-                </div>
-                <h3 class="font-bold text-slate-800 text-xl">数据导入成功</h3>
-                <p class="text-xs text-slate-500 mt-2 leading-relaxed">系统已完成时空轨迹深度解析。<br>请输入您的专属密码以解锁对应管辖权限的数据报表。</p>
-            </div>
-            <div class="p-6 flex flex-col gap-4">
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-2">访问授权码</label>
-                    <input type="password" id="authPasswordInput" class="w-full border border-slate-300 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition text-center tracking-[0.2em] font-mono text-lg shadow-inner" placeholder="请输入密码" onkeydown="if(event.key === 'Enter') submitPassword()">
-                </div>
-                <div id="authErrorMsg" class="text-xs text-rose-500 font-bold hidden text-center bg-rose-50 p-2 rounded-lg border border-rose-100">密码错误，请重新输入或联系管理员。</div>
-                <button onclick="submitPassword()" class="w-full bg-blue-600 text-white py-3.5 rounded-xl font-bold hover:bg-blue-700 transition shadow-md flex items-center justify-center gap-2 mt-1">
-                    <i data-lucide="unlock" class="w-4 h-4"></i> 验证并进入看板
-                </button>
-            </div>
-        </div>
-    </div>
-
     <script>
         // ==========================
         // 1. 底层字典、坐标引擎与参数配置
@@ -686,60 +663,7 @@
         let activeMonths = []; let viewState = { visit: true, attendance: true, hotel: true, anomalyOnly: false };
         let playbackInterval = null; let playbackMarker = null; let currentlyPlayingManager = null;
 
-        let currentDetailView = 'table'; 
-        
-        let currentAuthRole = null; // 新增：保存当前的鉴权角色
-
-        const PASSWORDS = {
-            'F8X2K9': { type: 'dept', id: 1, name: '营销一部', users: ['刘媛媛','董琥','苑傲华','袁海亮','王亚钊','黄祥明','曾耸俊'] },
-            'W4M7C3': { type: 'dept', id: 2, name: '营销二部', users: ['李曾灵','冯广科','高承栋','蓝俊','王甜','黄勇志','伍海波','谢健'] },
-            'P9N2H6': { type: 'dept', id: 3, name: '营销三部', users: ['韩洋洋','肖帆','张娟','陈明芳','周鹏','徐俊飞','谢镇旺','蔡志强'] },
-            'R5T8J4': { type: 'dept', id: 4, name: '营销四部', users: ['戴继锋','王毅','郑云峰','胡松'] },
-            'A3Q6V1': { type: 'all', id: 0, name: '全公司' }
-        };
-
-        function showPasswordModal() {
-            document.getElementById('passwordModal').classList.remove('hidden');
-            document.getElementById('authPasswordInput').value = '';
-            document.getElementById('authErrorMsg').classList.add('hidden');
-            setTimeout(() => document.getElementById('authPasswordInput').focus(), 100);
-            lucide.createIcons();
-        }
-
-        function submitPassword() {
-            const input = document.getElementById('authPasswordInput').value.trim();
-            const role = PASSWORDS[input];
-            
-            if (!role) {
-                document.getElementById('authErrorMsg').classList.remove('hidden');
-                return;
-            }
-            
-            currentAuthRole = role;
-            document.getElementById('passwordModal').classList.add('hidden');
-            applyRoleRestrictions(role);
-            refreshDashboard(); // 密码正确后才执行视图渲染，隐藏数据不被偷看
-        }
-
-        function applyRoleRestrictions(role) {
-            const treeContainer = document.getElementById('orgTreeContainer');
-            const deptDivs = treeContainer.querySelectorAll('.border.border-slate-100.rounded-lg.overflow-hidden');
-            const clearBtn = document.getElementById('clearTreeBtn');
-            
-            if (role.type === 'all') {
-                deptDivs.forEach(div => div.style.display = 'block');
-                if (clearBtn) clearBtn.style.display = 'block';
-                clearTreeFilter(); // 重置为全公司视图
-            } else {
-                deptDivs.forEach((div, index) => {
-                    if ((index + 1) === role.id) div.style.display = 'block';
-                    else div.style.display = 'none';
-                });
-                if (clearBtn) clearBtn.style.display = 'none';
-                // 强制锁定到该部门
-                selectDeptFilter(role.id, role.users);
-            }
-        }
+        let filterScopeType = "all"; let selectedDeptId = null; let allowedUsersPool = []; let currentDetailView = 'table'; 
 
         function stopTrajectoryPlayback() {
             if (playbackInterval) {
@@ -2577,15 +2501,7 @@
                 if (activeMonths.length === 0) activeMonths = [months[months.length - 1]]; 
                 activeMonths = activeMonths.filter(m => months.includes(m));
                 if (activeMonths.length === 0) activeMonths = [months[months.length - 1]];
-                updateMonthSelector(months); 
-                
-                // 拦截渲染逻辑：根据当前鉴权状态判断是否显示输入密码框
-                if (!currentAuthRole) {
-                    showPasswordModal();
-                } else {
-                    applyRoleRestrictions(currentAuthRole);
-                    refreshDashboard();
-                }
+                updateMonthSelector(months); refreshDashboard();
             } else {
                 const noMonthPlaceholder = document.getElementById('noMonthPlaceholder');
                 if(noMonthPlaceholder) noMonthPlaceholder.innerText = "数据提取成功但无有效月份信息";
