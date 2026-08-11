@@ -6,10 +6,10 @@
     <title>蜜乐涂料 (Miller Paint) - 智能库存补货系统</title>
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 React 核心库 -->
+    <!-- 【优化】引入 React 核心库 - 更换为高可用 CDN 并锁定稳定版本 18.3.1 -->
     <script crossorigin src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
     <script crossorigin src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
-    <!-- 引入 Babel -->
+    <!-- 【优化】引入 Babel - 更换为高可用 CDN 并锁定版本，消除首屏重定向延迟 -->
     <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
 </head>
 <body class="bg-slate-50 overflow-hidden">
@@ -39,6 +39,7 @@
         const IconTable = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="3" x2="21" y1="9" y2="9"/><line x1="3" x2="21" y1="15" y2="15"/><line x1="9" x2="9" y1="9" y2="21"/><line x1="15" x2="15" y1="9" y2="21"/></svg>;
         const IconAlertTriangle = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>;
         const IconTrendingUp = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>;
+        const IconArrowDown = ({ size = 12, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>;
         const IconPanelLeft = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><path d="M9 3v18"/></svg>;
         const IconCheckCircle = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>;
         const IconLayers = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>;
@@ -63,8 +64,7 @@
             basePeriod: 180,       
             endDate: new Date().toISOString().split('T')[0],
             overstockWarningDays: 270, 
-            deadStockDays: 720,
-            minDeadStockQty: 0         
+            deadStockDays: 720         
           };
           
           const [draftSettings, setDraftSettings] = useState(initialSettings);
@@ -75,6 +75,7 @@
           const [uploadError, setUploadError] = useState(''); 
           const [sortConfig, setSortConfig] = useState({ key: 'd', direction: 'desc' }); 
           const [showUserGuide, setShowUserGuide] = useState(false); 
+          const [showGuide, setShowGuide] = useState(false); 
           const [showAbcGuide, setShowAbcGuide] = useState(false);
           const [showAlgoSettings, setShowAlgoSettings] = useState(true); 
           const [parsedHeadersInfo, setParsedHeadersInfo] = useState(null);
@@ -255,7 +256,7 @@
               const buffer = event.target.result;
               const headerBytes = new Uint8Array(buffer).slice(0, 4);
               if ((headerBytes[0] === 0x50 && headerBytes[1] === 0x4B) || (headerBytes[0] === 0xD0 && headerBytes[1] === 0xCF)) {
-                  setUploadError('格式伪装拦截：这是被强行修改后缀名的 Excel 文件，系统拒绝解析乱码。请通过 Excel【另存为 CSV】后再导入。');
+                  setUploadError('格式伪装拦截：这是被强行修改后缀名的 Excel 文件，系统拒绝解析乱码。请老老实实通过 Excel【另存为 CSV】。');
                   setRawData([]); 
                   if (fileInputRef.current) fileInputRef.current.value = '';
                   return;
@@ -510,7 +511,6 @@
 
                 let promoAction = '-', promoLevel = 0;
                 if (item.currentStock === 0) { promoAction = '健康 (零库存)'; promoLevel = 0; } 
-                else if (appliedSettings.minDeadStockQty > 0 && item.currentStock <= appliedSettings.minDeadStockQty) { promoAction = '健康 (底仓保全)'; promoLevel = 0; }
                 else if (physicalCoverDays === Infinity) { promoAction = '无动销死库'; promoLevel = 2; } 
                 else if (physicalCoverDays > appliedSettings.deadStockDays) { promoAction = '重度积压'; promoLevel = 2; } 
                 else if (physicalCoverDays > appliedSettings.overstockWarningDays) { promoAction = '滞销预警'; promoLevel = 1; } 
@@ -724,46 +724,6 @@
             return { totalA, totalB, totalC, totalCapital, totalStock, totalItems: processedData.length, totalOverstockItems };
           }, [processedData]);
           
-          const tableSummary = useMemo(() => {
-            let totalD = 0, totalCurrentStock = 0, totalOnOrderStock = 0, totalAvailableStock = 0;
-            let totalRop = 0, totalTargetStock = 0, totalBasePurchase = 0, totalPadQty = 0;
-            let totalActualPurchase = 0, totalInitialCapital = 0;
-
-            sortedData.forEach(item => {
-              totalD += (item.d || 0);
-              totalCurrentStock += (item.currentStock || 0);
-              totalOnOrderStock += (item.onOrderStock || 0);
-              totalAvailableStock += (item.availableStock || 0);
-              if (!item.isExcludedQt) {
-                totalRop += (item.rop || 0);
-                totalTargetStock += (item.targetStock || 0);
-              }
-              totalBasePurchase += (item.basePurchase || 0);
-              totalPadQty += (item.padQty || 0);
-              totalActualPurchase += (item.actualPurchase || 0);
-              totalInitialCapital += (item.initialCapital || 0);
-            });
-
-            const overallPhysicalCover = totalD > 0 ? (totalCurrentStock / totalD) : (totalCurrentStock > 0 ? Infinity : 0);
-            const overallTotalCover = totalD > 0 ? (totalAvailableStock / totalD) : (totalAvailableStock > 0 ? Infinity : 0);
-
-            return {
-              count: sortedData.length,
-              totalD,
-              totalCurrentStock,
-              totalOnOrderStock,
-              totalAvailableStock,
-              overallPhysicalCover,
-              overallTotalCover,
-              totalRop,
-              totalTargetStock,
-              totalBasePurchase,
-              totalPadQty,
-              totalActualPurchase,
-              totalInitialCapital
-            };
-          }, [sortedData]);
-
           const dashboardData = useMemo(() => {
              let healthyFunds = 0, warningFunds = 0, deadFunds = 0;
              let healthyQty = 0, warningQty = 0, deadQty = 0;
@@ -898,7 +858,7 @@
 
             if (dataToExport.length === 0) { alert('当前没有符合条件的导出数据。'); return; }
 
-            const headers = ['涂料编号', '涂料名称', '规格', 'ABC分类', '核算销量', '日均销量', '现货库存', '现货可售天数', '采购在途量', '可用总库存', '总库可售天数', '库存健康状态', '预估单价', '目标水位(Target)', '警戒线(ROP)', '箱规(桶/箱)', '基础缺口(刚需)', '凑柜追加量', '最终采购量', '预计采购金额'];
+            const headers = ['涂料编号', '涂料名称', '规格', 'ABC分类', '核算销量', '日均需求', '当前公司库存', '实物周转天数', '采购在途', '可用总库存', '总库周转天数', '系统状态', '预估单价', '目标水位(Target)', '防断货红线(ROP)', '箱规(桶/箱)', '刚需数量', '凑柜补平量', '最终下单量(总额)', '预估采购资金'];
             const csvContent = [
               headers.join(','),
               ...dataToExport.map(item => {
@@ -1335,7 +1295,7 @@
                     <h3 className="text-[11px] font-bold text-rose-600 uppercase tracking-wider mb-2 flex items-center gap-1">
                         <IconTag size={12} /> 滞销清仓预警规则
                     </h3>
-                    <div className="grid grid-cols-2 gap-2 mb-2">
+                    <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block text-[11px] font-medium text-slate-700 mb-0.5 truncate">轻度积压天数</label>
                         <input type="number" name="overstockWarningDays" value={draftSettings.overstockWarningDays} onChange={handleSettingChange} className="w-full border border-slate-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-rose-400 outline-none" />
@@ -1344,13 +1304,6 @@
                         <label className="block text-[11px] font-medium text-slate-700 mb-0.5 truncate">死库红线天数</label>
                         <input type="number" name="deadStockDays" value={draftSettings.deadStockDays} onChange={handleSettingChange} className="w-full border border-slate-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-rose-400 outline-none" />
                       </div>
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-medium text-slate-700 mb-0.5 truncate" title="实际库存需大于此数量才判定为积压/死库。填0则与现在保持一致">
-                        最小预警件数 (0即不限)
-                      </label>
-                      <input type="number" name="minDeadStockQty" value={draftSettings.minDeadStockQty} onChange={handleSettingChange} min="0" className="w-full border border-slate-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-rose-400 outline-none font-bold text-slate-800" />
-                      <span className="text-[10px] text-slate-400 block mt-0.5">低于或等于此数量的保全底仓不触发积压告警</span>
                     </div>
                   </div>
                 </div>
@@ -1408,7 +1361,6 @@
                 </header>
 
                 <main className="flex-1 flex flex-col overflow-hidden relative">
-                  {}
                   {rawData.length === 0 ? (
                     <div className="h-full w-full flex flex-col items-center justify-center p-8 bg-slate-50 overflow-y-auto custom-scrollbar">
                         <div className="w-full max-w-4xl bg-white rounded-2xl shadow-sm border border-slate-200 p-8 md:p-12 text-slate-800">
@@ -1532,21 +1484,21 @@
                           <table className="w-full text-left border-collapse text-xs whitespace-nowrap">
                             <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
                               <tr>
-                                <SortableHeader label="涂料型号" sortKey="itemCode" title="涂料产品编号/SKU代码" />
-                                <SortableHeader label="名称与规格" sortKey="itemName" title="涂料品名与包装容量" />
-                                <SortableHeader label="ABC分类" sortKey="classLabel" title="A类畅销 / B类常规 / C类长尾" />
-                                <SortableHeader label="日均销量" sortKey="d" align="right" title="算法预估的每日销售需求量" />
-                                <SortableHeader label="现货库存" sortKey="currentStock" align="right" className="bg-slate-100 border-l border-slate-200 text-slate-700" title="仓库当前实际拥有的实物库存" />
-                                <SortableHeader label="现货可售天数" sortKey="physicalCoverDays" align="right" className="bg-slate-100 text-slate-700" title="仅按现货计算，预计还能卖多少天" />
-                                <SortableHeader label="采购在途量" sortKey="onOrderStock" align="right" className="bg-emerald-50 text-emerald-700 border-l border-emerald-100" title="已下单但在运送途中的数量" />
-                                <SortableHeader label="可用总库存" sortKey="availableStock" align="right" className="bg-blue-50 text-blue-900 border-l border-blue-100 font-bold" title="现货库存 + 采购在途量" />
-                                <SortableHeader label="总库可售天数" sortKey="totalCoverDays" align="right" className="bg-blue-50 text-blue-800" title="加上在途量后，预计总共还能卖多少天" />
-                                <SortableHeader label="库存健康状态" sortKey="promoLevel" align="center" className="bg-rose-50/50 border-l border-rose-100" title="标识健康流转、滞销预警还是无动销死库" />
-                                <SortableHeader label="警戒线 / 目标水位" sortKey="rop" align="right" className="bg-red-50 text-red-700 font-bold border-l border-red-100" title="触发补货警戒线(ROP) / 期望最高的备货目标" />
-                                <SortableHeader label="基础缺口(刚需)" sortKey="basePurchase" align="right" className="bg-purple-50 text-purple-800" title="达到目标水位所需的理论补货数量" />
-                                <SortableHeader label="凑柜追加量" sortKey="padQty" align="right" className="bg-purple-100/50 text-purple-600" title="为了凑满集装箱整柜额外分配的数量" />
-                                <SortableHeader label="最终采购量" sortKey="actualPurchase" align="right" className="bg-purple-100 text-purple-900 font-bold border-r border-purple-200" title="刚需量 + 凑柜追加量 (即实际下单数量)" />
-                                <SortableHeader label="预计采购金额" sortKey="initialCapital" align="right" className="bg-amber-50/30 text-amber-800" title="最终采购量 × 预估单价" />
+                                <SortableHeader label="涂料型号" sortKey="itemCode" />
+                                <SortableHeader label="名称与规格" sortKey="itemName" />
+                                <SortableHeader label="层级" sortKey="classLabel" />
+                                <SortableHeader label="日均发货" sortKey="d" align="right" />
+                                <SortableHeader label="公司库存" sortKey="currentStock" align="right" className="bg-slate-100 border-l border-slate-200 text-slate-700" />
+                                <SortableHeader label="实物周转" sortKey="physicalCoverDays" align="right" className="bg-slate-100 text-slate-700" />
+                                <SortableHeader label="采购在途" sortKey="onOrderStock" align="right" className="bg-emerald-50 text-emerald-700 border-l border-emerald-100" />
+                                <SortableHeader label="可用总库" sortKey="availableStock" align="right" className="bg-blue-50 text-blue-900 border-l border-blue-100 font-bold" />
+                                <SortableHeader label="总库周转" sortKey="totalCoverDays" align="right" className="bg-blue-50 text-blue-800" />
+                                <SortableHeader label="系统状态" sortKey="promoLevel" align="center" className="bg-rose-50/50 border-l border-rose-100" />
+                                <SortableHeader label="红线 / 目标位" sortKey="rop" align="right" className="bg-red-50 text-red-700 font-bold border-l border-red-100" />
+                                <SortableHeader label="刚需量" sortKey="basePurchase" align="right" className="bg-purple-50 text-purple-800" />
+                                <SortableHeader label="凑柜追加" sortKey="padQty" align="right" className="bg-purple-100/50 text-purple-600" />
+                                <SortableHeader label="最终下单" sortKey="actualPurchase" align="right" className="bg-purple-100 text-purple-900 font-bold border-r border-purple-200" />
+                                <SortableHeader label="预估资金" sortKey="initialCapital" align="right" className="bg-amber-50/30 text-amber-800" />
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -1569,7 +1521,7 @@
                                       {item.currentStock.toLocaleString()}
                                       {item.immediateRisk && <span className="ml-1 text-red-500 font-bold text-[10px]" title="实物库存已破红线，若无在途将断货!">(危)</span>}
                                   </td>
-                                  <td className={`py-2.5 px-2 text-right font-mono bg-slate-50/30 ${item.immediateRisk ? 'text-red-600 font-bold' : 'text-slate-700'}`}>
+                                  <td className={`py-2.5 px-2 text-right font-mono bg-slate-50/30 ${item.immediateRisk ? 'text-red-600 font-bold' : 'text-slate-500'}`}>
                                     {item.physicalCoverDays === Infinity ? '无动销' : Math.round(item.physicalCoverDays)}
                                   </td>
                                   <td className="py-2.5 px-2 text-right text-emerald-600 font-bold bg-emerald-50/30 border-l border-emerald-50">
@@ -1625,50 +1577,6 @@
                                 </tr>
                               ))}
                             </tbody>
-                            {}
-                            <tfoot className="bg-slate-100 sticky bottom-0 z-10 border-t-2 border-slate-300 font-bold shadow-[0_-2px_10px_rgba(0,0,0,0.08)]">
-                              <tr>
-                                <td className="py-2.5 px-2 text-slate-800 font-bold">汇总 ({tableSummary.count}款)</td>
-                                <td className="py-2.5 px-2"></td>
-                                <td className="py-2.5 px-2"></td>
-                                <td className="py-2.5 px-2 text-right font-bold text-slate-900">{tableSummary.totalD.toFixed(1)}</td>
-                                <td className="py-2.5 px-2 text-right font-bold text-slate-800 border-l border-slate-200 bg-slate-200/50">
-                                  {tableSummary.totalCurrentStock.toLocaleString()}
-                                </td>
-                                <td className="py-2.5 px-2 text-right font-bold font-mono text-slate-800 bg-slate-200/50">
-                                  {tableSummary.overallPhysicalCover === Infinity ? '无动销' : Math.round(tableSummary.overallPhysicalCover)}
-                                </td>
-                                <td className="py-2.5 px-2 text-right font-bold text-emerald-700 bg-emerald-100/50 border-l border-emerald-200">
-                                  {tableSummary.totalOnOrderStock > 0 ? tableSummary.totalOnOrderStock.toLocaleString() : '-'}
-                                </td>
-                                <td className="py-2.5 px-2 text-right font-bold text-blue-950 bg-blue-100/60 border-l border-blue-200 shadow-inner">
-                                  {tableSummary.totalAvailableStock.toLocaleString()}
-                                </td>
-                                <td className="py-2.5 px-2 text-right font-bold font-mono text-blue-900 bg-blue-100/40">
-                                  {tableSummary.overallTotalCover === Infinity ? '无动销' : Math.round(tableSummary.overallTotalCover)}
-                                </td>
-                                <td className="py-2.5 px-2 text-center text-slate-500 border-l border-rose-100">-</td>
-                                <td className="py-2.5 px-2 text-right font-bold text-rose-700 bg-rose-100/50 border-l border-rose-200 shadow-inner">
-                                  <div className="flex items-center justify-end gap-1.5">
-                                    <span>{tableSummary.totalRop.toLocaleString()}</span>
-                                    <span className="text-[11px] text-slate-400 font-normal">/</span>
-                                    <span className="text-slate-700 font-medium">{tableSummary.totalTargetStock.toLocaleString()}</span>
-                                  </div>
-                                </td>
-                                <td className="py-2.5 px-2 text-right font-bold text-purple-800 bg-purple-100/40 border-l border-purple-200">
-                                  {tableSummary.totalBasePurchase > 0 ? tableSummary.totalBasePurchase.toLocaleString() : '-'}
-                                </td>
-                                <td className="py-2.5 px-2 text-right font-bold text-purple-600 bg-purple-100/60">
-                                  {tableSummary.totalPadQty > 0 ? `+${tableSummary.totalPadQty.toLocaleString()}` : '-'}
-                                </td>
-                                <td className="py-2.5 px-2 text-right font-bold text-purple-950 bg-purple-200/80 border-r border-purple-300 shadow-sm">
-                                  {tableSummary.totalActualPurchase > 0 ? tableSummary.totalActualPurchase.toLocaleString() : '-'}
-                                </td>
-                                <td className="py-2.5 px-2 text-right font-mono font-bold text-amber-900 bg-amber-100/50">
-                                  {tableSummary.totalInitialCapital > 0 ? `¥${tableSummary.totalInitialCapital.toLocaleString(undefined, {maximumFractionDigits:0})}` : '-'}
-                                </td>
-                              </tr>
-                            </tfoot>
                           </table>
                           {sortedData.length === 0 && (
                             <div className="p-10 text-center flex flex-col items-center justify-center opacity-50">
